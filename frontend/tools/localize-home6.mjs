@@ -17,6 +17,7 @@ function replaceElement(id,content,required=true){
   const tag=html.slice(start,html.indexOf('>',start)+1);html=html.slice(0,start)+tag+'\n'+content+'\n</ul>'+html.slice(cursor);
 }
 
+
 function replaceDivContentsAfterId(id,className,content){
   const markerAt=html.indexOf(`id="${id}"`);if(markerAt<0)throw new Error(`${id} tapılmadı`);
   const classAt=html.indexOf(`class="${className}"`,markerAt);if(classAt<0)throw new Error(`${id} daxilində ${className} tapılmadı`);
