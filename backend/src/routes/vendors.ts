@@ -1,0 +1,94 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { pool, withTransaction } from '../db/pool.js';
+import { paginationMeta, paginationSchema } from '../core/pagination.js';
+import { slugify } from '../core/slug.js';
+import { actorOf, assertStoreScope } from '../core/scope.js';
+import { notFound } from '../core/errors.js';
+import { writeAudit } from '../core/audit.js';
+
+const vendorInput = z.object({
+  storeId: z.uuid(),
+  displayName: z.string().trim().min(2).max(160),
+  legalName: z.string().trim().min(2).max(200),
+  slug: z.string().trim().max(180).optional(),
+  taxId: z.string().trim().max(80).optional(),
+  email: z.email(),
+  phone: z.string().trim().max(40).optional(),
+  description: z.string().trim().max(5000).default(''),
+  commissionRate: z.number().min(0).max(100).default(0)
+});
+
+const vendorUpdate = vendorInput.partial().omit({ storeId: true }).extend({
+  status: z.enum(['pending', 'active', 'suspended', 'rejected']).optional()
+});
+
+export async function vendorRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/', { preHandler: app.requirePermission('vendors.read') }, async (request) => {
+    const query = paginationSchema.parse(request.query);
+    const actor = actorOf(request);
+    const params: unknown[] = [];
+    const conditions = ['v.deleted_at IS NULL'];
+    if (!actor.isSuperAdmin && actor.storeIds.length) {
+      params.push(actor.storeIds);
+      conditions.push(`v.store_id = ANY($${params.length}::uuid[])`);
+    }
+    if (query.search) {
+      params.push(`%${query.search}%`);
+      conditions.push(`(v.display_name ILIKE $${params.length} OR v.legal_name ILIKE $${params.length} OR v.email::text ILIKE $${params.length})`);
+    }
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`v.status::text = $${params.length}`);
+    }
+    params.push(query.limit, (query.page - 1) * query.limit);
+    const result = await pool.query(`
+      SELECT v.*, count(*) OVER()::int AS total_count
+      FROM vendors v WHERE ${conditions.join(' AND ')}
+      ORDER BY v.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+    const total = Number(result.rows[0]?.total_count ?? 0);
+    return { data: result.rows.map(({ total_count: _, ...row }) => row), meta: paginationMeta(query.page, query.limit, total) };
+  });
+
+  app.post('/', { preHandler: app.requirePermission('vendors.manage') }, async (request, reply) => {
+    const input = vendorInput.parse(request.body);
+    const actor = actorOf(request);
+    assertStoreScope(actor, input.storeId);
+    const result = await withTransaction(async (client) => {
+      const inserted = await client.query(`
+        INSERT INTO vendors (
+          store_id, display_name, legal_name, slug, tax_id, email, phone,
+          description, commission_rate, status
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING *
+      `, [input.storeId, input.displayName, input.legalName, input.slug ? slugify(input.slug) : slugify(input.displayName), input.taxId ?? null, input.email, input.phone ?? null, input.description, input.commissionRate]);
+      await writeAudit(client, { actorUserId: actor.userId, storeId: input.storeId, action: 'vendor.create', entityType: 'vendor', entityId: inserted.rows[0].id, afterData: inserted.rows[0], requestId: request.id });
+      return inserted.rows[0];
+    });
+    return reply.code(201).send({ data: result });
+  });
+
+  app.patch('/:id', { preHandler: app.requirePermission('vendors.manage') }, async (request) => {
+    const id = z.uuid().parse((request.params as { id: string }).id);
+    const input = vendorUpdate.parse(request.body);
+    const actor = actorOf(request);
+    const current = await pool.query('SELECT * FROM vendors WHERE id = $1 AND deleted_at IS NULL', [id]);
+    if (!current.rows[0]) throw notFound('Satıcı');
+    assertStoreScope(actor, current.rows[0].store_id);
+
+    const result = await withTransaction(async (client) => {
+      const updated = await client.query(`
+        UPDATE vendors SET
+          display_name = coalesce($2, display_name), legal_name = coalesce($3, legal_name),
+          slug = coalesce($4, slug), tax_id = coalesce($5, tax_id), email = coalesce($6, email),
+          phone = coalesce($7, phone), description = coalesce($8, description),
+          commission_rate = coalesce($9, commission_rate), status = coalesce($10::vendor_status, status),
+          approved_at = CASE WHEN $10 = 'active' AND approved_at IS NULL THEN now() ELSE approved_at END
+        WHERE id = $1 RETURNING *
+      `, [id, input.displayName ?? null, input.legalName ?? null, input.slug ? slugify(input.slug) : null, input.taxId ?? null, input.email ?? null, input.phone ?? null, input.description ?? null, input.commissionRate ?? null, input.status ?? null]);
+      await writeAudit(client, { actorUserId: actor.userId, storeId: current.rows[0].store_id, action: 'vendor.update', entityType: 'vendor', entityId: id, beforeData: current.rows[0], afterData: updated.rows[0], requestId: request.id });
+      return updated.rows[0];
+    });
+    return { data: result };
+  });
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Gündəlik Bakı",
+  "short_name": "Gündəlik Bakı",
+  "description": "Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#044bd9",
+  "icons": [
+    {
+      "src": "/assets/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

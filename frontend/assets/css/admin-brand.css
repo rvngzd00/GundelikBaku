@@ -1,0 +1,24 @@
+.login-brand-logo {
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+  margin-bottom: 28px;
+  padding: 7px 9px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.sidebar .brand {
+  display: block;
+  padding: 0 10px 22px;
+}
+
+.sidebar .brand img {
+  display: block;
+  width: 190px;
+  height: auto;
+  padding: 5px 7px;
+  background: #fff;
+  border-radius: 7px;
+}
