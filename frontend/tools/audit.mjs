@@ -92,6 +92,7 @@ const required = [
   ['main landmark', /<main\b[^>]*data-cms-region="main"/i.test(html)],
   ['Open Graph metadata', /property="og:title"/i.test(html)],
   ['structured data', /type="application\/ld\+json"/i.test(html)],
+  ['Gündəlik Bakı metadata and schema branding', /property="og:site_name" content="Gündəlik Bakı"/.test(html) && /"@type":"WebSite","name":"Gündəlik Bakı"/.test(html) && !/Daily\s+Baku/i.test(html)],
   ['Gündəlik Bakı logo', /assets\/brand\/gundelik-baki-logo-white\.png/i.test(html)],
   ['brand favicon', /assets\/brand\/favicon-32\.png/i.test(html)],
   ['language selectors removed', !/elementor-widget-et_language_switcher|class="current-lang"/i.test(html)],

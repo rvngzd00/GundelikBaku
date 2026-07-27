@@ -300,7 +300,7 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
     const campaigns = await pool.query(`SELECT c.*,v.display_name AS vendor_name FROM campaigns c LEFT JOIN vendors v ON v.id=c.vendor_id JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.status IN ('active','scheduled') AND c.ends_at>now() ORDER BY c.starts_at DESC`, [env.DEFAULT_STORE_CODE]);
     const section = navigationSections[2];
     const content = `${pageHero('AKTİV FÜRSƏTLƏR', 'Kampaniyalar', 'Günün təklifləri, mövsümi endirimlər və məhdud kampaniyaları bir yerdə izləyin.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container"><div class="page-campaign-grid">${renderCampaignCards(campaigns.rows) || emptyState('Aktiv kampaniya yoxdur','Yeni kampaniyalar tezliklə əlavə ediləcək.')}</div></div></section>`;
-    return sendHtml(reply, layout({ title: 'Kampaniyalar | Gündəlik Bakı', description: 'Gündəlik Bakı-da aktiv kampaniyalar, günün təklifləri və mövsümi endirimlər.', path: '/kampaniyalar/', active: 'kampaniyalar', schema: categorySchemas(section), content }));
+    return sendHtml(reply, layout({ title: 'Kampaniyalar | Gündəlik Bakı', description: 'Gündəlik Bakıda aktiv kampaniyalar, günün təklifləri və mövsümi endirimlər.', path: '/kampaniyalar/', active: 'kampaniyalar', schema: categorySchemas(section), content }));
   });
 
   app.get('/jurnal/', async (request, reply) => {

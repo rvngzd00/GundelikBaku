@@ -38,8 +38,14 @@ for (const path of [...paths].sort()) {
     continue;
   }
 
+  const contentType = response.headers.get('content-type') || '';
+  const body = contentType.includes('text/html') ? await response.text() : '';
+  if (body) {
+    if (/Daily\s+Baku/i.test(body)) failures.push(`Köhnə brend adı render olunur: ${path}`);
+    if (!body.includes('Gündəlik Bakı')) failures.push(`Gündəlik Bakı brendi yoxdur: ${path}`);
+  }
+
   if (categoryRoots.includes(path) || categoryPaths.includes(path)) {
-    const body = await response.text();
     const canonical = body.match(/<link rel="canonical" href="([^"]+)"/i)?.[1];
     if (!canonical || new URL(canonical, base).pathname !== new URL(path, base).pathname) failures.push(`Yanlış canonical: ${path}`);
     if (!body.includes('page-category-nav')) failures.push(`Dairə kateqoriya naviqasiyası yoxdur: ${path}`);

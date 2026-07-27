@@ -51,10 +51,20 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
   const app = await buildApp();
 
   try {
+    const home = await app.inject({ method: 'GET', url: '/' });
+    assert.equal(home.statusCode, 200);
+    assert.match(home.body, /<title>Gündəlik Bakı/);
+    assert.match(home.body, /property="og:site_name" content="Gündəlik Bakı"/);
+    assert.match(home.body, /"@type":"WebSite","name":"Gündəlik Bakı"/);
+    assert.doesNotMatch(home.body, /Daily\s+Baku/i);
+
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
     assert.equal(page.statusCode, 200);
     assert.match(page.headers['content-type'] ?? '', /^text\/html/);
     assert.match(page.body, /<h1>Bakı Club/);
+    assert.match(page.body, /property="og:site_name" content="Gündəlik Bakı"/);
+    assert.match(page.body, /"@type":"WebSite","name":"Gündəlik Bakı"/);
+    assert.doesNotMatch(page.body, /Daily\s+Baku/i);
     assert.match(page.body, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:3000\/baki-club\/">/);
     assert.match(page.body, /class="page-category-list"/);
     assert.match(page.body, /href="\/baki-club\/xal-qazanma\/"/);

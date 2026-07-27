@@ -119,7 +119,7 @@ async function seed(): Promise<void> {
         ON CONFLICT (store_id, slug) DO UPDATE
           SET name=EXCLUDED.name, description=EXCLUDED.description, position=EXCLUDED.position, status='active'
         RETURNING id
-      `, [storeId, name, slug, description, position, `${name} | Gündəlik Bakı`, `${description}. Gündəlik Bakı-da sərfəli seçimləri kəşf edin.`]);
+      `, [storeId, name, slug, description, position, `${name} | Gündəlik Bakı`, `${description}. Gündəlik Bakıda sərfəli seçimləri kəşf edin.`]);
       categoryIds.set(slug, result.rows[0]!.id);
     }
 
