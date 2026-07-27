@@ -39,7 +39,25 @@ jobs:
           ssh -i ~/.ssh/deploy_key "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" <<'EOF'
             set -e
             cd /var/www/dailybaku/app
+
             docker compose -f docker-compose.vps.yml --env-file .env up -d --build
+
+            echo "Waiting for app to become ready..."
+
+            for i in $(seq 1 40); do
+              if curl -fsS http://127.0.0.1:3001/api/v1/ready; then
+                echo
+                echo "App is ready."
+                docker compose -f docker-compose.vps.yml ps
+                exit 0
+              fi
+
+              echo "Attempt $i/40: app not ready yet..."
+              sleep 3
+            done
+
+            echo "App did not become ready in time. Showing logs:"
             docker compose -f docker-compose.vps.yml ps
-            curl -fsS http://127.0.0.1:3001/api/v1/ready
+            docker compose -f docker-compose.vps.yml logs app --tail=150
+            exit 1
           EOF
