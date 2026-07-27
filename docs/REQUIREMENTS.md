@@ -1,7 +1,7 @@
-# Daily Baku — təsdiqlənmiş məhsul tələbləri
+# Gündəlik Bakı — təsdiqlənmiş məhsul tələbləri
 
 Bu sənəd müştərinin təqdim etdiyi üç DOCX faylı və əlavə ekosistem brief-i
-əsasında hazırlanıb. Cari icra yalnız Daily Baku üçündür. TVSHOP və SEEMOORG
+əsasında hazırlanıb. Cari icra yalnız Gündəlik Bakı üçündür. TVSHOP və SEEMOORG
 storefront-ları yaradılmır; məlumat modeli gələcək ortaq commerce core-a
 qoşulmağa mane olmayacaq şəkildə `store_id` ilə ayrılır.
 

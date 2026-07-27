@@ -1,4 +1,4 @@
-# Daily Baku arxitekturası
+# Gündəlik Bakı arxitekturası
 
 ## Sərhədlər
 
@@ -26,9 +26,9 @@ AI consumer-ları sonradan outbox-dan ayrıca servisə çıxarıla bilər.
 
 ## Tenant modeli
 
-Daily Baku ilk `store`-dur. Məhsulun əsas məlumatı vendor-a aiddir, qiymət,
+Gündəlik Bakı ilk `store`-dur. Məhsulun əsas məlumatı vendor-a aiddir, qiymət,
 publish statusu və SEO təqdimatı `product_listings` vasitəsilə store-a bağlıdır.
-Beləliklə TVSHOP/SEEMOORG gələcəkdə əlavə olunanda Daily Baku kodu və məlumatı
+Beləliklə TVSHOP/SEEMOORG gələcəkdə əlavə olunanda Gündəlik Bakı kodu və məlumatı
 köçürülmür, sadəcə yeni store/listing yaranır.
 
 ## Authorization

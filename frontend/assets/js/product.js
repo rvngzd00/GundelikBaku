@@ -302,7 +302,7 @@
     const slug = encodeURIComponent(product.slug);
     const image = escapeAttribute(product.image || '/assets/wp-content/uploads/other-cat.webp');
     const sku = escapeHtml(product.sku || product.slug.toUpperCase());
-    const brand = escapeHtml(product.brand || product.vendor || 'Daily Baku');
+    const brand = escapeHtml(product.brand || product.vendor || 'Gündəlik Bakı');
     const price = money.format(Number(product.price || 0));
     return `<article class="db-product-card">
       <div class="db-product-media">

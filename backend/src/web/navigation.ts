@@ -30,7 +30,7 @@ export const navigationSections = [
     label: 'Mağaza',
     href: '/magaza/',
     image: `${categoryImages}/magaza.jpg`,
-    kicker: 'DAILY BAKU MAĞAZA',
+    kicker: 'GÜNDƏLİK BAKI MAĞAZA',
     description: 'Elektronika, ev, moda, gözəllik və digər kateqoriyalarda etibarlı satıcılardan seçilmiş məhsulları kəşf edin.',
     children: [
       { slug: 'elektronika', label: 'Elektronika', href: '/magaza/elektronika/', image: `${categoryImages}/magaza/elektronika.jpg`, description: 'Elektronika, rəqəmsal cihaz və gündəlik texnologiya məhsullarını müqayisə edin.' },
@@ -81,11 +81,11 @@ export const navigationSections = [
     label: 'Jurnal & Bloq',
     href: '/jurnal/',
     image: `${categoryImages}/jurnal.jpg`,
-    kicker: 'DAILY BAKU JURNAL',
+    kicker: 'GÜNDƏLİK BAKI JURNAL',
     description: 'Son jurnal buraxılışını, arxivi, brend hekayələrini və alış-veriş məsləhətlərini oxuyun.',
     children: [
-      { slug: 'son-buraxilis', label: 'Son Buraxılış (PDF)', href: '/jurnal/son-buraxilis/', image: `${categoryImages}/jurnal/son-buraxilis.jpg`, description: 'Daily Baku jurnalının ən son rəqəmsal buraxılışını və seçilmiş yazıları kəşf edin.' },
-      { slug: 'arxiv', label: 'Arxiv', href: '/jurnal/arxiv/', image: `${categoryImages}/jurnal/arxiv.jpg`, description: 'Daily Baku jurnalının əvvəlki buraxılış və məqalələrini tarix üzrə nəzərdən keçirin.' },
+      { slug: 'son-buraxilis', label: 'Son Buraxılış (PDF)', href: '/jurnal/son-buraxilis/', image: `${categoryImages}/jurnal/son-buraxilis.jpg`, description: 'Gündəlik Bakı jurnalının ən son rəqəmsal buraxılışını və seçilmiş yazıları kəşf edin.' },
+      { slug: 'arxiv', label: 'Arxiv', href: '/jurnal/arxiv/', image: `${categoryImages}/jurnal/arxiv.jpg`, description: 'Gündəlik Bakı jurnalının əvvəlki buraxılış və məqalələrini tarix üzrə nəzərdən keçirin.' },
       { slug: 'brend-hekayeleri', label: 'Brend Hekayələri', href: '/jurnal/brend-hekayeleri/', image: `${categoryImages}/jurnal/brend-hekayeleri.jpg`, description: 'Bakıda fəaliyyət göstərən brendlərin inkişaf, satış və yenilik hekayələrini oxuyun.' },
       { slug: 'alis-veris-meslehetleri', label: 'Alış-veriş Məsləhətləri', href: '/jurnal/alis-veris-meslehetleri/', image: `${categoryImages}/jurnal/alis-veris-meslehetleri.jpg`, description: 'Daha düzgün seçim və sərfəli alış-veriş üçün praktik bələdçi və məsləhətlər.' }
     ]
@@ -99,7 +99,7 @@ export const navigationSections = [
     kicker: 'LOYALLIQ PROQRAMI',
     description: 'QR skanları, kampaniyalar və alış-veriş vasitəsilə xal qazanın, hədiyyə və xüsusi fürsətlər əldə edin.',
     children: [
-      { slug: 'xal-qazanma', label: 'Xal Qazanma', href: '/baki-club/xal-qazanma/', image: `${categoryImages}/baki-club/xal-qazanma.jpg`, description: 'Daily Baku alış-verişləri, kampaniyaları və QR skanları ilə xal toplama qaydaları.' },
+      { slug: 'xal-qazanma', label: 'Xal Qazanma', href: '/baki-club/xal-qazanma/', image: `${categoryImages}/baki-club/xal-qazanma.jpg`, description: 'Gündəlik Bakı alış-verişləri, kampaniyaları və QR skanları ilə xal toplama qaydaları.' },
       { slug: 'hediyyeler', label: 'Hədiyyələr', href: '/baki-club/hediyyeler/', image: `${categoryImages}/baki-club/hediyyeler.jpg`, description: 'Topladığınız Bakı Club xalları ilə əldə edə biləcəyiniz hədiyyə və üstünlüklər.' },
       { slug: 'giveawayler', label: 'Giveawaylər', href: '/baki-club/giveawayler/', image: `${categoryImages}/baki-club/giveawayler.jpg`, description: 'Bakı Club üzvləri üçün keçirilən xüsusi giveaway və hədiyyə çəkilişləri.' },
       { slug: 'qr-idareetme', label: 'QR İdarəetmə', href: '/baki-club/qr-idareetme/', image: `${categoryImages}/baki-club/qr-idareetme.jpg`, description: 'QR kuponları, skan tarixçəsini, loyallıq xallarını və üstünlükləri bir mərkəzdən izləyin.' }
@@ -127,7 +127,7 @@ export const navigationSections = [
     href: '/biznes/',
     image: `${categoryImages}/biznes.jpg`,
     kicker: 'BİZNES ÜÇÜN',
-    description: 'Reklam, sponsorluq, brend vitrini və analitika həlləri ilə biznesinizi Daily Baku ekosistemində böyüdün.',
+    description: 'Reklam, sponsorluq, brend vitrini və analitika həlləri ilə biznesinizi Gündəlik Bakı ekosistemində böyüdün.',
     children: [
       { slug: 'reklam-ver', label: 'Reklam Ver', href: '/biznes/reklam-ver/', image: `${categoryImages}/biznes/reklam-ver.jpg`, description: 'Brendinizi hədəf auditoriyaya uyğun banner, jurnal və rəqəmsal reklamlarla tanıdın.' },
       { slug: 'sponsorluq', label: 'Sponsorluq', href: '/biznes/sponsorluq/', image: `${categoryImages}/biznes/sponsorluq.jpg`, description: 'Jurnal, tədbir, kampaniya və xüsusi layihələr üçün sponsorluq imkanlarını kəşf edin.' },

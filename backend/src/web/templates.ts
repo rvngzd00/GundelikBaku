@@ -66,7 +66,7 @@ export function productCard(product: ProductView): string {
     shortDescription: product.short_description
   });
   const detailUrl = `/mehsul/${encodeURIComponent(product.slug)}/`;
-  const brand = product.brand_name || product.vendor_name || 'Daily Baku';
+  const brand = product.brand_name || product.vendor_name || 'Gündəlik Bakı';
   const sku = product.sku || product.slug.split('-').slice(0, 3).join('-').toUpperCase();
   const compactMoney = (value: number) => `${new Intl.NumberFormat('az-AZ', { maximumFractionDigits: 0 }).format(value)} ₼`;
   const quickView = safeJson({
@@ -180,7 +180,7 @@ export function layout(options: LayoutOptions): string {
     ? (options.image.startsWith('http://') || options.image.startsWith('https://') ? options.image : `${origin}${options.image.startsWith('/') ? '' : '/'}${options.image}`)
     : `${origin}/assets/wp-content/uploads/revslider/slider-1/slider-back.webp`;
   const schemas = Array.isArray(options.schema) ? options.schema : options.schema ? [options.schema] : [];
-  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Daily Baku', url: origin, publisher: { '@type': 'Organization', name: 'Daily Baku', logo: { '@type': 'ImageObject', url: `${origin}/assets/brand/gundelik-baki-logo.png`, width: 1706, height: 526 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
+  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', logo: { '@type': 'ImageObject', url: `${origin}/assets/brand/gundelik-baki-logo.png`, width: 1706, height: 526 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
   const navigationHtml = navigationSections.map((section) => `<li class="page-navigation-item">
     <a href="${section.href}" aria-haspopup="true" aria-expanded="false"${options.active === section.key ? ' class="is-active-section"' : ''}${options.path === section.href ? ' aria-current="page"' : ''}><span>${escapeHtml(section.label)}</span><i class="page-nav-arrow" aria-hidden="true"></i></a>
     <ul class="page-submenu" aria-label="${escapeHtml(section.label)} alt kateqoriyaları">${section.children.map((child) => `<li><a href="${child.href}"${options.path === child.href ? ' aria-current="page"' : ''}>${escapeHtml(child.label)}</a></li>`).join('')}<li class="page-submenu-all"><a href="${section.href}">Hamısına bax <span aria-hidden="true">›</span></a></li></ul>
@@ -197,7 +197,7 @@ export function layout(options: LayoutOptions): string {
   <meta name="description" content="${escapeHtml(options.description)}">
   <meta name="robots" content="${escapeHtml(options.robots || 'index,follow,max-image-preview:large')}">
   <link rel="canonical" href="${escapeHtml(canonical)}">
-  <meta property="og:type" content="${options.ogType || 'website'}"><meta property="og:site_name" content="Daily Baku">
+  <meta property="og:type" content="${options.ogType || 'website'}"><meta property="og:site_name" content="Gündəlik Bakı">
   <meta property="og:title" content="${escapeHtml(options.title)}"><meta property="og:description" content="${escapeHtml(options.description)}">
   <meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:image" content="${escapeHtml(shareImage)}">
   <meta property="og:image:alt" content="${escapeHtml(options.title)}">
@@ -249,7 +249,7 @@ export function layout(options: LayoutOptions): string {
   <main id="main-content">${options.content}</main>
   <footer class="page-footer">
     <div class="page-container page-footer-main">
-      <div class="page-footer-brand"><img src="/assets/brand/gundelik-baki-logo-white.png" width="261" height="81" alt="Gündəlik Bakı"><p>Daily Baku şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Sosial şəbəkələr"><a class="facebook" href="/elaqe/" aria-label="Facebook"></a><a class="instagram" href="#" aria-label="Instagram"></a><a class="linkedin" href="#" aria-label="LinkedIn"></a><a class="telegram" href="#" aria-label="Telegram"></a><a class="twitter" href="#" aria-label="X"></a><a class="whatsapp" href="/elaqe/" aria-label="WhatsApp"></a></div></div>
+      <div class="page-footer-brand"><img src="/assets/brand/gundelik-baki-logo-white.png" width="261" height="81" alt="Gündəlik Bakı"><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Sosial şəbəkələr"><a class="facebook" href="/elaqe/" aria-label="Facebook"></a><a class="instagram" href="#" aria-label="Instagram"></a><a class="linkedin" href="#" aria-label="LinkedIn"></a><a class="telegram" href="#" aria-label="Telegram"></a><a class="twitter" href="#" aria-label="X"></a><a class="whatsapp" href="/elaqe/" aria-label="WhatsApp"></a></div></div>
       <div class="page-footer-links">
         <section><h2>Platforma haqqında</h2><a href="/haqqimizda/">Biz kimik</a><a href="/baki-club/">Bakı Club</a><a href="/biznes/">Biznes üçün</a></section>
         <section><h2>Müştəri dəstəyi</h2><a href="/faq/">Tez-tez verilən suallar</a><a href="/elaqe/">Əlaqə</a><a href="/catdirilma/">Çatdırılma siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma</a></section>
@@ -262,7 +262,7 @@ export function layout(options: LayoutOptions): string {
         <div><i class="page-shell-icon clock" aria-hidden="true"></i><span>Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00</span></div>
       </div>
     </div>
-    <div class="page-footer-bottom"><div class="page-container page-footer-legal"><p>Copyright © 2026 Daily Baku. Bütün hüquqlar qorunur.</p><nav aria-label="Hüquqi keçidlər"><a href="/mexfilik/">Məxfilik siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma siyasəti</a><a href="/istifade-sertleri/">İstifadə şərtləri</a></nav></div></div>
+    <div class="page-footer-bottom"><div class="page-container page-footer-legal"><p>Copyright © 2026 Gündəlik Bakı. Bütün hüquqlar qorunur.</p><nav aria-label="Hüquqi keçidlər"><a href="/mexfilik/">Məxfilik siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma siyasəti</a><a href="/istifade-sertleri/">İstifadə şərtləri</a></nav></div></div>
   </footer>
   <nav class="page-mobile-dashboard" aria-label="Mobil sürətli keçidlər">
     <a href="/hesabim/"><i class="page-shell-icon account" aria-hidden="true"></i><span>Hesab</span><b data-wishlist-count>0</b></a>

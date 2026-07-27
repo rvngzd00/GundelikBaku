@@ -1,4 +1,4 @@
-# Daily Baku frontend
+# Gündəlik Bakı frontend
 
 This folder contains the cleaned static **Home 6** export. The imported theme DOM,
 inline layout styles, slider configuration and theme scripts are intentionally kept

@@ -111,7 +111,7 @@
   function productResult(product, index, listId) {
     const price = Number(product.price || 0);
     const compareAt = Number(product.compare_at_price || 0);
-    const brand = product.brand_name || product.vendor_name || 'Daily Baku';
+    const brand = product.brand_name || product.vendor_name || 'Gündəlik Bakı';
     const meta = [brand, product.category_names].filter(Boolean).join(' · ');
     const payload = escapeHtml(JSON.stringify(productPayload(product)));
     return `<li id="${listId}-option-${index}" role="option" aria-selected="false" data-search-option>

@@ -34,7 +34,7 @@ const newsItems = [
   ['Endirim kampaniyasında ağıllı alış-verişin 7 qaydası', 'endirim-kampaniyasinda-agilli-alis-veris', 'Kampaniyalar', '2026-07-18', 'kampaniyalar/movsumi-endirimler.jpg'],
   ['Baku Pro Market: yerli satıcının rəqəmsal inkişaf hekayəsi', 'baku-pro-market-reqemsal-inkisaf-hekayesi', 'Brend hekayəsi', '2026-07-15', 'jurnal/brend-hekayeleri.jpg'],
   ['Yay fürsətlərini qaçırmamaq üçün praktik alış-veriş planı', 'yay-fursetleri-alis-veris-plani', 'Məsləhətlər', '2026-07-12', 'endirimler.jpg'],
-  ['Daily Baku jurnalının yeni rəqəmsal buraxılışı yayımlandı', 'daily-baku-yeni-reqemsal-buraxilis', 'Daily Baku jurnalı', '2026-07-10', 'jurnal/son-buraxilis.jpg'],
+  ['Gündəlik Bakı jurnalının yeni rəqəmsal buraxılışı yayımlandı', 'daily-baku-yeni-reqemsal-buraxilis', 'Gündəlik Bakı jurnalı', '2026-07-10', 'jurnal/son-buraxilis.jpg'],
   ['Yerli brendlər rəqəmsal vitrində necə fərqlənə bilər?', 'yerli-brendler-reqemsal-vitrin', 'Biznes', '2026-07-08', 'biznes/brend-vitrini.jpg'],
   ['Bakı Club üzvləri üçün yeni hədiyyə imkanları', 'baki-club-yeni-hediyyeler', 'Bakı Club', '2026-07-05', 'baki-club/giveawayler.jpg'],
   ['Ayın ən çox oxunan alış-veriş və şəhər hekayələri', 'ayin-en-cox-oxunan-hekayeleri', 'Arxiv', '2026-07-02', 'jurnal/arxiv.jpg']
@@ -173,7 +173,7 @@ function newsCard([title, slug, category, date, image]) {
 
 function newsSlider() {
   const dots = Array.from({ length: 6 }, (_, index) => `<button${index === 0 ? ' class="active"' : ''} type="button" role="tab" aria-selected="${index === 0}" aria-label="${index + 1}-ci xəbər mövqeyi" data-news-page="${index}"></button>`).join('');
-  return `<div class="db-news-viewport" tabindex="0" aria-label="Daily Baku yenilikləri slayderi"><div class="db-news-track">${newsItems.map(newsCard).join('\n')}</div></div>
+  return `<div class="db-news-viewport" tabindex="0" aria-label="Gündəlik Bakı yenilikləri slayderi"><div class="db-news-track">${newsItems.map(newsCard).join('\n')}</div></div>
 <div class="db-news-navigation" aria-label="Xəbər slayderi idarələri"><button type="button" data-news-prev aria-label="Əvvəlki xəbər" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" data-news-next aria-label="Növbəti xəbər"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
 <div class="db-news-pagination" role="tablist" aria-label="Xəbər mövqeləri">${dots}</div>
 <p class="db-news-status seo-page-title" role="status" aria-live="polite">İlk xəbər göstərilir</p>`;
@@ -247,4 +247,4 @@ function replaceNewsContainer() {
 replaceNewsContainer();
 
 await writeFile(file, html);
-console.log('Məhsul carouselləri, kateqoriyalı seçimlər və Daily Baku yenilikləri ilkin HTML-ə yerləşdirildi.');
+console.log('Məhsul carouselləri, kateqoriyalı seçimlər və Gündəlik Bakı yenilikləri ilkin HTML-ə yerləşdirildi.');

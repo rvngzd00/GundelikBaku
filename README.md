@@ -1,6 +1,6 @@
-# Daily Baku platforması
+# Gündəlik Bakı platforması
 
-Daily Baku üçün mövcud Home 6 görünüşünü saxlayan Azərbaycan dilli frontend və store/vendor scope-lu Node.js CMS platformasıdır. TVSHOP.AZ və SEEMOORG bu repository-də implementasiya edilməyib; yalnız gələcək inteqrasiya üçün store-aware sərhədlər nəzərə alınıb.
+Gündəlik Bakı üçün mövcud Home 6 görünüşünü saxlayan Azərbaycan dilli frontend və store/vendor scope-lu Node.js CMS platformasıdır. TVSHOP.AZ və SEEMOORG bu repository-də implementasiya edilməyib; yalnız gələcək inteqrasiya üçün store-aware sərhədlər nəzərə alınıb.
 
 ## Struktur
 

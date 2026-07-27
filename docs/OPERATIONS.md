@@ -1,4 +1,4 @@
-# Daily Baku production əməliyyatları
+# Gündəlik Bakı production əməliyyatları
 
 ## Buraxılış
 

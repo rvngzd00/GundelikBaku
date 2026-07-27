@@ -91,8 +91,8 @@ const footer=[['Platforma haqqında',[['Biz kimik','/haqqimizda/'],['Bakı Club'
 replaceElement('menu-footer-menu',footer.map(([title,links])=>`<li class="menu-item menu-item-has-children depth-0"><a class="mi-link"><span class="txt">${title}</span></a><ul class="sub-menu">${links.map(([label,href])=>`<li class="menu-item depth-1"><a href="${href}" class="mi-link"><span class="txt">${label}</span></a></li>`).join('')}</ul></li>`).join(''));
 
 const replacements=new Map([
- ['lang="en"','lang="az"'],['Toolz | Professional Tools & Equipment','Daily Baku — Endirim, Kupon, Reklam, Elan və Kampaniyalar'],
- ['Shop professional power tools, hand tools, measuring equipment and accessories from trusted brands, with expert support and dependable delivery.','Daily Baku — Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması. Oxu, skan et, qazan!'],
+ ['lang="en"','lang="az"'],['Toolz | Professional Tools & Equipment','Gündəlik Bakı — Endirim, Kupon, Reklam, Elan və Kampaniyalar'],
+ ['Shop professional power tools, hand tools, measuring equipment and accessories from trusted brands, with expert support and dependable delivery.','Gündəlik Bakı — Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması. Oxu, skan et, qazan!'],
  ['./assets/wp-content/uploads/logo-white-yellow.svg','./assets/brand/gundelik-baki-logo-white.png'],['title="Toolz"','title="Gündəlik Bakı"'],['alt="Toolz"','alt="Gündəlik Bakı"'],
  ['Hello Guest','Salam, qonaq'],['For better experience login','Daha yaxşı təcrübə üçün daxil olun'],['Navigation','Naviqasiya'],['Settings','Parametrlər'],['Settigns','Parametrlər'],
   ['Contact us','Əlaqə'],['Login','Daxil ol'],['My account','Hesabım'],['Compare','Müqayisə'],['Wishlist','Seçilmişlər'],
@@ -103,15 +103,15 @@ const replacements=new Map([
   ['Air Compressors','Hava kompressorları'],['Inflators','Şişirtmə cihazları'],['Cutting Tools','Kəsici alətlər'],['Drywall Tools','Təmir alətləri'],['Hammers & Mallets','Çəkiclər'],['Laser Levels','Lazer ölçü cihazları'],['Levels','Ölçü cihazları'],['Measuring Tools','Ölçmə alətləri'],['Temperature Meters','Temperatur ölçənlər'],['Machine Tools','Dəzgah avadanlığı'],['Marking Tools','İşarələmə alətləri'],['Other','Digər'],['Drills','Drellər'],['Grease Guns','Yağlama avadanlığı'],['Grinders','Cilalama avadanlığı'],['Impact Wrenches','Zərbəli açarlar'],['Nailers','Mismar tapançaları'],['Planers','Rəndələr'],['Ratchets','Açar dəstləri'],['Sanders','Zımpara cihazları'],['Saws','Mişarlar'],['Staplers','Steplerlər'],['Tool Services','Alət xidmətləri'],['Hand Tool Services','Əl aləti xidmətləri'],['Measuring & Marking','Ölçmə və işarələmə'],['Laser Level Services','Lazer ölçmə xidmətləri'],['Power Tool Services','Elektrik aləti xidmətləri'],['Drill Bits','Drel ucları'],
   ['Measuring','Ölçmə'],['Hammers &amp; Mallets','Çəkiclər'],['Measuring &amp; Marking','Ölçmə və işarələmə'],['Shop','Mağaza'],['now','indi'],['Air','Hava'],['Tools','Alətlər'],['Hand','Əl'],['Laser','Lazer'],['Power','Elektrik'],['Grease','Yağlama'],['Guns','cihazları'],['Tool','Alət'],['Drill','Drel'],['Bits','ucları'],
   ['Chile','Çili'],['China','Çin'],['Germany','Almaniya'],['India','Hindistan'],['Italy','İtaliya'],['Japan','Yaponiya'],['Malaysia','Malayziya'],['Mexico','Meksika'],['Myanmar','Myanma'],['S. Korea','Cənubi Koreya'],['Switzerland','İsveçrə'],['Taiwan','Tayvan'],['Thailand','Tailand'],['United States','ABŞ'],['Vietnam','Vyetnam'],
-  ['NEW ITEMS','YENİ FÜRSƏTLƏR'],['Most popular products','Ən populyar seçimlər'],['THE MOST POPULAR PICKS IN:','ƏN ÇOX SEÇİLƏNLƏR:'],['PROFESSIONAL','KEYFİYYƏTLİ'],['EQUIPMENT','MƏHSULLAR'],['Top Offers','Ən yaxşı təkliflər'],['Spend $99','99 AZN xərclə'],['Get 25% Discount','25% endirim qazan'],['DISCOVER BRAND','BRENDİ KƏŞF ET'],['High performance power','Yüksək keyfiyyətli'],['tools.','məhsullar.'],['Stay Informed BIGXON World','Daily Baku yeniliklərini izlə'],['Latest offers, promos, product','Son təkliflər, kampaniyalar və'],['releases and industry news','şəhərin ən maraqlı xəbərləri'],['ONE TIME SPECIAL','XÜSUSİ MÜDDƏTLİ'],['DEALS','TƏKLİFLƏR'],['My cart','Səbətim'],['Order 5 items and get FREE Next Day Delivery!','5 məhsul sifariş et, növbəti gün pulsuz çatdırılma qazan!'],['Payment options','Ödəniş üsulları'],
+  ['NEW ITEMS','YENİ FÜRSƏTLƏR'],['Most popular products','Ən populyar seçimlər'],['THE MOST POPULAR PICKS IN:','ƏN ÇOX SEÇİLƏNLƏR:'],['PROFESSIONAL','KEYFİYYƏTLİ'],['EQUIPMENT','MƏHSULLAR'],['Top Offers','Ən yaxşı təkliflər'],['Spend $99','99 AZN xərclə'],['Get 25% Discount','25% endirim qazan'],['DISCOVER BRAND','BRENDİ KƏŞF ET'],['High performance power','Yüksək keyfiyyətli'],['tools.','məhsullar.'],['Stay Informed BIGXON World','Gündəlik Bakı yeniliklərini izlə'],['Latest offers, promos, product','Son təkliflər, kampaniyalar və'],['releases and industry news','şəhərin ən maraqlı xəbərləri'],['ONE TIME SPECIAL','XÜSUSİ MÜDDƏTLİ'],['DEALS','TƏKLİFLƏR'],['My cart','Səbətim'],['Order 5 items and get FREE Next Day Delivery!','5 məhsul sifariş et, növbəti gün pulsuz çatdırılma qazan!'],['Payment options','Ödəniş üsulları'],
   ['Monday - Friday: 9:00 - 20:00','Bazar ertəsi – Cümə: 09:00 – 18:00'],['Saturday: 10:00 - 15:00','Şənbə: 10:00 – 15:00'],
   ['Categories','Kateqoriyalar'],['Search','Axtarış'],['Cart','Səbət'],['Top','Yuxarı'],['Shop now','İndi kəşf et'],['View all','Hamısına bax'],
  ['Featured Products','Seçilmiş fürsətlər'],['Special offers &amp; discounts','Xüsusi təkliflər və endirimlər'],['Shop by ','Kəşf et: '],
  ['Air Tools','Elektronika'],['Electrical','Ev & Mətbəx'],['Hand Tools','Moda'],['Power Tools','Gözəllik & Sağlamlıq'],['Accessories','Xidmətlər'],
  ['Popular','Populyar'],['New','Yeni'],['Sale!','Endirim!'],['Account','Hesab'],['Dashboard','İdarə paneli'],['Orders','Sifarişlər'],['History','Tarixçə'],['Addresses','Ünvanlar'],['Catalog','Kataloq'],['Brands','Brendlər'],['Popular items','Populyar seçimlər'],['Useful','Faydalı'],['Career','Karyera'],['FAQ','Tez-tez verilən suallar'],['Features','İmkanlar'],
- ["With over 250+ branches nationwide\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tand 130,000 parts available Bigxon Tools\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tis the USA's number 1 supplier!",'Daily Baku şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.'],
+ ["With over 250+ branches nationwide\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tand 130,000 parts available Bigxon Tools\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tis the USA's number 1 supplier!",'Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.'],
  ['17 Antares Place, Mairangi Bay, Auckland\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t0632','Bakı şəhəri, Azərbaycan'],['833-474-8531','+994 12 000 00 00'],['Sales &amp; Service Support','Müştəri və biznes dəstəyi'],['Monday - Friday: 9:00 - 20:00<br>Saturday: 10:00 - 15:00','Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00'],
- ['Copyright © 2026 Bigxon. All Rights\n\t\t\t\t\t\t\t\t\t\t\t\tReserved','Copyright © 2026 Daily Baku. Bütün hüquqlar qorunur.'],['Privacy Policy','Məxfilik siyasəti'],['Refund and Returns\n\t\t\t\t\t\t\t\t\t\t\t\tPolicy','Geri qaytarma siyasəti'],['Terms of use','İstifadə şərtləri'],['current-lang">En','current-lang">AZ'],['>English<','>Azərbaycan dili<'],['>Deutsch<','>English<'],['>Français<','>Русский<']
+ ['Copyright © 2026 Bigxon. All Rights\n\t\t\t\t\t\t\t\t\t\t\t\tReserved','Copyright © 2026 Gündəlik Bakı. Bütün hüquqlar qorunur.'],['Privacy Policy','Məxfilik siyasəti'],['Refund and Returns\n\t\t\t\t\t\t\t\t\t\t\t\tPolicy','Geri qaytarma siyasəti'],['Terms of use','İstifadə şərtləri'],['current-lang">En','current-lang">AZ'],['>English<','>Azərbaycan dili<'],['>Deutsch<','>English<'],['>Français<','>Русский<']
 ]);
 // Köhnə versiyada edilən ümumi əvəzləmələri əvvəlcə geri qaytarırıq. Bu addım
 // skriptin təkrar işə salınmasını təhlükəsiz edir və inline JS identifikatorlarını qoruyur.
@@ -119,16 +119,16 @@ for(const[from,to]of [...replacements].reverse())html=html.split(to).join(from);
 
 // Brand, SEO və struktur atributları mətn düyünü deyil, ona görə ayrıca idarə olunur.
 html=html.replace('<html lang="en">','<html lang="az">')
-  .replace(/<title>[^<]*<\/title>/,'<title>Daily Baku — Endirim, Kupon, Reklam, Elan və Kampaniyalar</title>')
-  .replace(/<meta name="description"\s+content="[^"]*">/,'<meta name="description" content="Daily Baku — Bakıda endirimlər, kuponlar, kampaniyalar, elanlar və rəqəmsal jurnal. Şəhərin fürsətlərini kəşf et. Oxu, skan et, qazan!">')
+  .replace(/<title>[^<]*<\/title>/,'<title>Gündəlik Bakı — Endirim, Kupon, Reklam, Elan və Kampaniyalar</title>')
+  .replace(/<meta name="description"\s+content="[^"]*">/,'<meta name="description" content="Gündəlik Bakı — Bakıda endirimlər, kuponlar, kampaniyalar, elanlar və rəqəmsal jurnal. Şəhərin fürsətlərini kəşf et. Oxu, skan et, qazan!">')
   .replaceAll('./assets/wp-content/uploads/logo-white-yellow.svg','./assets/brand/gundelik-baki-logo-white.png')
   .replaceAll('./assets/brand/daily-baku-logo.svg','./assets/brand/gundelik-baki-logo-white.png')
   .replaceAll('./assets/brand/gundelik-baki-logo.png','./assets/brand/gundelik-baki-logo-white.png')
   .replaceAll('title="Toolz"','title="Gündəlik Bakı"').replaceAll('alt="Toolz"','alt="Gündəlik Bakı"')
-  .replaceAll('content="Toolz"','content="Daily Baku"').replaceAll('data-site-name="Toolz"','data-site-name="Daily Baku"')
-  .replaceAll('content="Toolz | Professional Tools & Equipment"','content="Daily Baku — Endirim, Kupon və Kampaniyalar"')
+  .replaceAll('content="Toolz"','content="Gündəlik Bakı"').replaceAll('data-site-name="Toolz"','data-site-name="Gündəlik Bakı"')
+  .replaceAll('content="Toolz | Professional Tools & Equipment"','content="Gündəlik Bakı — Endirim, Kupon və Kampaniyalar"')
   .replaceAll('content="Professional tools, equipment and accessories from trusted brands."','content="Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması."')
-  .replace('"name":"Toolz","description":"Professional tools, equipment and accessories from trusted brands."','"name":"Daily Baku","description":"Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması."')
+  .replace('"name":"Toolz","description":"Professional tools, equipment and accessories from trusted brands."','"name":"Gündəlik Bakı","description":"Bakının endirim, kupon, kampaniya, elan və rəqəmsal jurnal platforması."')
   .replace(/<link rel="icon"[^>]*cropped-favicon\.webp[^>]*sizes="32x32"[^>]*>/, '<link rel="icon" type="image/png" href="./assets/brand/favicon-32.png" sizes="32x32">')
   .replace(/<link rel="icon"[^>]*cropped-favicon\.webp[^>]*sizes="192x192"[^>]*>/, '<link rel="icon" type="image/png" href="./assets/brand/icon-192.png" sizes="192x192">')
   .replace(/<link rel="apple-touch-icon"[^>]*cropped-favicon\.webp[^>]*>/, '<link rel="apple-touch-icon" href="./assets/brand/apple-touch-icon.png" sizes="180x180">')
@@ -143,11 +143,11 @@ html=html.replace(/>([^<]+)</g,(whole,text)=>{
   return `>${localized}<`;
 });
 html=html.replace(/__DB_PROTECTED_(\d+)__/g,(_whole,index)=>protectedBlocks[Number(index)]);
-html=html.replace(/With over 250\+ branches nationwide[\s\S]*?is the USA's number 1 supplier!/,'Daily Baku şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.')
+html=html.replace(/With over 250\+ branches nationwide[\s\S]*?is the USA's number 1 supplier!/,'Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.')
   .replace(/17 Antares Place, Mairangi Bay, Auckland\s+0632/,'Bakı şəhəri, Azərbaycan')
-  .replace(/Copyright © 2026 Bigxon\. All Rights\s+Reserved/,'Copyright © 2026 Daily Baku. Bütün hüquqlar qorunur.')
+  .replace(/Copyright © 2026 Bigxon\. All Rights\s+Reserved/,'Copyright © 2026 Gündəlik Bakı. Bütün hüquqlar qorunur.')
   .replace(/Refund and Returns\s+Policy/,'Geri qaytarma siyasəti')
-  .replace('Professional Tools & Equipment</h1>','Daily Baku — Şəhərin fürsətlər platforması</h1>')
+  .replace('Professional Tools & Equipment</h1>','Gündəlik Bakı — Şəhərin fürsətlər platforması</h1>')
   .replace('Skip to main content','Əsas məzmuna keç')
   .replaceAll('class="current-lang">En','class="current-lang">AZ')
   .replaceAll('>English</span>','>Azərbaycan dili</span>').replaceAll('>Deutsch</span>','>English</span>').replaceAll('>Français</span>','>Русский</span>')
@@ -158,7 +158,7 @@ html=html.replace(/With over 250\+ branches nationwide[\s\S]*?is the USA's numbe
   .replaceAll('/?wc-ajax=%%endpoint%%','/api/wp-compat?wc-ajax=%%endpoint%%')
   .replace('/?action=kirki-styles&amp;ver=4.0','./assets/css/kirki-styles.css')
   .replaceAll('platüçünması','platforması').replaceAll('Platüçünma','Platforma')
-  .replaceAll('High perüçünmance power','Yüksək keyfiyyətli').replaceAll('Stay Inüçünmed BIGXON World','Daily Baku yeniliklərini izlə')
+  .replaceAll('High perüçünmance power','Yüksək keyfiyyətli').replaceAll('Stay Inüçünmed BIGXON World','Gündəlik Bakı yeniliklərini izlə')
   .replaceAll('Accountım navigation','Hesab naviqasiyası').replaceAll('Mağaza by','Brendlərə görə alış-veriş')
   .replaceAll('Hava Alətlər','Elektronika').replaceAll('Əl Alətlər','Moda').replaceAll('Elektrik Alətlər','Gözəllik &amp; Sağlamlıq')
   .replace(/Mağaza\s+indi/g,'İndi kəşf et');

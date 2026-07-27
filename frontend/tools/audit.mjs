@@ -103,9 +103,9 @@ const required = [
   ['popular and top-picks sliders have 68 horizontal products', (html.match(/class="db-popular-card"/g) || []).length === 68],
   ['top-picks has four category sliders', (html.match(/data-top-picks-products/g) || []).length === 4 && (html.match(/class="db-top-picks-track"/g) || []).length === 4],
   ['top-picks category controls', /data-section-tab-title="Power Tools"/.test(html) && /data-section-tab-title="Hand Tools"/.test(html) && /data-section-tab-title="Air Tools"/.test(html) && /data-section-tab-title="Machine tools"/.test(html)],
-  ['Daily Baku news slider', /class="db-news-track"/.test(html) && /data-news-prev/.test(html) && /data-news-next/.test(html) && /class="db-news-pagination"/.test(html)],
-  ['Daily Baku news slider has eight cards', (html.match(/class="db-news-card"/g) || []).length === 8],
-  ['Daily Baku news cards have no hover actions', !/db-news-(?:actions?|wishlist|quick-view|whatsapp)/.test(html)],
+  ['Gündəlik Bakı news slider', /class="db-news-track"/.test(html) && /data-news-prev/.test(html) && /data-news-next/.test(html) && /class="db-news-pagination"/.test(html)],
+  ['Gündəlik Bakı news slider has eight cards', (html.match(/class="db-news-card"/g) || []).length === 8],
+  ['Gündəlik Bakı news cards have no hover actions', !/db-news-(?:actions?|wishlist|quick-view|whatsapp)/.test(html)],
   ['interactive sliders have 88 quick actions', (html.match(/data-quick-view=/g) || []).length === 88],
   ['interactive sliders have 88 WhatsApp actions', (html.match(/class="db-(?:product-action|popular-action) db-product-whatsapp"/g) || []).length === 88],
   ['featured compare action removed', !/db-product-compare|data-compare=/.test(html)]

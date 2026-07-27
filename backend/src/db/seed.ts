@@ -119,14 +119,14 @@ async function seed(): Promise<void> {
         ON CONFLICT (store_id, slug) DO UPDATE
           SET name=EXCLUDED.name, description=EXCLUDED.description, position=EXCLUDED.position, status='active'
         RETURNING id
-      `, [storeId, name, slug, description, position, `${name} | Daily Baku`, `${description}. Daily Baku-da sərfəli seçimləri kəşf edin.`]);
+      `, [storeId, name, slug, description, position, `${name} | Gündəlik Bakı`, `${description}. Gündəlik Bakı-da sərfəli seçimləri kəşf edin.`]);
       categoryIds.set(slug, result.rows[0]!.id);
     }
 
     const vendorResult = await client.query<{ id: string }>(`
       INSERT INTO vendors (store_id, display_name, legal_name, slug, email, phone, description, commission_rate, status, approved_at)
       VALUES ($1, 'Baku Pro Market', 'Baku Pro Market MMC', 'baku-pro-market', 'satis@bakupromarket.az', '+994 12 555 10 10',
-        'Daily Baku demo kataloqu üçün təsdiqlənmiş peşəkar alət satıcısı.', 12, 'active', now())
+        'Gündəlik Bakı demo kataloqu üçün təsdiqlənmiş peşəkar alət satıcısı.', 12, 'active', now())
       ON CONFLICT (store_id, slug) DO UPDATE SET
         display_name=EXCLUDED.display_name, legal_name=EXCLUDED.legal_name, description=EXCLUDED.description,
         commission_rate=EXCLUDED.commission_rate, status='active', approved_at=coalesce(vendors.approved_at, now())
@@ -152,7 +152,7 @@ async function seed(): Promise<void> {
           VALUES ($1, $2, $3, $4, 'active', $5, $6)
           ON CONFLICT (store_id, slug) DO UPDATE SET name=EXCLUDED.name, status='active'
           RETURNING id
-        `, [storeId, item.brand, item.brandSlug, `${item.brand} məhsullarının rəsmi demo vitrini.`, `${item.brand} məhsulları | Daily Baku`, `${item.brand} alətləri, qiymətlər və kampaniyalar.`]);
+        `, [storeId, item.brand, item.brandSlug, `${item.brand} məhsullarının rəsmi demo vitrini.`, `${item.brand} məhsulları | Gündəlik Bakı`, `${item.brand} alətləri, qiymətlər və kampaniyalar.`]);
         brandId = brandResult.rows[0]!.id;
         brandIds.set(item.brandSlug, brandId);
       }
@@ -183,7 +183,7 @@ async function seed(): Promise<void> {
           description=EXCLUDED.description, price=EXCLUDED.price, compare_at_price=EXCLUDED.compare_at_price,
           status='published', seo_title=EXCLUDED.seo_title, seo_description=EXCLUDED.seo_description,
           canonical_url=EXCLUDED.canonical_url, schema_data=EXCLUDED.schema_data, published_at=coalesce(product_listings.published_at, now())
-      `, [storeId, productId, item.title, item.slug, item.short, `${item.short} Məhsul stokdadır, təhlükəsiz sifariş və sürətli çatdırılma mümkündür.`, item.price, item.compareAt, `${item.title} — qiymət və sifariş`, `${item.title}. Xüsusiyyətləri, aktual qiyməti və Daily Baku kampaniyasını yoxlayın.`, `/mehsul/${item.slug}/`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Product', name: item.title, sku: item.sku, offers: { '@type': 'Offer', price: item.price, priceCurrency: 'AZN', availability: 'https://schema.org/InStock' } })]);
+      `, [storeId, productId, item.title, item.slug, item.short, `${item.short} Məhsul stokdadır, təhlükəsiz sifariş və sürətli çatdırılma mümkündür.`, item.price, item.compareAt, `${item.title} — qiymət və sifariş`, `${item.title}. Xüsusiyyətləri, aktual qiyməti və Gündəlik Bakı kampaniyasını yoxlayın.`, `/mehsul/${item.slug}/`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Product', name: item.title, sku: item.sku, offers: { '@type': 'Offer', price: item.price, priceCurrency: 'AZN', availability: 'https://schema.org/InStock' } })]);
 
       await client.query(`
         INSERT INTO product_categories (product_id, category_id, is_primary)
@@ -229,7 +229,7 @@ async function seed(): Promise<void> {
     await client.query(`
       INSERT INTO qr_codes (store_id, vendor_id, campaign_id, code, name, qr_type, target_url, per_user_limit,
         scan_count, starts_at, expires_at, status, rules, created_by)
-      VALUES ($1, $2, $3, 'DB-DEMO-CLUB', 'Daily Baku Club demo QR', 'store', $4, 3, 126,
+      VALUES ($1, $2, $3, 'DB-DEMO-CLUB', 'Gündəlik Bakı Club demo QR', 'store', $4, 3, 126,
         now() - interval '7 days', now() + interval '90 days', 'active', '{}', $5)
       ON CONFLICT (code) DO UPDATE SET status='active', expires_at=EXCLUDED.expires_at, target_url=EXCLUDED.target_url
     `, [storeId, vendorId, campaignResult.rows[0]!.id, `${env.PUBLIC_ORIGIN}/baki-club/`, userResult.rows[0]!.id]);
@@ -269,7 +269,7 @@ async function seed(): Promise<void> {
     const postCategoryResult = await client.query<{ id: string }>(`
       INSERT INTO post_categories (store_id, name, slug, description, seo_title, seo_description)
       VALUES ($1, 'Alış-veriş bələdçisi', 'alis-veris-beledcisi', 'Məhsul seçimi və sərfəli alış-veriş üçün faydalı bələdçilər.',
-        'Alış-veriş bələdçisi | Daily Baku', 'Məhsul seçimi, endirim və kampaniyalardan düzgün istifadə üçün məsləhətlər.')
+        'Alış-veriş bələdçisi | Gündəlik Bakı', 'Məhsul seçimi, endirim və kampaniyalardan düzgün istifadə üçün məsləhətlər.')
       ON CONFLICT (store_id, slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description
       RETURNING id
     `, [storeId]);
@@ -312,7 +312,7 @@ async function seed(): Promise<void> {
           { type: 'heading', data: { text: 'Fiziki vitrindən rəqəmsal kataloqa' } },
           { type: 'paragraph', data: { text: 'Baku Pro Market məhsul məlumatlarını, stok və qiymətləri vahid CMS daxilində idarə edərək müştəriyə daha sürətli xidmət göstərməyə başladı.' } },
           { type: 'heading', data: { text: 'Ölçülə bilən kampaniyalar' } },
-          { type: 'paragraph', data: { text: 'Daily Baku kampaniya və QR analitikası hansı təkliflərin real satış yaratdığını izləməyə imkan verdi.' } }
+          { type: 'paragraph', data: { text: 'Gündəlik Bakı kampaniya və QR analitikası hansı təkliflərin real satış yaratdığını izləməyə imkan verdi.' } }
         ]
       },
       {
@@ -328,10 +328,10 @@ async function seed(): Promise<void> {
       },
       {
         type: 'news',
-        title: 'Daily Baku jurnalının yeni rəqəmsal buraxılışı yayımlandı',
+        title: 'Gündəlik Bakı jurnalının yeni rəqəmsal buraxılışı yayımlandı',
         slug: 'daily-baku-yeni-reqemsal-buraxilis',
         excerpt: 'Şəhər, alış-veriş və yerli brend hekayələri yeni rəqəmsal buraxılışda bir araya gəldi.',
-        keyword: 'Daily Baku jurnalı',
+        keyword: 'Gündəlik Bakı jurnalı',
         blocks: [
           { type: 'heading', data: { text: 'Yeni buraxılış artıq onlayndır' } },
           { type: 'paragraph', data: { text: 'Oxucular aktual şəhər yeniliklərini, alış-veriş bələdçilərini və yerli biznes hekayələrini vahid buraxılışda izləyə bilərlər.' } }
@@ -381,20 +381,20 @@ async function seed(): Promise<void> {
           content=EXCLUDED.content, status='published', seo_title=EXCLUDED.seo_title,
           seo_description=EXCLUDED.seo_description, deleted_at=NULL, published_at=coalesce(posts.published_at,now())
         RETURNING id
-      `, [storeId, postCategoryId, post.type, post.title, post.slug, post.excerpt, JSON.stringify(post.blocks), `${post.title} | Daily Baku`, `${post.excerpt} Daily Baku jurnalında ətraflı oxuyun.`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article', headline: post.title, keywords: post.keyword }), userResult.rows[0]!.id]);
+      `, [storeId, postCategoryId, post.type, post.title, post.slug, post.excerpt, JSON.stringify(post.blocks), `${post.title} | Gündəlik Bakı`, `${post.excerpt} Gündəlik Bakı jurnalında ətraflı oxuyun.`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article', headline: post.title, keywords: post.keyword }), userResult.rows[0]!.id]);
       seededPostIds.push(result.rows[0]!.id);
     }
 
     const aboutPageResult = await client.query<{ id: string }>(`
       INSERT INTO pages (store_id, locale, title, slug, excerpt, content, template, status, seo_title,
         seo_description, robots_directive, schema_data, author_id, reviewed_by, published_at)
-      VALUES ($1, 'az-AZ', 'Daily Baku haqqında', 'haqqimizda', 'Daily Baku şəhərin rəqəmsal fürsətlər platformasıdır.', $2,
-        'about', 'published', 'Daily Baku haqqında', 'Daily Baku missiyası, platformanın imkanları və şəhər ekosistemi.',
+      VALUES ($1, 'az-AZ', 'Gündəlik Bakı haqqında', 'haqqimizda', 'Gündəlik Bakı şəhərin rəqəmsal fürsətlər platformasıdır.', $2,
+        'about', 'published', 'Gündəlik Bakı haqqında', 'Gündəlik Bakı missiyası, platformanın imkanları və şəhər ekosistemi.',
         'index,follow', $3, $4, $4, now())
       ON CONFLICT (store_id, locale, slug) DO UPDATE SET content=EXCLUDED.content, status='published',
         seo_title=EXCLUDED.seo_title, seo_description=EXCLUDED.seo_description, deleted_at=NULL
       RETURNING id
-    `, [storeId, JSON.stringify([{ type: 'heading', data: { text: 'Şəhərin fürsətlərini birləşdiririk' } }, { type: 'paragraph', data: { text: 'Daily Baku istifadəçiləri etibarlı biznes, məhsul, kampaniya və faydalı kontentlə əlaqələndirir.' } }]), JSON.stringify({ '@context': 'https://schema.org', '@type': 'AboutPage' }), userResult.rows[0]!.id]);
+    `, [storeId, JSON.stringify([{ type: 'heading', data: { text: 'Şəhərin fürsətlərini birləşdiririk' } }, { type: 'paragraph', data: { text: 'Gündəlik Bakı istifadəçiləri etibarlı biznes, məhsul, kampaniya və faydalı kontentlə əlaqələndirir.' } }]), JSON.stringify({ '@context': 'https://schema.org', '@type': 'AboutPage' }), userResult.rows[0]!.id]);
 
     const clusterResult = await client.query<{ id: string }>(`
       INSERT INTO seo_clusters (store_id, name, primary_keyword, search_intent, pillar_page_id, target_audience, status, created_by)
@@ -410,7 +410,7 @@ async function seed(): Promise<void> {
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (cluster_id, page_id, post_id) DO UPDATE SET target_keyword=EXCLUDED.target_keyword,
           supporting_keywords=EXCLUDED.supporting_keywords, planned_internal_links=EXCLUDED.planned_internal_links, position=EXCLUDED.position
-      `, [clusterResult.rows[0]!.id, postId, demoPosts[position]!.keyword, [`${demoPosts[position]!.keyword} Bakı`, 'Daily Baku'], JSON.stringify([{ anchor: 'Daily Baku mağaza', url: '/magaza/' }]), position]);
+      `, [clusterResult.rows[0]!.id, postId, demoPosts[position]!.keyword, [`${demoPosts[position]!.keyword} Bakı`, 'Gündəlik Bakı'], JSON.stringify([{ anchor: 'Gündəlik Bakı mağaza', url: '/magaza/' }]), position]);
     }
 
     const demoListings = [

@@ -85,7 +85,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await app.register(swagger, {
     openapi: {
-      info: { title: 'Daily Baku CMS API', version: '1.0.0' },
+      info: { title: 'Gündəlik Bakı CMS API', version: '1.0.0' },
       servers: [{ url: env.PUBLIC_ORIGIN }]
     }
   });

@@ -44,7 +44,7 @@ const demoNews = [
   ['Endirim kampaniyasında ağıllı alış-verişin 7 qaydası', 'endirim-kampaniyasinda-agilli-alis-veris', 'Kampaniyalar', '2026-07-18', 'kampaniyalar/movsumi-endirimler.jpg'],
   ['Baku Pro Market: yerli satıcının rəqəmsal inkişaf hekayəsi', 'baku-pro-market-reqemsal-inkisaf-hekayesi', 'Brend hekayəsi', '2026-07-15', 'jurnal/brend-hekayeleri.jpg'],
   ['Yay fürsətlərini qaçırmamaq üçün praktik alış-veriş planı', 'yay-fursetleri-alis-veris-plani', 'Məsləhətlər', '2026-07-12', 'endirimler.jpg'],
-  ['Daily Baku jurnalının yeni rəqəmsal buraxılışı yayımlandı', 'daily-baku-yeni-reqemsal-buraxilis', 'Daily Baku jurnalı', '2026-07-10', 'jurnal/son-buraxilis.jpg'],
+  ['Gündəlik Bakı jurnalının yeni rəqəmsal buraxılışı yayımlandı', 'daily-baku-yeni-reqemsal-buraxilis', 'Gündəlik Bakı jurnalı', '2026-07-10', 'jurnal/son-buraxilis.jpg'],
   ['Yerli brendlər rəqəmsal vitrində necə fərqlənə bilər?', 'yerli-brendler-reqemsal-vitrin', 'Biznes', '2026-07-08', 'biznes/brend-vitrini.jpg'],
   ['Bakı Club üzvləri üçün yeni hədiyyə imkanları', 'baki-club-yeni-hediyyeler', 'Bakı Club', '2026-07-05', 'baki-club/giveawayler.jpg'],
   ['Ayın ən çox oxunan alış-veriş və şəhər hekayələri', 'ayin-en-cox-oxunan-hekayeleri', 'Arxiv', '2026-07-02', 'jurnal/arxiv.jpg']
@@ -54,7 +54,7 @@ const demoNews = [
   category_name: categoryName,
   published_at: publishedAt,
   image_url: `/assets/images/categories/${image}`,
-  alt_text: `${title} — Daily Baku yeniliyi`
+  alt_text: `${title} — Gündəlik Bakı yeniliyi`
 }));
 
 const defaultWishlist = new Set([
@@ -98,7 +98,7 @@ function quickViewProduct(product, price, compareAt) {
     variantId: product.variant_id,
     slug: product.slug,
     title: product.title,
-    brand: product.brand_name || product.vendor_name || 'Daily Baku',
+    brand: product.brand_name || product.vendor_name || 'Gündəlik Bakı',
     vendor: product.vendor_name || '',
     sku: product.sku || product.slug.split('-').map((part) => part[0]).join('').toUpperCase().slice(0, 8),
     description: product.description || product.short_description || '',
@@ -118,7 +118,7 @@ function productCard(product, { featured = false, featuredIndex = 0 } = {}) {
   const discount = compareAt > price ? Math.round((1 - price / compareAt) * 100) : 0;
   const title = escapeHtml(product.title);
   const slug = escapeHtml(product.slug);
-  const brand = escapeHtml(product.brand_name || product.vendor_name || 'Daily Baku');
+  const brand = escapeHtml(product.brand_name || product.vendor_name || 'Gündəlik Bakı');
   const sku = escapeHtml(product.sku || product.slug.split('-').map((part) => part[0]).join('').toUpperCase().slice(0, 8));
   const image = safeImage(product.image_url);
   const cartItem = encodedJson({
@@ -203,7 +203,7 @@ function popularProductCard(product, index, variant = 'popular') {
   const compareAt = Number(product.compare_at_price || 0);
   const title = escapeHtml(product.title);
   const slug = escapeHtml(product.slug);
-  const brand = escapeHtml(product.brand_name || product.vendor_name || 'Daily Baku');
+  const brand = escapeHtml(product.brand_name || product.vendor_name || 'Gündəlik Bakı');
   const sku = escapeHtml(product.sku || product.slug.split('-').map((part) => part[0]).join('').toUpperCase().slice(0, 8));
   const image = safeImage(product.image_url);
   const cartItem = encodedJson({
@@ -307,9 +307,9 @@ function completeNewsSet(posts) {
         brand_story: 'Brend hekayəsi',
         news: 'Yeniliklər',
         sponsored: 'Tərəfdaş materialı'
-      })[post.post_type] || 'Daily Baku',
+      })[post.post_type] || 'Gündəlik Bakı',
       image_url: post.image_url || fallback?.image_url || demoNews[unique.size % demoNews.length].image_url,
-      alt_text: post.alt_text || fallback?.alt_text || `${post.title} — Daily Baku yeniliyi`
+      alt_text: post.alt_text || fallback?.alt_text || `${post.title} — Gündəlik Bakı yeniliyi`
     });
   });
   return [...unique.values()].slice(0, 8);
@@ -328,7 +328,7 @@ function newsDateParts(value) {
 function newsCard(post) {
   const title = escapeHtml(post.title);
   const slug = escapeHtml(post.slug);
-  const category = escapeHtml(post.category_name || 'Daily Baku');
+  const category = escapeHtml(post.category_name || 'Gündəlik Bakı');
   const image = safeImage(post.image_url);
   const date = newsDateParts(post.published_at);
   return `<article class="db-news-card">
@@ -345,7 +345,7 @@ function newsCard(post) {
 }
 
 function newsMarkup(posts) {
-  return `<div class="db-news-viewport" tabindex="0" aria-label="Daily Baku yenilikləri slayderi">
+  return `<div class="db-news-viewport" tabindex="0" aria-label="Gündəlik Bakı yenilikləri slayderi">
     <div class="db-news-track">${completeNewsSet(posts).map(newsCard).join('')}</div>
   </div>
   <div class="db-news-navigation" aria-label="Xəbər slayderi idarələri">

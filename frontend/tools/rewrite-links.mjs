@@ -37,4 +37,4 @@ html = html
   .replaceAll('href="#" class="et__button', 'href="/magaza/" class="et__button');
 
 await writeFile(file, html);
-console.log('Köhnə WordPress keçidləri real Daily Baku route-larına bağlandı.');
+console.log('Köhnə WordPress keçidləri real Gündəlik Bakı route-larına bağlandı.');

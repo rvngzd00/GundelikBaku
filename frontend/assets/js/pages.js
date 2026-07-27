@@ -351,7 +351,7 @@ function accountProductCard(item, { removable = false } = {}) {
     image: item.image || '/assets/wp-content/uploads/other-cat.webp'
   };
   const payload = escapeHtml(JSON.stringify(product));
-  const brand = item.brand || item.vendor || 'Daily Baku';
+  const brand = item.brand || item.vendor || 'Gündəlik Bakı';
   const sku = item.sku || String(item.slug || '').split('-').slice(0, 3).join('-').toUpperCase();
   const cartButton = item.slug
     ? `<button class="db-account-product-cart db-add-cart" type="button" data-add-cart="${payload}" aria-label="${escapeHtml(item.title)} səbətə əlavə et"><span class="db-cart-icon" aria-hidden="true"></span></button>`

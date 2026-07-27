@@ -168,7 +168,7 @@ function reviewList(reviews: ProductReviewView[]): string {
 
 export function renderProductDetail(options: ProductDetailOptions): string {
   const { product, related, categories } = options;
-  const brand = product.brand_name || product.vendor_name || 'Daily Baku';
+  const brand = product.brand_name || product.vendor_name || 'Gündəlik Bakı';
   const logo = brandLogo(brand);
   const rows = informationRows(product);
   const visibleRows = rows.slice(0, 5);
