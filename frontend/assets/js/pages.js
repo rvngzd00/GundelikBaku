@@ -35,7 +35,7 @@ function safeImageUrl(value) {
 }
 
 function whatsappUrl(title) {
-  return `https://wa.me/37499833889?text=${encodeURIComponent(`${title} haqqında məlumat almaq istəyirəm`)}`;
+  return `https://wa.me/994502645400?text=${encodeURIComponent(`${title} haqqında məlumat almaq istəyirəm`)}`;
 }
 
 function brandLogoUrl(brand = '') {
@@ -223,7 +223,7 @@ function checkoutForm(total) {
     <div class="page-section-title"><div><p>TƏHLÜKƏSİZ SİFARİŞ</p><h2>Çatdırılma məlumatları</h2></div></div>
     <div class="page-form-grid">
       <label>Ad və soyad<input name="customerName" autocomplete="name" minlength="2" maxlength="200" required></label>
-      <label>Telefon<input name="customerPhone" type="tel" autocomplete="tel" minlength="7" maxlength="40" placeholder="+994 50 000 00 00" required></label>
+      <label>Telefon<input name="customerPhone" type="tel" autocomplete="tel" minlength="7" maxlength="40" placeholder="+994 50 264 54 00" required></label>
       <label>E-poçt<input name="customerEmail" type="email" autocomplete="email" required></label>
       <label>Şəhər<input name="city" autocomplete="address-level2" value="Bakı" minlength="2" maxlength="120" required></label>
       <label class="page-form-wide">Ünvan<input name="addressLine1" autocomplete="street-address" minlength="5" maxlength="300" required></label>

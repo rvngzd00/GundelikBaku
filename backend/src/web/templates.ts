@@ -92,7 +92,7 @@ export function productCard(product: ProductView): string {
       <div class="db-product-actions" aria-label="Məhsul əməliyyatları">
         <button class="db-product-action db-product-wishlist" type="button" data-wishlist="${escapeHtml(product.slug)}" aria-label="Seçilmişlərə əlavə et" aria-pressed="false"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">Seçilmişlərə əlavə et</span></button>
         <button class="db-product-action db-product-quick-view" type="button" data-quick-view="${escapeHtml(quickView)}" aria-label="Sürətli baxış"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">Sürətli baxış</span></button>
-        <a class="db-product-action db-product-whatsapp" href="https://wa.me/37499833889?text=${whatsappMessage}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp ilə soruş"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">WhatsApp</span></a>
+        <a class="db-product-action db-product-whatsapp" href="https://wa.me/994502645400?text=${whatsappMessage}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp ilə soruş"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">WhatsApp</span></a>
       </div>
       <a href="${detailUrl}" aria-label="${escapeHtml(product.title)}">
         <img src="${escapeHtml(image)}" alt="${escapeHtml(product.alt_text || `${product.title} — məhsul şəkli`)}" width="420" height="390" loading="lazy" decoding="async" itemprop="image">
@@ -232,9 +232,9 @@ export function layout(options: LayoutOptions): string {
     <div class="page-container page-header-main">
       <a class="page-logo" href="/" aria-label="Gündəlik Bakı ana səhifə"><img src="/assets/brand/gundelik-baki-logo-white.png" width="220" height="68" alt="Gündəlik Bakı"></a>
       <form class="page-search" action="/magaza/" method="get" role="search" data-db-search><label class="sr-only" for="site-search">Məhsul axtarışı</label><i class="page-shell-icon search" aria-hidden="true"></i><input id="site-search" name="axtaris" type="search" placeholder="Nə axtarırsınız?"><button>Axtarış</button></form>
-      <a class="page-support page-header-contact" href="tel:+994120000000"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 12 000 00 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
+      <a class="page-support page-header-contact" href="tel:+994502645400"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 50 264 54 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
       <a class="page-live-chat page-header-contact" href="/elaqe/"><i class="page-shell-icon chat" aria-hidden="true"></i><span><strong>Canlı çat</strong><small>Mütəxəssislə danış</small></span></a>
-      <a class="page-mobile-phone" href="tel:+994120000000" aria-label="Müştəri dəstəyinə zəng et"><i class="page-shell-icon phone" aria-hidden="true"></i></a>
+      <a class="page-mobile-phone" href="tel:+994502645400" aria-label="Müştəri dəstəyinə zəng et"><i class="page-shell-icon phone" aria-hidden="true"></i></a>
       <a class="page-cart-link" href="/sebet/" data-mini-cart-toggle aria-label="Səbətimi aç"><i class="page-shell-icon cart" aria-hidden="true"></i><span data-cart-count>0</span></a>
       <button class="page-menu-toggle" type="button" aria-expanded="false" aria-controls="page-navigation" aria-label="Menyunu aç"><span></span><span></span><span></span></button>
     </div>
@@ -258,11 +258,11 @@ export function layout(options: LayoutOptions): string {
       </div>
       <div class="page-footer-contact">
         <a href="/elaqe/"><i class="page-shell-icon pin" aria-hidden="true"></i><span>Bakı şəhəri, Azərbaycan</span></a>
-        <a href="tel:+994120000000"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 12 000 00 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
+        <a href="tel:+994502645400"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 50 264 54 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
         <div><i class="page-shell-icon clock" aria-hidden="true"></i><span>Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00</span></div>
       </div>
     </div>
-    <div class="page-footer-bottom"><div class="page-container page-footer-legal"><p>Copyright © 2026 Gündəlik Bakı. Bütün hüquqlar qorunur.</p><nav aria-label="Hüquqi keçidlər"><a href="/mexfilik/">Məxfilik siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma siyasəti</a><a href="/istifade-sertleri/">İstifadə şərtləri</a></nav></div></div>
+    <div class="page-footer-bottom"><div class="page-container page-footer-legal"><div class="db-footer-identity"><p>Copyright © 2026 Gündəlik Bakı Poçtu-Daily Baku Mail. Bütün hüquqlar qorunur.</p><p class="db-footer-company"><span>"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır.</span><span>VÖEN 2007614681</span></p></div><nav aria-label="Hüquqi keçidlər"><a href="/mexfilik/">Məxfilik siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma siyasəti</a><a href="/istifade-sertleri/">İstifadə şərtləri</a></nav></div></div>
   </footer>
   <nav class="page-mobile-dashboard" aria-label="Mobil sürətli keçidlər">
     <a href="/hesabim/"><i class="page-shell-icon account" aria-hidden="true"></i><span>Hesab</span><b data-wishlist-count>0</b></a>

@@ -88,7 +88,7 @@ const homeCircles=homeCircleAssets.map(([id,label,href,asset],index)=>`<div clas
   <div class="image-container"><img ${index===0?'loading="eager" fetchpriority="high"':'loading="lazy"'} decoding="async" src="./assets/images/categories/${asset}" width="640" height="640" alt="${escapeHtml(label)}"><svg aria-hidden="true" viewBox="0 0 300 300"><path d="M0,0H300V300H0V0Z"></path></svg></div>
   <h3 class="attribute-title">${escapeHtml(label)}</h3><div class="button-back"></div>
 </a></div>`).join('\n');
-const footer=[['Platforma haqqında',[['Biz kimik','/haqqimizda/'],['Bakı Club','/baki-club/'],['Biznes üçün','/biznes/']]],['Müştəri dəstəyi',[['Tez-tez verilən suallar','/faq/'],['Əlaqə','/elaqe/'],['Çatdırılma siyasəti','/catdirilma/'],['Geri qaytarma','/geri-qaytarma/']]],['Biznes əməkdaşlığı',[['Reklam portalı','/biznes/#reklam'],['Sponsorluq','/biznes/#sponsorluq'],['Brend olun','/biznes/#brend-vitrini']]],['Sürətli keçidlər',[['Son jurnal','/jurnal/'],['Kateqoriyalar','/magaza/'],['Elan yerləşdir','/elanlar/'],['Sitemap','/sitemap.xml']]]];
+const footer=[['Platforma haqqında',[['Biz kimik','/haqqimizda/'],['Bakı Club','/baki-club/'],['Biznes üçün','/biznes/']]],['Müştəri dəstəyi',[['Tez-tez verilən suallar','/faq/'],['Əlaqə','/elaqe/'],['Çatdırılma siyasəti','/catdirilma/'],['Geri qaytarma','/geri-qaytarma/']]],['Biznes əməkdaşlığı',[['Reklam portalı','/biznes/#reklam'],['Sponsorluq','/biznes/#sponsorluq'],['Brend olun','/biznes/#brend-vitrini']]],['Sürətli keçidlər',[['Son jurnal','/jurnal/'],['Kateqoriyalar','/magaza/'],['Elan yerləşdir','/elanlar/']]]];
 replaceElement('menu-footer-menu',footer.map(([title,links])=>`<li class="menu-item menu-item-has-children depth-0"><a class="mi-link"><span class="txt">${title}</span></a><ul class="sub-menu">${links.map(([label,href])=>`<li class="menu-item depth-1"><a href="${href}" class="mi-link"><span class="txt">${label}</span></a></li>`).join('')}</ul></li>`).join(''));
 
 const replacements=new Map([
@@ -111,7 +111,7 @@ const replacements=new Map([
  ['Air Tools','Elektronika'],['Electrical','Ev & Mətbəx'],['Hand Tools','Moda'],['Power Tools','Gözəllik & Sağlamlıq'],['Accessories','Xidmətlər'],
  ['Popular','Populyar'],['New','Yeni'],['Sale!','Endirim!'],['Account','Hesab'],['Dashboard','İdarə paneli'],['Orders','Sifarişlər'],['History','Tarixçə'],['Addresses','Ünvanlar'],['Catalog','Kataloq'],['Brands','Brendlər'],['Popular items','Populyar seçimlər'],['Useful','Faydalı'],['Career','Karyera'],['FAQ','Tez-tez verilən suallar'],['Features','İmkanlar'],
  ["With over 250+ branches nationwide\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tand 130,000 parts available Bigxon Tools\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tis the USA's number 1 supplier!",'Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.'],
- ['17 Antares Place, Mairangi Bay, Auckland\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t0632','Bakı şəhəri, Azərbaycan'],['833-474-8531','+994 12 000 00 00'],['Sales &amp; Service Support','Müştəri və biznes dəstəyi'],['Monday - Friday: 9:00 - 20:00<br>Saturday: 10:00 - 15:00','Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00'],
+ ['17 Antares Place, Mairangi Bay, Auckland\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t0632','Bakı şəhəri, Azərbaycan'],['833-474-8531','+994 50 264 54 00'],['Sales &amp; Service Support','Müştəri və biznes dəstəyi'],['Monday - Friday: 9:00 - 20:00<br>Saturday: 10:00 - 15:00','Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00'],
  ['Copyright © 2026 Bigxon. All Rights\n\t\t\t\t\t\t\t\t\t\t\t\tReserved','Copyright © 2026 Gündəlik Bakı. Bütün hüquqlar qorunur.'],['Privacy Policy','Məxfilik siyasəti'],['Refund and Returns\n\t\t\t\t\t\t\t\t\t\t\t\tPolicy','Geri qaytarma siyasəti'],['Terms of use','İstifadə şərtləri'],['current-lang">En','current-lang">AZ'],['>English<','>Azərbaycan dili<'],['>Deutsch<','>English<'],['>Français<','>Русский<']
 ]);
 // Köhnə versiyada edilən ümumi əvəzləmələri əvvəlcə geri qaytarırıq. Bu addım
@@ -166,6 +166,16 @@ html=html.replace(/With over 250\+ branches nationwide[\s\S]*?is the USA's numbe
 html=html.replaceAll('data-cms-region="hero"','data-cms-region="hero" data-api-resource="campaigns"').replaceAll('data-cms-region="products"','data-cms-region="products" data-api-resource="products"');
 html=html.replaceAll('./assets/wp-content/uploads/nowa.svg','./assets/wp-content/uploads/india.svg')
   .replaceAll('./assets/wp-content/themes/bigxon/images/icons/magaza/.svg','./assets/wp-content/uploads/product-categories.svg');
+html=html
+  .replaceAll('tel:555555555','tel:+994502645400')
+  .replaceAll('tel:55555555','tel:+994502645400')
+  .replaceAll('tel:+994120000000','tel:+994502645400')
+  .replaceAll('+994 12 000 00 00','+994 50 264 54 00')
+  .replaceAll('37499833889','994502645400');
+const footerIdentity='<div class="db-footer-identity"><p class="et__heading"><span class="text">Copyright © 2026 Gündəlik Bakı Poçtu-Daily Baku Mail. Bütün hüquqlar qorunur.</span></p><p class="db-footer-company"><span>"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır.</span><span>VÖEN 2007614681</span></p></div>';
+html=html.includes('<div class="db-footer-identity">')
+  ? html.replace(/<div class="db-footer-identity">[\s\S]*?<\/p><\/div>/,footerIdentity)
+  : html.replace(/<p class="et__heading"><span class="text">Copyright © 2026 (?:Gündəlik Bakı|Bigxon)\.[\s\S]*?<\/span><\/p>/,footerIdentity);
 setElementAttributes('icc-33cef79',{'data-cl-d':'7','data-cl-lp':'7','data-cl-tbl':'6','data-cl-tb':'5','data-cl-mb':'4','data-cl-mbs':'4','data-gap-mb':'8','data-gap-mbs':'6','data-inc':'0'});
 replaceDivContentsAfterId('icc-33cef79','items-carousel swiper-wrapper',homeCircles);
 for(const id of ['96d76ab','2e11818','7b89df5'])removeWidgetById(id);

@@ -309,7 +309,7 @@
         <div class="db-product-actions" aria-label="Məhsul əməliyyatları">
           <button class="db-product-action db-product-wishlist" type="button" data-wishlist="${escapeAttribute(product.slug)}" aria-label="Seçilmişlərə əlavə et" aria-pressed="false"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">Seçilmişlərə əlavə et</span></button>
           <button class="db-product-action db-product-quick-view" type="button" data-quick-view="${payload}" aria-label="Sürətli baxış"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">Sürətli baxış</span></button>
-          <a class="db-product-action db-product-whatsapp" href="https://wa.me/37499833889?text=${encodeURIComponent(`Salam, ${product.title} məhsulu haqqında məlumat almaq istəyirəm.`)}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp ilə soruş"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">WhatsApp</span></a>
+          <a class="db-product-action db-product-whatsapp" href="https://wa.me/994502645400?text=${encodeURIComponent(`Salam, ${product.title} məhsulu haqqında məlumat almaq istəyirəm.`)}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp ilə soruş"><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">WhatsApp</span></a>
         </div>
         <a href="/mehsul/${slug}/" aria-label="${title}"><img src="${image}" alt="${title} — məhsul şəkli" width="420" height="390" loading="lazy" decoding="async"></a>
       </div>

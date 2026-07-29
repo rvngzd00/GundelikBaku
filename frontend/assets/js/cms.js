@@ -88,7 +88,7 @@ function encodedJson(value) {
 }
 
 function whatsappUrl(title) {
-  const number = String(globalThis.copt?.whatsappNumber || '37499833889').replace(/\D/g, '');
+  const number = String(globalThis.copt?.whatsappNumber || '994502645400').replace(/\D/g, '');
   return `https://wa.me/${number}?text=${encodeURIComponent(`${title} haqqında məlumat almaq istəyirəm`)}`;
 }
 

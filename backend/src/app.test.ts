@@ -56,7 +56,12 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(home.body, /<title>Gündəlik Bakı/);
     assert.match(home.body, /property="og:site_name" content="Gündəlik Bakı"/);
     assert.match(home.body, /"@type":"WebSite","name":"Gündəlik Bakı"/);
-    assert.doesNotMatch(home.body, /Daily\s+Baku/i);
+    assert.doesNotMatch(home.body.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', ''), /Daily\s+Baku/i);
+    assert.match(home.body, /Copyright © 2026 Gündəlik Bakı Poçtu-Daily Baku Mail/);
+    assert.match(home.body, /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/);
+    assert.match(home.body, /VÖEN 2007614681/);
+    assert.match(home.body, /tel:\+994502645400/);
+    assert.doesNotMatch(home.body, /37499833889|tel:55555555/);
 
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
     assert.equal(page.statusCode, 200);
@@ -64,7 +69,11 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(page.body, /<h1>Bakı Club/);
     assert.match(page.body, /property="og:site_name" content="Gündəlik Bakı"/);
     assert.match(page.body, /"@type":"WebSite","name":"Gündəlik Bakı"/);
-    assert.doesNotMatch(page.body, /Daily\s+Baku/i);
+    assert.doesNotMatch(page.body.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', ''), /Daily\s+Baku/i);
+    assert.match(page.body, /Copyright © 2026 Gündəlik Bakı Poçtu-Daily Baku Mail/);
+    assert.match(page.body, /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/);
+    assert.match(page.body, /VÖEN 2007614681/);
+    assert.match(page.body, /tel:\+994502645400/);
     assert.match(page.body, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:3000\/baki-club\/">/);
     assert.match(page.body, /class="page-category-list"/);
     assert.match(page.body, /href="\/baki-club\/xal-qazanma\/"/);
@@ -108,6 +117,8 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(product.body, /data-review-form/);
     assert.match(product.body, /data-product-copy-sku/);
     assert.doesNotMatch(product.body, /data-product-compare/);
+    assert.match(product.body, /https:\/\/wa\.me\/994502645400/);
+    assert.doesNotMatch(product.body, /37499833889/);
     assert.match(product.body, /src="\/assets\/js\/product\.js"/);
     assert.match(product.body, /src="\/assets\/js\/mobile-panels\.js"/);
 

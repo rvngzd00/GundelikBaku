@@ -236,7 +236,7 @@ export function renderProductDetail(options: ProductDetailOptions): string {
         </div>
         <div class="db-product-inline-actions">
           <button class="db-product-wishlist" type="button" data-wishlist="${escapeHtml(product.slug)}" aria-label="Seçilmişlərə əlavə et" aria-pressed="false">${icon.heart}</button>
-          <a class="db-product-enquiry" href="https://wa.me/37499833889?text=${whatsappMessage}" target="_blank" rel="noopener noreferrer">${icon.whatsapp}<span>Sual verin</span></a>
+          <a class="db-product-enquiry" href="https://wa.me/994502645400?text=${whatsappMessage}" target="_blank" rel="noopener noreferrer">${icon.whatsapp}<span>Sual verin</span></a>
         </div>
         <div class="db-product-next-delivery"><i aria-hidden="true"></i><span><strong>Növbəti gün çatdırılma!</strong><small>Gün ərzində sifariş edin, növbəti gün mümkün olan ən erkən vaxtda çatdıraq.</small></span></div>
         <p class="db-product-categories"><span>Kateqoriyalar:</span> ${categoryLinks}</p>

@@ -125,7 +125,7 @@ async function seed(): Promise<void> {
 
     const vendorResult = await client.query<{ id: string }>(`
       INSERT INTO vendors (store_id, display_name, legal_name, slug, email, phone, description, commission_rate, status, approved_at)
-      VALUES ($1, 'Baku Pro Market', 'Baku Pro Market MMC', 'baku-pro-market', 'satis@bakupromarket.az', '+994 12 555 10 10',
+      VALUES ($1, 'Baku Pro Market', 'Baku Pro Market MMC', 'baku-pro-market', 'satis@bakupromarket.az', '+994 50 264 54 00',
         'Gündəlik Bakı demo kataloqu üçün təsdiqlənmiş peşəkar alət satıcısı.', 12, 'active', now())
       ON CONFLICT (store_id, slug) DO UPDATE SET
         display_name=EXCLUDED.display_name, legal_name=EXCLUDED.legal_name, description=EXCLUDED.description,
@@ -235,9 +235,9 @@ async function seed(): Promise<void> {
     `, [storeId, vendorId, campaignResult.rows[0]!.id, `${env.PUBLIC_ORIGIN}/baki-club/`, userResult.rows[0]!.id]);
 
     const demoOrders = [
-      ['demo-order-001', 'Aysel Məmmədova', 'aysel@example.az', '+994 50 555 11 22', 'pending', 0],
-      ['demo-order-002', 'Murad Əliyev', 'murad@example.az', '+994 55 444 33 22', 'processing', 2],
-      ['demo-order-003', 'Nigar Həsənli', 'nigar@example.az', '+994 70 333 22 11', 'delivered', 6]
+      ['demo-order-001', 'Aysel Məmmədova', 'aysel@example.az', '+994 50 264 54 00', 'pending', 0],
+      ['demo-order-002', 'Murad Əliyev', 'murad@example.az', '+994 50 264 54 00', 'processing', 2],
+      ['demo-order-003', 'Nigar Həsənli', 'nigar@example.az', '+994 50 264 54 00', 'delivered', 6]
     ] as const;
     for (const [index, [idempotencyKey, customerName, email, phone, status, daysAgo]] of demoOrders.entries()) {
       const product = seededProducts[index]!;
@@ -425,7 +425,7 @@ async function seed(): Promise<void> {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'AZN', $9, $10, 'published', now()+interval '90 days', $2)
         ON CONFLICT (store_id, slug) DO UPDATE SET title=EXCLUDED.title, description=EXCLUDED.description,
           price=EXCLUDED.price, status='published', expires_at=EXCLUDED.expires_at, deleted_at=NULL
-      `, [storeId, userResult.rows[0]!.id, vendorId, category, title, slug, description, price, JSON.stringify({ phone: '+994 50 000 00 00', email: 'elan@dailybaku.az' }), JSON.stringify({ city: 'Bakı' })]);
+      `, [storeId, userResult.rows[0]!.id, vendorId, category, title, slug, description, price, JSON.stringify({ phone: '+994 50 264 54 00', email: 'elan@dailybaku.az' }), JSON.stringify({ city: 'Bakı' })]);
     }
   });
 
