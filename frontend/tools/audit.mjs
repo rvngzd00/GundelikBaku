@@ -53,8 +53,7 @@ for (const runtimeAsset of [
 ]) checkFile(runtimeAsset);
 
 for (const brandAsset of [
-  './assets/brand/gundelik-baki-logo.png',
-  './assets/brand/gundelik-baki-logo-white.png',
+  './assets/images/categories/logoSite.png',
   './assets/brand/favicon-32.png',
   './assets/brand/apple-touch-icon.png',
   './assets/brand/icon-192.png',
@@ -93,13 +92,14 @@ const required = [
   ['Open Graph metadata', /property="og:title"/i.test(html)],
   ['structured data', /type="application\/ld\+json"/i.test(html)],
   ['Gündəlik Bakı metadata and schema branding', /property="og:site_name" content="Gündəlik Bakı"/.test(html) && /"@type":"WebSite","name":"Gündəlik Bakı"/.test(html) && !/Daily\s+Baku/i.test(html.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', ''))],
-  ['Gündəlik Bakı logo', /assets\/brand\/gundelik-baki-logo-white\.png/i.test(html)],
+  ['Gündəlik Bakı logo', (html.match(/assets\/images\/categories\/logoSite\.png/gi) || []).length >= 6 && !/assets\/brand\/(?:daily-baku-logo\.svg|gundelik-baki-logo(?:-white)?\.png)/i.test(html)],
   ['brand favicon', /assets\/brand\/favicon-32\.png/i.test(html)],
   ['language selectors removed', !/elementor-widget-et_language_switcher|class="current-lang"/i.test(html)],
   ['footer Sitemap link removed', !/<a href="\/sitemap\.xml"[^>]*>/i.test(html)],
   ['footer payment logos disabled', /<!-- Payment method logos are intentionally disabled\.[\s\S]*?elementor-element-6d02874[\s\S]*?-->/i.test(html)],
   ['footer company identity', /Gündəlik Bakı Poçtu-Daily Baku Mail/.test(html) && /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/.test(html) && /VÖEN 2007614681/.test(html)],
   ['public contact phone', (html.match(/\+994 50 264 54 00/g) || []).length >= 3 && !/tel:(?:55555555|\+994120000000)/.test(html) && !/37499833889/.test(html)],
+  ['public contact address', (html.match(/Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/g) || []).length >= 2 && !/Bakı şəhəri, Azərbaycan/.test(html)],
   ['demo product cards', (html.match(/class="db-product-card"/g) || []).length >= 20],
   ['featured product slider', /class="db-featured-track"/.test(html) && !/class="db-featured-controls"/.test(html)],
   ['popular product slider', /class="db-popular-track"/.test(html) && /data-popular-prev/.test(html) && /data-popular-next/.test(html) && /class="db-popular-pagination"/.test(html)],

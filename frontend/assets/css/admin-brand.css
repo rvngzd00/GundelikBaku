@@ -1,10 +1,13 @@
 .login-brand-logo {
   display: block;
   width: min(240px, 100%);
+  aspect-ratio: 240 / 74;
   height: auto;
   margin-bottom: 28px;
   padding: 7px 9px;
-  background: #fff;
+  object-fit: cover;
+  object-position: center;
+  background: #090909;
   border: 1px solid var(--line);
   border-radius: 9px;
 }
@@ -17,8 +20,11 @@
 .sidebar .brand img {
   display: block;
   width: 190px;
+  aspect-ratio: 190 / 59;
   height: auto;
   padding: 5px 7px;
-  background: #fff;
+  object-fit: cover;
+  object-position: center;
+  background: #090909;
   border-radius: 7px;
 }

@@ -180,7 +180,7 @@ export function layout(options: LayoutOptions): string {
     ? (options.image.startsWith('http://') || options.image.startsWith('https://') ? options.image : `${origin}${options.image.startsWith('/') ? '' : '/'}${options.image}`)
     : `${origin}/assets/wp-content/uploads/revslider/slider-1/slider-back.webp`;
   const schemas = Array.isArray(options.schema) ? options.schema : options.schema ? [options.schema] : [];
-  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', logo: { '@type': 'ImageObject', url: `${origin}/assets/brand/gundelik-baki-logo.png`, width: 1706, height: 526 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
+  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', logo: { '@type': 'ImageObject', url: `${origin}/assets/images/categories/logoSite.png`, width: 1536, height: 1024 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
   const navigationHtml = navigationSections.map((section) => `<li class="page-navigation-item">
     <a href="${section.href}" aria-haspopup="true" aria-expanded="false"${options.active === section.key ? ' class="is-active-section"' : ''}${options.path === section.href ? ' aria-current="page"' : ''}><span>${escapeHtml(section.label)}</span><i class="page-nav-arrow" aria-hidden="true"></i></a>
     <ul class="page-submenu" aria-label="${escapeHtml(section.label)} alt kateqoriyaları">${section.children.map((child) => `<li><a href="${child.href}"${options.path === child.href ? ' aria-current="page"' : ''}>${escapeHtml(child.label)}</a></li>`).join('')}<li class="page-submenu-all"><a href="${section.href}">Hamısına bax <span aria-hidden="true">›</span></a></li></ul>
@@ -223,14 +223,14 @@ export function layout(options: LayoutOptions): string {
 <body id="top" data-page="${escapeHtml(options.active || '')}">
   <a class="page-skip" href="#main-content">Əsas məzmuna keç</a>
   <div class="page-topbar"><div class="page-container">
-    <span class="page-topbar-item"><i class="page-shell-icon pin" aria-hidden="true"></i>Bakı şəhəri, Azərbaycan</span>
+    <span class="page-topbar-item"><i class="page-shell-icon pin" aria-hidden="true"></i>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</span>
     <a class="page-topbar-item page-topbar-contact" href="/elaqe/"><i class="page-shell-icon mail" aria-hidden="true"></i>Əlaqə</a>
     <span class="page-topbar-item page-topbar-delivery"><i class="page-shell-icon truck" aria-hidden="true"></i>99 AZN-dən yuxarı pulsuz çatdırılma</span>
     <a class="page-login" href="/hesabim/"><i class="page-shell-icon user" aria-hidden="true"></i><span>Daxil ol</span></a>
   </div></div>
   <header class="page-header">
     <div class="page-container page-header-main">
-      <a class="page-logo" href="/" aria-label="Gündəlik Bakı ana səhifə"><img src="/assets/brand/gundelik-baki-logo-white.png" width="220" height="68" alt="Gündəlik Bakı"></a>
+      <a class="page-logo" href="/" aria-label="Gündəlik Bakı ana səhifə"><img src="/assets/images/categories/logoSite.png" width="220" height="68" alt="Gündəlik Bakı"></a>
       <form class="page-search" action="/magaza/" method="get" role="search" data-db-search><label class="sr-only" for="site-search">Məhsul axtarışı</label><i class="page-shell-icon search" aria-hidden="true"></i><input id="site-search" name="axtaris" type="search" placeholder="Nə axtarırsınız?"><button>Axtarış</button></form>
       <a class="page-support page-header-contact" href="tel:+994502645400"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 50 264 54 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
       <a class="page-live-chat page-header-contact" href="/elaqe/"><i class="page-shell-icon chat" aria-hidden="true"></i><span><strong>Canlı çat</strong><small>Mütəxəssislə danış</small></span></a>
@@ -249,7 +249,7 @@ export function layout(options: LayoutOptions): string {
   <main id="main-content">${options.content}</main>
   <footer class="page-footer">
     <div class="page-container page-footer-main">
-      <div class="page-footer-brand"><img src="/assets/brand/gundelik-baki-logo-white.png" width="261" height="81" alt="Gündəlik Bakı"><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Sosial şəbəkələr"><a class="facebook" href="/elaqe/" aria-label="Facebook"></a><a class="instagram" href="#" aria-label="Instagram"></a><a class="linkedin" href="#" aria-label="LinkedIn"></a><a class="telegram" href="#" aria-label="Telegram"></a><a class="twitter" href="#" aria-label="X"></a><a class="whatsapp" href="/elaqe/" aria-label="WhatsApp"></a></div></div>
+      <div class="page-footer-brand"><span class="page-footer-logo"><img src="/assets/images/categories/logoSite.png" width="261" height="81" alt="Gündəlik Bakı"></span><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Sosial şəbəkələr"><a class="facebook" href="/elaqe/" aria-label="Facebook"></a><a class="instagram" href="#" aria-label="Instagram"></a><a class="linkedin" href="#" aria-label="LinkedIn"></a><a class="telegram" href="#" aria-label="Telegram"></a><a class="twitter" href="#" aria-label="X"></a><a class="whatsapp" href="/elaqe/" aria-label="WhatsApp"></a></div></div>
       <div class="page-footer-links">
         <section><h2>Platforma haqqında</h2><a href="/haqqimizda/">Biz kimik</a><a href="/baki-club/">Bakı Club</a><a href="/biznes/">Biznes üçün</a></section>
         <section><h2>Müştəri dəstəyi</h2><a href="/faq/">Tez-tez verilən suallar</a><a href="/elaqe/">Əlaqə</a><a href="/catdirilma/">Çatdırılma siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma</a></section>
@@ -257,7 +257,7 @@ export function layout(options: LayoutOptions): string {
         <section><h2>Sürətli keçidlər</h2><a href="/jurnal/">Son jurnal</a><a href="/magaza/">Kateqoriyalar</a><a href="/elanlar/">Elan yerləşdir</a></section>
       </div>
       <div class="page-footer-contact">
-        <a href="/elaqe/"><i class="page-shell-icon pin" aria-hidden="true"></i><span>Bakı şəhəri, Azərbaycan</span></a>
+        <a href="/elaqe/"><i class="page-shell-icon pin" aria-hidden="true"></i><span>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</span></a>
         <a href="tel:+994502645400"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 50 264 54 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
         <div><i class="page-shell-icon clock" aria-hidden="true"></i><span>Bazar ertəsi – Cümə: 09:00 – 18:00<br>Şənbə: 10:00 – 15:00</span></div>
       </div>

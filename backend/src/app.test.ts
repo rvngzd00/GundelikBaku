@@ -61,6 +61,10 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(home.body, /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/);
     assert.match(home.body, /VÖEN 2007614681/);
     assert.match(home.body, /tel:\+994502645400/);
+    assert.match(home.body, /assets\/images\/categories\/logoSite\.png/);
+    assert.doesNotMatch(home.body, /assets\/brand\/gundelik-baki-logo/);
+    assert.match(home.body, /Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/);
+    assert.doesNotMatch(home.body, /Bakı şəhəri, Azərbaycan/);
     assert.doesNotMatch(home.body, /37499833889|tel:55555555/);
 
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
@@ -74,6 +78,8 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(page.body, /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/);
     assert.match(page.body, /VÖEN 2007614681/);
     assert.match(page.body, /tel:\+994502645400/);
+    assert.match(page.body, /assets\/images\/categories\/logoSite\.png/);
+    assert.match(page.body, /Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/);
     assert.match(page.body, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:3000\/baki-club\/">/);
     assert.match(page.body, /class="page-category-list"/);
     assert.match(page.body, /href="\/baki-club\/xal-qazanma\/"/);
