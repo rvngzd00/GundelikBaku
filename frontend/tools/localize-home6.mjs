@@ -56,15 +56,16 @@ function removeWidgetById(id){
 }
 
 const mega=[
- ['magaza','Mağaza',[['Elektronika','/magaza/elektronika/'],['Ev & Mətbəx','/magaza/ev-metbex/'],['Moda','/magaza/moda/'],['Gözəllik & Sağlamlıq','/magaza/gozellik-saglamliq/'],['Qida','/magaza/qida/'],['Uşaq','/magaza/usaq/'],['Avtomobil','/magaza/avtomobil/'],['Xidmətlər','/magaza/xidmetler/']]],
- ['endirimler','Endirimlər & Kuponlar',[['Restoranlar','/endirimler/restoranlar/'],['Marketlər','/endirimler/marketler/'],['Geyim','/endirimler/geyim/'],['Gözəllik & Sağlamlıq','/endirimler/gozellik-saglamliq/'],['Əyləncə','/endirimler/eylence/'],['Səyahət','/endirimler/seyahet/']]],
+ ['magaza','Mağaza',[['Elektronika','/magaza/elektronika/'],['Ev & Mətbəx','/magaza/ev-metbex/'],['Moda','/magaza/moda/'],['Gözəllik & Sağlamlıq','/magaza/gozellik-saglamliq/'],['Qida','/magaza/qida/'],['Uşaq','/magaza/usaq/'],['Avtomobil','/magaza/avtomobil/'],['Xidmətlər','/magaza/xidmetler/'],['Hədiyyələr','/magaza/hediyyeler/']]],
+ ['endirimler','Endirimlər',[['Restoranlar','/endirimler/restoranlar/'],['Marketlər','/endirimler/marketler/'],['Geyim','/endirimler/geyim/'],['Gözəllik & Sağlamlıq','/endirimler/gozellik-saglamliq/'],['Əyləncə','/endirimler/eylence/'],['Səyahət','/endirimler/seyahet/']]],
+ ['kuponlar','Kuponlar',[]],
  ['kampaniyalar','Kampaniyalar',[['Günün Təklifi','/kampaniyalar/gunun-teklifi/'],['Həftənin Kampaniyası','/kampaniyalar/heftenin-kampaniyasi/'],['Məhdud Sayda','/kampaniyalar/mehdud-sayda/'],['Mövsümi Endirimlər','/kampaniyalar/movsumi-endirimler/']]],
  ['jurnal','Jurnal & Bloq',[['Son Buraxılış (PDF)','/jurnal/son-buraxilis/'],['Arxiv','/jurnal/arxiv/'],['Brend Hekayələri','/jurnal/brend-hekayeleri/'],['Alış-veriş Məsləhətləri','/jurnal/alis-veris-meslehetleri/']]],
  ['baki-club','Bakı Club',[['Xal Qazanma','/baki-club/xal-qazanma/'],['Hədiyyələr','/baki-club/hediyyeler/'],['Giveawaylər','/baki-club/giveawayler/'],['QR İdarəetmə','/baki-club/qr-idareetme/']]],
  ['elanlar','Elanlar',[['Məhsullar','/elanlar/mehsullar/'],['Xidmətlər','/elanlar/xidmetler/'],['Əmlak','/elanlar/emlak/'],['Avtomobil','/elanlar/avtomobil/']]],
  ['biznes','Biznes üçün',[['Reklam Ver','/biznes/reklam-ver/'],['Sponsorluq','/biznes/sponsorluq/'],['Brend Vitrini','/biznes/brend-vitrini/'],['Analitika Paneli','/biznes/analitika-paneli/']]]
 ];
-const navigationItem=([slug,label,children])=>`<li class="menu-item menu-item-has-children depth-0"><a href="/${slug}/" class="mi-link"><span class="txt">${escapeHtml(label)}</span><span class="arrow"></span><span class="effect"></span></a><ul class="sub-menu">${children.map(([child,href])=>`<li class="menu-item depth-1"><a href="${href}" class="mi-link"><span class="txt">${escapeHtml(child)}</span><span class="arrow"></span><span class="effect"></span></a></li>`).join('')}</ul></li>`;
+const navigationItem=([slug,label,children])=>`<li class="menu-item${children.length?' menu-item-has-children':''} depth-0"><a href="/${slug}/" class="mi-link"><span class="txt">${escapeHtml(label)}</span>${children.length?'<span class="arrow"></span>':''}<span class="effect"></span></a>${children.length?`<ul class="sub-menu">${children.map(([child,href])=>`<li class="menu-item depth-1"><a href="${href}" class="mi-link"><span class="txt">${escapeHtml(child)}</span><span class="arrow"></span><span class="effect"></span></a></li>`).join('')}</ul>`:''}</li>`;
 const nav=mega.map(navigationItem).join('');
 const mobileNav=mega.slice(1).map(navigationItem).join('');
 replaceElement('menu-mobile-menu',mobileNav);
@@ -77,7 +78,9 @@ replaceElement('menu-categories-1',categories);
 
 const homeCircleAssets=[
  ['95400e4','Mağaza','/magaza/','magaza.jpg'],
- ['da5964b','Endirimlər & Kuponlar','/endirimler/','endirimler.jpg'],
+ ['db-gifts','Hədiyyələr','/magaza/hediyyeler/','baki-club/hediyyeler.jpg'],
+ ['da5964b','Endirimlər','/endirimler/','endirimler.jpg'],
+ ['db-coupons','Kuponlar','/kuponlar/','endirimler.jpg'],
  ['acf68c3','Kampaniyalar','/kampaniyalar/','kampaniyalar.jpg'],
  ['8c7abe9','Jurnal & Bloq','/jurnal/','jurnal.jpg'],
  ['ed230dd','Bakı Club','/baki-club/','baki-club.jpg'],

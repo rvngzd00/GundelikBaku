@@ -2542,10 +2542,14 @@
 				});
 
 				$this.find('input[type="submit"]').on("click",function(event) {
+					var $identity = $this.find('input[type="email"], input[type="text"]').first();
+					var $password = $this.find('input[type="password"]').first();
+					var identityValue = String($identity.val() || '').trim();
+					var passwordValue = String($password.val() || '');
 
-					if (!$this.find('input[type="text"]').val() || !$this.find('input[type="password"]').val() ||
-						$this.find('input[type="text"]').val() == $this.find('input[type="text"]').data('placeholder') ||
-						$this.find('input[type="password"]').val() == $this.find('input[type="password"]').data('placeholder')) {
+					if (!identityValue || !passwordValue ||
+						identityValue == $identity.data('placeholder') ||
+						passwordValue == $password.data('placeholder')) {
 						event.preventDefault();
 					}
 

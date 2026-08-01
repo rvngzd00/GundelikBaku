@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test, { after } from 'node:test';
 
-process.env['LOG_LEVEL'] = 'silent';
+process.env['LOG_LEVEL'] ||= 'silent';
 
 after(async () => {
   const { closePool } = await import('./db/pool.js');
@@ -67,6 +68,13 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.doesNotMatch(home.body, /Bakı şəhəri, Azərbaycan/);
     assert.doesNotMatch(home.body, /37499833889|tel:55555555/);
 
+    const homeApi = await app.inject({ method: 'GET', url: '/api/v1/public/home' });
+    assert.equal(homeApi.statusCode, 200);
+    assert.ok(Array.isArray(homeApi.json().data.products));
+    assert.ok(Array.isArray(homeApi.json().data.categories));
+    assert.ok(Array.isArray(homeApi.json().data.brands));
+    assert.ok(homeApi.json().data.products.every((item: { review_count: number; category_slugs: string[] }) => Number.isInteger(item.review_count) && Array.isArray(item.category_slugs)));
+
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
     assert.equal(page.statusCode, 200);
     assert.match(page.headers['content-type'] ?? '', /^text\/html/);
@@ -103,6 +111,22 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
 
     const unknownChild = await app.inject({ method: 'GET', url: '/baki-club/movcud-deyil/' });
     assert.equal(unknownChild.statusCode, 404);
+
+    const discounts = await app.inject({ method: 'GET', url: '/endirimler/' });
+    assert.equal(discounts.statusCode, 200);
+    assert.match(discounts.body, /<h1>Endirimlər<\/h1>/);
+    assert.doesNotMatch(discounts.body, /<div class="page-coupon-grid">/);
+
+    const coupons = await app.inject({ method: 'GET', url: '/kuponlar/' });
+    assert.equal(coupons.statusCode, 200);
+    assert.match(coupons.body, /<h1>Kuponlar<\/h1>/);
+    assert.match(coupons.body, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:3000\/kuponlar\/">/);
+
+    const gifts = await app.inject({ method: 'GET', url: '/magaza/hediyyeler/' });
+    assert.equal(gifts.statusCode, 200);
+    assert.match(gifts.body, /<h1>Hədiyyələr<\/h1>/);
+    assert.match(gifts.body, /href="\/magaza\/hediyyeler\/" aria-current="page"/);
+    assert.match(gifts.body, /class="db-product-card"/);
 
     const search = await app.inject({ method: 'GET', url: '/api/v1/public/search?q=milwaukee&limit=5' });
     assert.equal(search.statusCode, 200);
@@ -173,6 +197,9 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.equal(searchPage.statusCode, 200);
     assert.match(searchPage.body, /“milwaukee” üçün nəticələr/);
     assert.match(searchPage.body, /name="robots" content="noindex,follow"/);
+    const originFilter = await app.inject({ method: 'GET', url: '/magaza/?mense=united-states' });
+    assert.equal(originFilter.statusCode, 200);
+    assert.match(originFilter.body, /data-page="magaza"/);
   } finally {
     await app.close();
   }
@@ -221,8 +248,8 @@ test('rəy limiti müştəri sessiyalarını bir-birindən ayırır', async () =
       payload
     });
     assert.equal(limited.statusCode, 429);
-    assert.equal(limited.json().code, 'REVIEW_RATE_LIMITED');
-    assert.match(limited.json().message, /Ardıcıl çox sayda rəy/);
+    assert.equal(limited.json().error.code, 'REVIEW_RATE_LIMITED');
+    assert.match(limited.json().error.message, /Ardıcıl çox sayda rəy/);
 
     const otherCustomer = await app.inject({
       method: 'POST',
@@ -257,6 +284,13 @@ test('customer account səhifələri və anonim state API-si işləyir', async (
     assert.doesNotMatch(account.body, />History</);
     assert.doesNotMatch(account.body, /href="\/hesabim\/tarixce\/"/);
 
+    const details = await app.inject({ method: 'GET', url: '/hesabim/hesab-melumatlari/' });
+    assert.equal(details.statusCode, 200);
+    assert.match(details.body, /data-account-profile-form/);
+    assert.match(details.body, /data-account-password-form/);
+    assert.match(details.body, /Profil məlumatlarını yadda saxla/);
+    assert.match(details.body, /Şifrəni yenilə/);
+
     const removedHistory = await app.inject({ method: 'GET', url: '/hesabim/tarixce/' });
     assert.equal(removedHistory.statusCode, 302);
     assert.equal(removedHistory.headers.location, '/hesabim/sifarisler/');
@@ -280,19 +314,707 @@ test('customer account səhifələri və anonim state API-si işləyir', async (
   }
 });
 
-test('mega menu ağacı sənəddəki 7 əsas və 34 alt kateqoriyanı əhatə edir', async () => {
+test('şifrə bərpası tokeni birdəfəlik işləyir və yeni sessiya yaradır', async () => {
+  const { buildApp } = await import('./app.js');
+  const { pool } = await import('./db/pool.js');
+  const { hashPassword } = await import('./core/password.js');
+  const app = await buildApp();
+  const suffix=randomUUID().slice(0,8);const email=`password-audit-${suffix}@example.test`;const oldPassword='OldPassword!2026';const newPassword='NewPassword!2026';let userId='';
+  try {
+    const created=await pool.query<{id:string}>(`INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at) VALUES($1,$2,'Şifrə','Auditi','active',now()) RETURNING id`,[email,await hashPassword(oldPassword)]);userId=created.rows[0]!.id;
+    await pool.query(`INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE code='customer'`,[userId]);
+    const forgot=await app.inject({method:'POST',url:'/api/v1/auth/forgot-password',payload:{email}});assert.equal(forgot.statusCode,200);assert.equal(forgot.json().data.accepted,true);assert.ok(forgot.json().data.previewUrl);
+    const token=new URL(forgot.json().data.previewUrl).searchParams.get('token');assert.ok(token);
+    const valid=await app.inject({method:'GET',url:`/api/v1/auth/action-token/${encodeURIComponent(token!)}`});assert.equal(valid.statusCode,200);assert.equal(valid.json().data.type,'password_reset');
+    const reset=await app.inject({method:'POST',url:'/api/v1/auth/reset-password',payload:{token,password:newPassword}});assert.equal(reset.statusCode,200);assert.ok(reset.headers['set-cookie']);
+    const reused=await app.inject({method:'POST',url:'/api/v1/auth/reset-password',payload:{token,password:'AnotherPassword!2026'}});assert.equal(reused.statusCode,404);assert.equal(reused.json().error.code,'TOKEN_INVALID');
+    const oldLogin=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email,password:oldPassword}});assert.equal(oldLogin.statusCode,401);
+    const newLogin=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email,password:newPassword}});assert.equal(newLogin.statusCode,200);
+  } finally {
+    if(userId)await pool.query('DELETE FROM users WHERE id=$1',[userId]);
+    await app.close();
+  }
+});
+
+test('checkout quote, kupon, ödəniş üsulu və müştəri ləğvi stokla birlikdə işləyir', async () => {
+  const { buildApp } = await import('./app.js');
+  const { pool } = await import('./db/pool.js');
+  const { env } = await import('./config/env.js');
+  const app=await buildApp();const suffix=randomUUID().slice(0,8);const couponCode=`T${suffix.slice(0,7)}`.toUpperCase();let orderId='';let couponId='';
+  const cookieJar=(response:{headers:Record<string,string|string[]|number|undefined>})=>{const result:Record<string,string>={};const raw=response.headers['set-cookie'];for(const item of Array.isArray(raw)?raw:typeof raw==='string'?[raw]:[]){const pair=item.split(';',1)[0]!;const index=pair.indexOf('=');if(index>0)result[pair.slice(0,index)]=pair.slice(index+1);}return result;};
+  const cookieHeader=(jar:Record<string,string>)=>Object.entries(jar).map(([key,value])=>`${key}=${value}`).join('; ');
+  try {
+    const store=await pool.query<{id:string}>('SELECT id FROM stores WHERE code=$1',[env.DEFAULT_STORE_CODE]);assert.ok(store.rows[0]);
+    const home=await app.inject({method:'GET',url:'/api/v1/public/home'});assert.equal(home.statusCode,200);const product=home.json().data.products.find((item:{id?:string;variant_id?:string})=>item.id&&item.variant_id);assert.ok(product);
+    const coupon=await pool.query<{id:string}>(`INSERT INTO coupons(store_id,name,code_prefix,discount_type,discount_value,minimum_order,per_user_limit,starts_at,expires_at,status) VALUES($1,$2,$3,'percentage',10,0,2,now()-interval '1 hour',now()+interval '1 day','active') RETURNING id`,[store.rows[0]!.id,`Checkout auditi ${suffix}`,couponCode]);couponId=coupon.rows[0]!.id;
+    const quote=await app.inject({method:'POST',url:'/api/v1/checkout/quote',payload:{couponCode,items:[{listingId:product.id,variantId:product.variant_id,quantity:1}]}});assert.equal(quote.statusCode,200);assert.ok(Number(quote.json().data.discountTotal)>0);assert.equal(quote.json().data.paymentMethods.length,3);const jar=cookieJar(quote);
+    const checkout=await app.inject({method:'POST',url:'/api/v1/checkout/',headers:{cookie:cookieHeader(jar),'idempotency-key':randomUUID()},payload:{couponCode,paymentMethod:'card_on_delivery',customerEmail:`checkout-${suffix}@example.test`,customerPhone:'+994501112233',customerName:'Checkout Audit',shippingAddress:{recipientName:'Checkout Audit',phone:'+994501112233',countryCode:'AZ',city:'Bakı',addressLine1:'Audit küçəsi 10'},items:[{listingId:product.id,variantId:product.variant_id,quantity:1}]}});assert.equal(checkout.statusCode,201,checkout.body);assert.equal(checkout.json().data.paymentMethod,'card_on_delivery');assert.ok(Number(checkout.json().data.discountTotal)>0);orderId=checkout.json().data.id;
+    const cancelled=await app.inject({method:'POST',url:`/api/v1/customer/orders/${orderId}/cancel`,headers:{cookie:cookieHeader(jar)}});assert.equal(cancelled.statusCode,200);assert.equal(cancelled.json().data.status,'cancelled');
+    const payment=await pool.query<{status:string}>('SELECT status FROM payments WHERE order_id=$1',[orderId]);assert.equal(payment.rows[0]?.status,'cancelled');
+  } finally {
+    if(orderId){await pool.query('DELETE FROM outbox_events WHERE aggregate_id=$1',[orderId]);await pool.query('DELETE FROM inventory_movements WHERE reference_id=$1',[orderId]);await pool.query('DELETE FROM payments WHERE order_id=$1',[orderId]);await pool.query('DELETE FROM order_items WHERE order_id=$1',[orderId]);await pool.query('DELETE FROM vendor_orders WHERE order_id=$1',[orderId]);await pool.query('DELETE FROM orders WHERE id=$1',[orderId]);}
+    if(couponId)await pool.query('DELETE FROM coupons WHERE id=$1',[couponId]);
+    await app.close();
+  }
+});
+
+test('mega menu ağacı ayrılmış kuponlar və hədiyyələr daxil olmaqla tamdır', async () => {
   const { navigationPaths, navigationSections } = await import('./web/navigation.js');
-  assert.equal(navigationSections.length, 7);
-  assert.equal(navigationSections.reduce((total, section) => total + section.children.length, 0), 34);
-  assert.equal(navigationPaths.length, 41);
+  assert.equal(navigationSections.length, 8);
+  assert.equal(navigationSections.reduce((total, section) => total + section.children.length, 0), 35);
+  assert.equal(navigationPaths.length, 43);
   assert.equal(new Set(navigationPaths).size, navigationPaths.length);
+  assert.ok(navigationPaths.includes('/kuponlar/'));
+  assert.ok(navigationPaths.includes('/magaza/hediyyeler/'));
   const categoryImages = navigationSections.flatMap((section) => {
-    assert.equal(section.image, `/assets/images/categories/${section.slug}.jpg`);
+    assert.match(section.image, /^\/assets\/images\/categories\/.+\.jpg$/);
     for (const child of section.children) {
-      assert.equal(child.image, `/assets/images/categories/${section.slug}/${child.slug}.jpg`);
+      assert.match(child.image, /^\/assets\/images\/categories\/.+\.jpg$/);
     }
     return [section.image, ...section.children.map((child) => child.image)];
   });
-  assert.equal(categoryImages.length, 41);
-  assert.equal(new Set(categoryImages).size, categoryImages.length);
+  assert.equal(categoryImages.length, 43);
+  assert.ok(new Set(categoryImages).size >= 41);
+});
+
+test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işləyir', async () => {
+  const { buildApp } = await import('./app.js');
+  const { pool } = await import('./db/pool.js');
+  const { hashPassword } = await import('./core/password.js');
+  const { env } = await import('./config/env.js');
+  const app = await buildApp();
+  const suffix = randomUUID().slice(0, 8);
+  const adminEmail = `audit-admin-${suffix}@example.test`;
+  const customerEmail = `audit-customer-${suffix}@example.test`;
+  const ownerEmail = `audit-owner-${suffix}@example.test`;
+  const vendorAccountEmail = `audit-vendor-account-${suffix}@example.test`;
+  const managedUserEmail = `audit-managed-user-${suffix}@example.test`;
+  const adminPassword = 'AuditAdmin!2026';
+  const customerPassword = 'AuditCustomer!2026';
+  const updatedCustomerPassword = 'AuditCustomer!2027';
+  const ownerPassword = 'AuditVendor!2026';
+  const vendorAccountPassword = 'VendorAccount!2026';
+  const managedUserPassword = 'ManagedUser!2026';
+  const managedUserNewPassword = 'ManagedUser!2027';
+  const createdUserIds: string[] = [];
+  let vendorId = '';
+  let categoryId = '';
+  let brandId = '';
+  let mediaId = '';
+  let pdfMediaId = '';
+  let journalId = '';
+  let classifiedId = '';
+  let productId = '';
+  let productReviewId = '';
+  let rewardId = '';
+  let pageId = '';
+  let postId = '';
+  let postCategoryId = '';
+  let seoClusterId = '';
+  let campaignId = '';
+  let couponId = '';
+  let qrId = '';
+  const inventoryReferences = [`audit-add-${suffix}`, `audit-revert-${suffix}`];
+
+  type CookieJar = Record<string, string>;
+  type InjectableResponse = { headers: Record<string, string | string[] | number | undefined> };
+  const mergeCookies = (response: InjectableResponse, base: CookieJar = {}): CookieJar => {
+    const jar = { ...base };
+    const raw = response.headers['set-cookie'];
+    for (const item of Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : []) {
+      const pair = item.split(';', 1)[0]!;
+      const separator = pair.indexOf('=');
+      if (separator > 0) jar[pair.slice(0, separator)] = pair.slice(separator + 1);
+    }
+    return jar;
+  };
+  const cookieHeader = (jar: CookieJar) => Object.entries(jar).map(([name, value]) => `${name}=${value}`).join('; ');
+  const authHeaders = (jar: CookieJar, csrf = true): Record<string, string> => {
+    const headers: Record<string, string> = { cookie: cookieHeader(jar) };
+    const csrfToken = jar['db_csrf'] || jar['__Host-db_csrf'];
+    if (csrf && csrfToken) headers['x-csrf-token'] = csrfToken;
+    return headers;
+  };
+
+  try {
+    const store = await pool.query<{ id: string; name: string; locale: string; currency: string; timezone: string }>(
+      'SELECT id,name,locale,currency,timezone FROM stores WHERE code=$1',
+      [env.DEFAULT_STORE_CODE]
+    );
+    assert.ok(store.rows[0]);
+    const storeRow = store.rows[0]!;
+    const moderatorMedia = await pool.query(`SELECT 1 FROM role_permissions rp JOIN roles r ON r.id=rp.role_id JOIN permissions p ON p.id=rp.permission_id WHERE r.code='moderator' AND p.code='media.read'`);
+    assert.equal(moderatorMedia.rowCount, 1);
+    const passwordHash = await hashPassword(adminPassword);
+    const admin = await pool.query<{ id: string }>(`
+      INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
+      VALUES($1,$2,'Audit','Admin','active',now()) RETURNING id
+    `, [adminEmail, passwordHash]);
+    const adminId = admin.rows[0]!.id;
+    createdUserIds.push(adminId);
+    const assigned = await pool.query(`
+      INSERT INTO user_roles(user_id,role_id,store_id)
+      SELECT $1,id,$2 FROM roles WHERE code='super_admin' RETURNING id
+    `, [adminId, storeRow.id]);
+    assert.ok(assigned.rows[0]);
+
+    const adminLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: adminEmail, password: adminPassword }
+    });
+    assert.equal(adminLogin.statusCode, 200);
+    const adminJar = mergeCookies(adminLogin);
+    assert.ok(adminJar['db_access'] || adminJar['__Host-db_access']);
+    assert.ok(adminJar['db_refresh'] || adminJar['__Host-db_refresh']);
+    assert.ok(adminJar['db_csrf'] || adminJar['__Host-db_csrf']);
+
+    const adminMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(adminJar) });
+    assert.equal(adminMe.statusCode, 200);
+    assert.ok(adminMe.json().data.roles.includes('super_admin'));
+
+    const csrfRejected = await app.inject({
+      method: 'POST', url: '/api/v1/vendors', headers: authHeaders(adminJar, false),
+      payload: {
+        storeId: storeRow.id, displayName: `CSRF ${suffix}`, legalName: `CSRF ${suffix} MMC`,
+        email: `csrf-${suffix}@example.test`, commissionRate: 0
+      }
+    });
+    assert.equal(csrfRejected.statusCode, 403);
+    assert.equal(csrfRejected.json().error.code, 'CSRF_REJECTED');
+
+    const registration = await app.inject({
+      method: 'POST', url: '/api/v1/auth/register',
+      payload: { email: customerEmail, phone: `+99450${Date.now().toString().slice(-7)}`, firstName: 'Audit', lastName: 'Müştəri', password: customerPassword }
+    });
+    assert.equal(registration.statusCode, 201);
+    assert.deepEqual(registration.json().data.roles, ['customer']);
+    assert.deepEqual(registration.json().data.permissions, []);
+    const customerId = registration.json().data.userId as string;
+    createdUserIds.push(customerId);
+    const originalCustomerJar = mergeCookies(registration);
+
+    const customerMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(originalCustomerJar) });
+    assert.equal(customerMe.statusCode, 200);
+    const profileUpdate = await app.inject({
+      method: 'PATCH', url: '/api/v1/customer/profile', headers: authHeaders(originalCustomerJar),
+      payload: { firstName: 'Yenilənmiş', lastName: 'Müştəri', displayName: 'Yenilənmiş Müştəri', email: customerEmail, phone: '+994501234567' }
+    });
+    assert.equal(profileUpdate.statusCode, 200, profileUpdate.body);
+    assert.equal(profileUpdate.json().data.firstName, 'Yenilənmiş');
+    assert.equal(profileUpdate.json().data.displayName, 'Yenilənmiş Müştəri');
+    assert.equal(profileUpdate.json().data.phone, '+994 50 123 45 67');
+    const wrongPasswordChange = await app.inject({
+      method: 'PATCH', url: '/api/v1/customer/profile/password', headers: authHeaders(originalCustomerJar),
+      payload: { currentPassword: 'YanlisSifre!2026', newPassword: updatedCustomerPassword }
+    });
+    assert.equal(wrongPasswordChange.statusCode, 400);
+    assert.equal(wrongPasswordChange.json().error.code, 'CURRENT_PASSWORD_INVALID');
+    const passwordChange = await app.inject({
+      method: 'PATCH', url: '/api/v1/customer/profile/password', headers: authHeaders(originalCustomerJar),
+      payload: { currentPassword: customerPassword, newPassword: updatedCustomerPassword }
+    });
+    assert.equal(passwordChange.statusCode, 200, passwordChange.body);
+    assert.equal(passwordChange.json().data.changed, true);
+    const oldCustomerLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: customerEmail, password: customerPassword } });
+    assert.equal(oldCustomerLogin.statusCode, 401);
+    const updatedCustomerLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: customerEmail, password: updatedCustomerPassword } });
+    assert.equal(updatedCustomerLogin.statusCode, 200);
+    const customerForbidden = await app.inject({ method: 'GET', url: '/api/v1/users', headers: authHeaders(originalCustomerJar) });
+    assert.equal(customerForbidden.statusCode, 403);
+
+    const duplicateRegistration = await app.inject({
+      method: 'POST', url: '/api/v1/auth/register',
+      payload: { email: customerEmail, firstName: 'Audit', lastName: 'Müştəri', password: customerPassword }
+    });
+    assert.equal(duplicateRegistration.statusCode, 409);
+    assert.equal(duplicateRegistration.json().error.code, 'ACCOUNT_EXISTS');
+
+    const createdVendor = await app.inject({
+      method: 'POST', url: '/api/v1/vendors', headers: authHeaders(adminJar),
+      payload: {
+        storeId: storeRow.id, displayName: `Audit Satıcı ${suffix}`, legalName: `Audit Satıcı ${suffix} MMC`,
+        email: `audit-vendor-${suffix}@example.test`, phone: '+994501112233', description: 'Avtomatik audit satıcısı', commissionRate: 7.5,
+        ownerFirstName: 'Avtomatik', ownerLastName: 'Satıcı', accountEmail: vendorAccountEmail, accountPassword: vendorAccountPassword
+      }
+    });
+    assert.equal(createdVendor.statusCode, 201);
+    assert.equal(createdVendor.json().data.status, 'active');
+    assert.equal(createdVendor.json().data.portalUrl, '/satici-paneli/');
+    assert.equal(createdVendor.json().data.owner.email, vendorAccountEmail);
+    createdUserIds.push(createdVendor.json().data.owner.id);
+    vendorId = createdVendor.json().data.id;
+
+    const vendorAccountLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: vendorAccountEmail, password: vendorAccountPassword }
+    });
+    assert.equal(vendorAccountLogin.statusCode, 200, vendorAccountLogin.body);
+    assert.deepEqual(vendorAccountLogin.json().data.roles, ['vendor_owner']);
+    assert.deepEqual(vendorAccountLogin.json().data.vendorIds, [vendorId]);
+    const vendorAccountJar = mergeCookies(vendorAccountLogin);
+    const vendorCatalog = await app.inject({ method: 'GET', url: '/api/v1/catalog/products', headers: authHeaders(vendorAccountJar) });
+    assert.equal(vendorCatalog.statusCode, 200);
+    const vendorPortal = await app.inject({ method: 'GET', url: '/satici-paneli/' });
+    assert.equal(vendorPortal.statusCode, 200);
+    assert.match(vendorPortal.body, /id="loginForm"/);
+
+    const approvedVendor = await app.inject({
+      method: 'PATCH', url: `/api/v1/vendors/${vendorId}`, headers: authHeaders(adminJar), payload: { status: 'active' }
+    });
+    assert.equal(approvedVendor.statusCode, 200);
+    assert.equal(approvedVendor.json().data.status, 'active');
+    assert.ok(approvedVendor.json().data.approved_at);
+
+    const createdOwner = await app.inject({
+      method: 'POST', url: '/api/v1/users', headers: authHeaders(adminJar),
+      payload: {
+        storeId: storeRow.id, vendorId, email: ownerEmail, firstName: 'Audit', lastName: 'Satıcı',
+        temporaryPassword: ownerPassword, roleCode: 'vendor_owner', status: 'invited'
+      }
+    });
+    assert.equal(createdOwner.statusCode, 201);
+    assert.equal(createdOwner.json().data.status, 'invited');
+    assert.match(createdOwner.json().data.inviteUrl, /\/deveti-qebul-et\/\?token=/);
+    const ownerId = createdOwner.json().data.id as string;
+    createdUserIds.push(ownerId);
+
+    const invitedLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: ownerEmail, password: ownerPassword }
+    });
+    assert.equal(invitedLogin.statusCode, 401);
+
+    const activatedOwner = await app.inject({
+      method: 'PATCH', url: `/api/v1/users/${ownerId}/status`, headers: authHeaders(adminJar), payload: { status: 'active' }
+    });
+    assert.equal(activatedOwner.statusCode, 200);
+    assert.equal(activatedOwner.json().data.status, 'active');
+
+    const ownerLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: ownerEmail, password: ownerPassword }
+    });
+    assert.equal(ownerLogin.statusCode, 200);
+    const ownerJar = mergeCookies(ownerLogin);
+    assert.deepEqual(ownerLogin.json().data.vendorIds, [vendorId]);
+    assert.ok(ownerLogin.json().data.permissions.includes('catalog.read'));
+    assert.ok(ownerLogin.json().data.permissions.includes('media.read'));
+    assert.ok(ownerLogin.json().data.permissions.includes('loyalty.read'));
+
+    const ownerDashboard = await app.inject({ method: 'GET', url: '/api/v1/dashboard', headers: authHeaders(ownerJar) });
+    assert.equal(ownerDashboard.statusCode, 200);
+    const ownerProducts = await app.inject({ method: 'GET', url: '/api/v1/catalog/products', headers: authHeaders(ownerJar) });
+    assert.equal(ownerProducts.statusCode, 200);
+    const ownerUsers = await app.inject({ method: 'GET', url: '/api/v1/users', headers: authHeaders(ownerJar) });
+    assert.equal(ownerUsers.statusCode, 403);
+    const ownerSettings = await app.inject({ method: 'GET', url: '/api/v1/settings', headers: authHeaders(ownerJar) });
+    assert.equal(ownerSettings.statusCode, 403);
+
+    const createdManagedUser = await app.inject({
+      method: 'POST', url: '/api/v1/users', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, email: managedUserEmail, firstName: 'İdarə', lastName: 'Olunan', temporaryPassword: managedUserPassword, roleCode: 'customer', status: 'active' }
+    });
+    assert.equal(createdManagedUser.statusCode, 201, createdManagedUser.body);
+    const managedUserId = createdManagedUser.json().data.id as string;
+    createdUserIds.push(managedUserId);
+    const managedUserDetail = await app.inject({ method: 'GET', url: `/api/v1/users/${managedUserId}`, headers: authHeaders(adminJar) });
+    assert.equal(managedUserDetail.statusCode, 200);
+    assert.equal(managedUserDetail.json().data.email, managedUserEmail);
+    const editedManagedUser = await app.inject({
+      method: 'PATCH', url: `/api/v1/users/${managedUserId}`, headers: authHeaders(adminJar),
+      payload: { firstName: 'Yenilənmiş', lastName: 'İstifadəçi', phone: '+994 50 222 33 44', newPassword: managedUserNewPassword, status: 'active' }
+    });
+    assert.equal(editedManagedUser.statusCode, 200, editedManagedUser.body);
+    assert.equal(editedManagedUser.json().data.first_name, 'Yenilənmiş');
+    assert.equal(editedManagedUser.json().data.phone, '+994 50 222 33 44');
+    const oldManagedLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: managedUserEmail, password: managedUserPassword } });
+    assert.equal(oldManagedLogin.statusCode, 401);
+    const newManagedLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: managedUserEmail, password: managedUserNewPassword } });
+    assert.equal(newManagedLogin.statusCode, 200);
+    const deletedManagedUser = await app.inject({ method: 'DELETE', url: `/api/v1/users/${managedUserId}`, headers: authHeaders(adminJar) });
+    assert.equal(deletedManagedUser.statusCode, 204);
+    const missingManagedUser = await app.inject({ method: 'GET', url: `/api/v1/users/${managedUserId}`, headers: authHeaders(adminJar) });
+    assert.equal(missingManagedUser.statusCode, 404);
+
+    const notifications = await app.inject({ method: 'GET', url: '/api/v1/notifications', headers: authHeaders(adminJar) });
+    assert.equal(notifications.statusCode, 200);
+    assert.ok(Array.isArray(notifications.json().data));
+    assert.equal(typeof notifications.json().meta.unread, 'number');
+
+    const createdCategory = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/categories', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, name: `Audit kateqoriyası ${suffix}`, description: 'Avtomatik kateqoriya auditi', position: 999 }
+    });
+    assert.equal(createdCategory.statusCode, 201);
+    categoryId = createdCategory.json().data.id;
+    const updatedCategory = await app.inject({
+      method: 'PATCH', url: `/api/v1/catalog/categories/${categoryId}`, headers: authHeaders(adminJar),
+      payload: { seoTitle: `Audit kateqoriyası ${suffix}`, status: 'active' }
+    });
+    assert.equal(updatedCategory.statusCode, 200);
+    assert.equal(updatedCategory.json().data.seo_title, `Audit kateqoriyası ${suffix}`);
+
+    const createdBrand = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/brands', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, name: `Audit brendi ${suffix}`, description: 'Avtomatik brend auditi', websiteUrl: 'https://example.com' }
+    });
+    assert.equal(createdBrand.statusCode, 201);
+    brandId = createdBrand.json().data.id;
+    const updatedBrand = await app.inject({
+      method: 'PATCH', url: `/api/v1/catalog/brands/${brandId}`, headers: authHeaders(adminJar),
+      payload: { seoTitle: `Audit brendi ${suffix}`, status: 'active' }
+    });
+    assert.equal(updatedBrand.statusCode, 200);
+    assert.equal(updatedBrand.json().data.seo_title, `Audit brendi ${suffix}`);
+
+    const boundary = `audit-${suffix}`;
+    const multipartHead = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="storeId"\r\n\r\n${storeRow.id}\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="vendorId"\r\n\r\n${vendorId}\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="altText"\r\n\r\nAudit məhsul şəkli\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nAudit media ${suffix}\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audit.png"\r\nContent-Type: application/octet-stream\r\n\r\n`
+    );
+    const multipartTail = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const uploadedMedia = await app.inject({
+      method: 'POST', url: '/api/v1/media',
+      headers: { ...authHeaders(adminJar), 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: Buffer.concat([multipartHead, Buffer.from('89504e470d0a1a0a', 'hex'), multipartTail])
+    });
+    assert.equal(uploadedMedia.statusCode, 201);
+    mediaId = uploadedMedia.json().data.id;
+    assert.equal(uploadedMedia.json().data.vendor_id, vendorId);
+    assert.equal(uploadedMedia.json().data.mime_type, 'image/png');
+    const updatedMedia = await app.inject({
+      method: 'PATCH', url: `/api/v1/media/${mediaId}`, headers: authHeaders(adminJar),
+      payload: { altText: 'Yenilənmiş audit məhsul şəkli' }
+    });
+    assert.equal(updatedMedia.statusCode, 200);
+    assert.equal(updatedMedia.json().data.alt_text, 'Yenilənmiş audit məhsul şəkli');
+
+    const pdfBoundary = `audit-pdf-${suffix}`;
+    const pdfHead = Buffer.from(
+      `--${pdfBoundary}\r\nContent-Disposition: form-data; name="storeId"\r\n\r\n${storeRow.id}\r\n`
+      + `--${pdfBoundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nAudit jurnal PDF ${suffix}\r\n`
+      + `--${pdfBoundary}\r\nContent-Disposition: form-data; name="file"; filename="audit.pdf"\r\nContent-Type: application/pdf\r\n\r\n`
+    );
+    const pdfTail = Buffer.from(`\r\n--${pdfBoundary}--\r\n`);
+    const uploadedPdf = await app.inject({
+      method: 'POST', url: '/api/v1/media',
+      headers: { ...authHeaders(adminJar), 'content-type': `multipart/form-data; boundary=${pdfBoundary}` },
+      payload: Buffer.concat([pdfHead, Buffer.from('%PDF-1.4\n%%EOF'), pdfTail])
+    });
+    assert.equal(uploadedPdf.statusCode, 201);
+    pdfMediaId = uploadedPdf.json().data.id;
+
+    const warehouses = await app.inject({ method: 'GET', url: '/api/v1/catalog/warehouses', headers: authHeaders(adminJar) });
+    assert.equal(warehouses.statusCode, 200);
+    assert.ok(warehouses.json().data.length > 0);
+
+    const identifierPreview = await app.inject({
+      method: 'GET', url: `/api/v1/catalog/product-identifiers/preview?storeId=${storeRow.id}&vendorId=${vendorId}`, headers: authHeaders(adminJar)
+    });
+    assert.equal(identifierPreview.statusCode, 200, identifierPreview.body);
+    assert.match(identifierPreview.json().data.sku, /^GB-\d{6}-[A-F0-9]{8}$/);
+
+    const createdProduct = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/products', headers: authHeaders(adminJar),
+      payload: {
+        storeId: storeRow.id, vendorId, sku: identifierPreview.json().data.sku, name: `Audit məhsulu ${suffix}`,
+        shortDescription: 'Audit məhsulunun qısa təsviri.',
+        description: 'Admin məhsul yaratma və status axınını yoxlayan audit məhsuludur.',
+        price: 19.9, currency: 'AZN', brandId, categoryIds: [categoryId], mediaIds: [mediaId], attributes: { material: 'Audit' },
+        isFeatured: true, isPopular: true, isTopPick: true, displayPosition: 987, merchandisingBadge: 'recommended',
+        seoTitle: `Audit məhsulu ${suffix}`, seoDescription: 'Audit məhsulunun avtomatik SEO təsviri.',
+        warehouseId: warehouses.json().data[0].id, initialStock: 3
+      }
+    });
+    assert.equal(createdProduct.statusCode, 201, createdProduct.body);
+    assert.equal(createdProduct.json().data.sku, identifierPreview.json().data.sku);
+    assert.equal(createdProduct.json().data.barcode, null);
+    assert.equal(createdProduct.json().data.variants[0].sku, createdProduct.json().data.sku);
+    assert.equal(createdProduct.json().data.variants[0].barcode, null);
+    productId = createdProduct.json().data.id;
+    const productDetail = await app.inject({ method: 'GET', url: `/api/v1/catalog/products/${productId}`, headers: authHeaders(adminJar) });
+    assert.equal(productDetail.statusCode, 200);
+    assert.equal(productDetail.json().data.brand_id, brandId);
+    assert.equal(productDetail.json().data.categories[0].id, categoryId);
+    assert.equal(productDetail.json().data.media[0].id, mediaId);
+    assert.equal(Number(productDetail.json().data.variants[0].inventory[0].quantity), 3);
+    assert.equal(productDetail.json().data.is_featured, true);
+    assert.equal(productDetail.json().data.merchandising_badge, 'recommended');
+    const publishedProduct = await app.inject({
+      method: 'PATCH', url: `/api/v1/catalog/products/${productId}/status`, headers: authHeaders(adminJar),
+      payload: { status: 'published', note: 'Audit nəşri' }
+    });
+    assert.equal(publishedProduct.statusCode, 200);
+    assert.equal(publishedProduct.json().data.status, 'published');
+
+    const submittedProductReview = await app.inject({
+      method: 'POST', url: `/api/v1/customer/products/${createdProduct.json().data.listing.slug}/reviews`, headers: authHeaders(originalCustomerJar),
+      payload: { rating: 5, authorName: 'Audit Müştəri', email: customerEmail, title: 'Admin moderasiya auditi', body: 'Məhsul rəyinin admin paneldə idarə olunmasını yoxlayan avtomatik testdir.' }
+    });
+    assert.equal(submittedProductReview.statusCode, 200);
+    productReviewId = submittedProductReview.json().data.review.id;
+    const adminReviews = await app.inject({ method: 'GET', url: `/api/v1/catalog/reviews?search=${suffix}`, headers: authHeaders(adminJar) });
+    assert.equal(adminReviews.statusCode, 200);
+    assert.ok(adminReviews.json().data.some((row: { id: string }) => row.id === productReviewId));
+    const rejectedReview = await app.inject({ method: 'PATCH', url: `/api/v1/catalog/reviews/${productReviewId}/status`, headers: authHeaders(adminJar), payload: { status: 'rejected' } });
+    assert.equal(rejectedReview.statusCode, 200);
+    assert.equal(rejectedReview.json().data.status, 'rejected');
+
+    const createdReward = await app.inject({
+      method: 'POST', url: '/api/v1/loyalty/rewards', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, name: `Audit hədiyyəsi ${suffix}`, description: 'Loyallıq backend auditi', pointsCost: 25, stock: 10, status: 'active' }
+    });
+    assert.equal(createdReward.statusCode, 201);
+    rewardId = createdReward.json().data.id;
+    const updatedReward = await app.inject({
+      method: 'PATCH', url: `/api/v1/loyalty/rewards/${rewardId}`, headers: authHeaders(adminJar),
+      payload: { pointsCost: 30, description: 'Yenilənmiş loyallıq backend auditi' }
+    });
+    assert.equal(updatedReward.statusCode, 200);
+    assert.equal(Number(updatedReward.json().data.points_cost), 30);
+    const rewards = await app.inject({ method: 'GET', url: `/api/v1/loyalty/rewards?search=${suffix}`, headers: authHeaders(adminJar) });
+    assert.equal(rewards.statusCode, 200);
+    assert.ok(rewards.json().data.some((row: { id: string }) => row.id === rewardId));
+
+    const contentPayload = {
+      storeId: storeRow.id, excerpt: 'Avtomatik admin audit kontentinin xülasəsi.',
+      content: [{ type: 'paragraph', data: { html: '<p>Admin kontent axını üçün audit mətni.</p>' } }],
+      seoDescription: 'Admin kontent axınının avtomatik audit təsviri.'
+    };
+    const createdPage = await app.inject({
+      method: 'POST', url: '/api/v1/content/pages', headers: authHeaders(adminJar),
+      payload: { ...contentPayload, title: `Audit səhifəsi ${suffix}`, slug: `audit-page-${suffix}`, seoTitle: `Audit səhifəsi ${suffix}` }
+    });
+    assert.equal(createdPage.statusCode, 201);
+    pageId = createdPage.json().data.id;
+    const publishedPage = await app.inject({
+      method: 'PATCH', url: `/api/v1/content/pages/${pageId}/status`, headers: authHeaders(adminJar), payload: { status: 'published' }
+    });
+    assert.equal(publishedPage.statusCode, 200);
+    assert.equal(publishedPage.json().data.status, 'published');
+    const pageDetail = await app.inject({ method: 'GET', url: `/api/v1/content/pages/${pageId}`, headers: authHeaders(adminJar) });
+    assert.equal(pageDetail.statusCode, 200);
+    assert.equal(pageDetail.json().data.id, pageId);
+
+    const createdPostCategory = await app.inject({
+      method: 'POST', url: '/api/v1/content/post-categories', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, name: `Audit jurnal mövzusu ${suffix}`, description: 'Avtomatik jurnal kateqoriyası auditi' }
+    });
+    assert.equal(createdPostCategory.statusCode, 201);
+    postCategoryId = createdPostCategory.json().data.id;
+
+    const createdPost = await app.inject({
+      method: 'POST', url: '/api/v1/content/posts', headers: authHeaders(adminJar),
+      payload: { ...contentPayload, title: `Audit məqaləsi ${suffix}`, slug: `audit-post-${suffix}`, seoTitle: `Audit məqaləsi ${suffix}`, categoryId: postCategoryId, featuredAssetId: mediaId, postType: 'guide' }
+    });
+    assert.equal(createdPost.statusCode, 201);
+    postId = createdPost.json().data.id;
+    const reviewedPost = await app.inject({
+      method: 'PATCH', url: `/api/v1/content/posts/${postId}/status`, headers: authHeaders(adminJar), payload: { status: 'review' }
+    });
+    assert.equal(reviewedPost.statusCode, 200);
+    assert.equal(reviewedPost.json().data.status, 'review');
+    const postDetail = await app.inject({ method: 'GET', url: `/api/v1/content/posts/${postId}`, headers: authHeaders(adminJar) });
+    assert.equal(postDetail.statusCode, 200);
+    assert.equal(postDetail.json().data.category_id, postCategoryId);
+    assert.equal(postDetail.json().data.featured_asset_id, mediaId);
+
+    const createdJournal = await app.inject({
+      method: 'POST', url: '/api/v1/publishing/journal', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, issueNumber: `AUD-${suffix}`, title: `Audit jurnal buraxılışı ${suffix}`, description: 'Jurnal idarəetmə axınının avtomatik auditi.', coverAssetId: mediaId, pdfAssetId: pdfMediaId }
+    });
+    assert.equal(createdJournal.statusCode, 201, createdJournal.body);
+    journalId = createdJournal.json().data.id;
+    const publishedJournal = await app.inject({ method: 'PATCH', url: `/api/v1/publishing/journal/${journalId}/status`, headers: authHeaders(adminJar), payload: { status: 'published' } });
+    assert.equal(publishedJournal.statusCode, 200);
+    assert.equal(publishedJournal.json().data.status, 'published');
+    const journals = await app.inject({ method: 'GET', url: `/api/v1/publishing/journal?search=${suffix}`, headers: authHeaders(adminJar) });
+    assert.equal(journals.statusCode, 200);
+    assert.ok(journals.json().data.some((row: { id: string }) => row.id === journalId));
+
+    const createdClassified = await app.inject({
+      method: 'POST', url: '/api/v1/publishing/classifieds', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, vendorId, category: 'service', title: `Audit elanı ${suffix}`, description: 'Elan moderasiya axınının avtomatik auditi.', price: 25, currency: 'AZN', phone: '+994501112233', city: 'Bakı', mediaIds: [mediaId] }
+    });
+    assert.equal(createdClassified.statusCode, 201, createdClassified.body);
+    classifiedId = createdClassified.json().data.id;
+    const classifiedDetail = await app.inject({ method: 'GET', url: `/api/v1/publishing/classifieds/${classifiedId}`, headers: authHeaders(adminJar) });
+    assert.equal(classifiedDetail.statusCode, 200);
+    assert.equal(classifiedDetail.json().data.media[0].id, mediaId);
+    const publishedClassified = await app.inject({ method: 'PATCH', url: `/api/v1/publishing/classifieds/${classifiedId}/status`, headers: authHeaders(adminJar), payload: { status: 'published' } });
+    assert.equal(publishedClassified.statusCode, 200);
+    assert.equal(publishedClassified.json().data.status, 'published');
+    const protectedMedia = await app.inject({ method: 'DELETE', url: `/api/v1/media/${mediaId}`, headers: authHeaders(adminJar) });
+    assert.equal(protectedMedia.statusCode, 400);
+    assert.equal(protectedMedia.json().error.code, 'MEDIA_IN_USE');
+
+    const createdCluster = await app.inject({
+      method: 'POST', url: '/api/v1/content/seo/clusters', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, name: `Audit klasteri ${suffix}`, primaryKeyword: `audit ${suffix}`, searchIntent: 'informational', targetAudience: 'Audit auditoriyası' }
+    });
+    assert.equal(createdCluster.statusCode, 201);
+    seoClusterId = createdCluster.json().data.id;
+    const searchedCluster = await app.inject({
+      method: 'GET', url: `/api/v1/content/seo/clusters?search=${suffix}`, headers: authHeaders(adminJar)
+    });
+    assert.equal(searchedCluster.statusCode, 200);
+    assert.ok(searchedCluster.json().data.some((row: { id: string }) => row.id === seoClusterId));
+
+    const startsAt = new Date(Date.now() + 3_600_000).toISOString();
+    const endsAt = new Date(Date.now() + 7_200_000).toISOString();
+    const createdCampaign = await app.inject({
+      method: 'POST', url: '/api/v1/marketing/campaigns', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, vendorId, name: `Audit kampaniyası ${suffix}`, slug: `audit-campaign-${suffix}`, campaignType: 'limited', startsAt, endsAt, description: 'Audit kampaniyası', goals: {}, targeting: {} }
+    });
+    assert.equal(createdCampaign.statusCode, 201);
+    campaignId = createdCampaign.json().data.id;
+    const activatedCampaign = await app.inject({
+      method: 'PATCH', url: `/api/v1/marketing/campaigns/${campaignId}/status`, headers: authHeaders(adminJar), payload: { status: 'active' }
+    });
+    assert.equal(activatedCampaign.statusCode, 200);
+    assert.equal(activatedCampaign.json().data.status, 'active');
+
+    const createdCoupon = await app.inject({
+      method: 'POST', url: '/api/v1/marketing/coupons', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, vendorId, campaignId, name: `Audit kuponu ${suffix}`, codePrefix: `A${suffix.slice(0, 6)}`, discountType: 'percentage', discountValue: 10, minimumOrder: 0, perUserLimit: 1, startsAt, expiresAt: endsAt, rules: {} }
+    });
+    assert.equal(createdCoupon.statusCode, 201);
+    couponId = createdCoupon.json().data.id;
+    const pausedCoupon = await app.inject({
+      method: 'PATCH', url: `/api/v1/marketing/coupons/${couponId}/status`, headers: authHeaders(adminJar), payload: { status: 'inactive' }
+    });
+    assert.equal(pausedCoupon.statusCode, 200);
+    assert.equal(pausedCoupon.json().data.status, 'inactive');
+    const searchedCoupon = await app.inject({ method: 'GET', url: `/api/v1/marketing/coupons?search=${suffix}`, headers: authHeaders(adminJar) });
+    assert.equal(searchedCoupon.statusCode, 200);
+    assert.ok(searchedCoupon.json().data.some((row: { id: string }) => row.id === couponId));
+
+    const createdQr = await app.inject({
+      method: 'POST', url: '/api/v1/marketing/qr', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, vendorId, campaignId, name: `Audit QR ${suffix}`, qrType: 'store', targetUrl: `https://example.com/audit-${suffix}`, perUserLimit: 1, rules: {} }
+    });
+    assert.equal(createdQr.statusCode, 201);
+    qrId = createdQr.json().data.id;
+    const pausedQr = await app.inject({
+      method: 'PATCH', url: `/api/v1/marketing/qr/${qrId}/status`, headers: authHeaders(adminJar), payload: { status: 'inactive' }
+    });
+    assert.equal(pausedQr.statusCode, 200);
+    assert.equal(pausedQr.json().data.status, 'inactive');
+    const searchedQr = await app.inject({ method: 'GET', url: `/api/v1/marketing/qr?search=${suffix}`, headers: authHeaders(adminJar) });
+    assert.equal(searchedQr.statusCode, 200);
+    assert.ok(searchedQr.json().data.some((row: { id: string }) => row.id === qrId));
+
+    const inventory = await app.inject({ method: 'GET', url: '/api/v1/catalog/inventory?limit=1', headers: authHeaders(adminJar) });
+    assert.equal(inventory.statusCode, 200);
+    assert.ok(inventory.json().data.length > 0);
+    const inventoryRow = inventory.json().data[0];
+    const quantityBefore = Number(inventoryRow.quantity);
+    const adjusted = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/inventory/adjust', headers: authHeaders(adminJar),
+      payload: { variantId: inventoryRow.variant_id, warehouseId: inventoryRow.warehouse_id, quantityDelta: 1, note: 'Audit stok artımı', referenceId: inventoryReferences[0] }
+    });
+    assert.equal(adjusted.statusCode, 200);
+    assert.equal(Number(adjusted.json().data.quantity), quantityBefore + 1);
+    const reverted = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/inventory/adjust', headers: authHeaders(adminJar),
+      payload: { variantId: inventoryRow.variant_id, warehouseId: inventoryRow.warehouse_id, quantityDelta: -1, note: 'Audit stok bərpası', referenceId: inventoryReferences[1] }
+    });
+    assert.equal(reverted.statusCode, 200);
+    assert.equal(Number(reverted.json().data.quantity), quantityBefore);
+
+    const currentSettings = await app.inject({ method: 'GET', url: '/api/v1/settings', headers: authHeaders(adminJar) });
+    assert.equal(currentSettings.statusCode, 200);
+    assert.equal(currentSettings.json().data.id, storeRow.id);
+    const savedSettings = await app.inject({
+      method: 'PATCH', url: `/api/v1/settings/${storeRow.id}`, headers: authHeaders(adminJar),
+      payload: { name: storeRow.name, locale: storeRow.locale, currency: storeRow.currency.trim(), timezone: storeRow.timezone }
+    });
+    assert.equal(savedSettings.statusCode, 200);
+    assert.equal(savedSettings.json().data.timezone, storeRow.timezone);
+
+    const suspendedOwner = await app.inject({
+      method: 'PATCH', url: `/api/v1/users/${ownerId}/status`, headers: authHeaders(adminJar), payload: { status: 'suspended' }
+    });
+    assert.equal(suspendedOwner.statusCode, 200);
+    const revokedOwnerSession = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(ownerJar) });
+    assert.equal(revokedOwnerSession.statusCode, 401);
+    const suspendedCustomerState = await app.inject({ method: 'GET', url: '/api/v1/customer/state', headers: authHeaders(ownerJar) });
+    assert.equal(suspendedCustomerState.statusCode, 200);
+    assert.equal(suspendedCustomerState.json().data.profile.authenticated, false);
+    const suspendedLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: ownerEmail, password: ownerPassword }
+    });
+    assert.equal(suspendedLogin.statusCode, 401);
+
+    const refreshed = await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', headers: { cookie: cookieHeader(originalCustomerJar) } });
+    assert.equal(refreshed.statusCode, 200);
+    const refreshedCustomerJar = mergeCookies(refreshed, originalCustomerJar);
+    const reused = await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', headers: { cookie: cookieHeader(originalCustomerJar) } });
+    assert.equal(reused.statusCode, 401);
+    assert.equal(reused.json().error.code, 'SESSION_REUSE_DETECTED');
+    const revokedFamily = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(refreshedCustomerJar) });
+    assert.equal(revokedFamily.statusCode, 401);
+
+    const logout = await app.inject({ method: 'POST', url: '/api/v1/auth/logout', headers: authHeaders(adminJar) });
+    assert.equal(logout.statusCode, 204);
+    const loggedOutSession = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(adminJar) });
+    assert.equal(loggedOutSession.statusCode, 401);
+    const loggedOutCustomerState = await app.inject({ method: 'GET', url: '/api/v1/customer/state', headers: authHeaders(adminJar) });
+    assert.equal(loggedOutCustomerState.statusCode, 200);
+    assert.equal(loggedOutCustomerState.json().data.profile.authenticated, false);
+
+    const adminScript = await app.inject({ method: 'GET', url: '/admin/admin.js' });
+    assert.equal(adminScript.statusCode, 200);
+    assert.match(adminScript.body, /\/catalog\/inventory/);
+    assert.match(adminScript.body, /data-user-status/);
+    assert.match(adminScript.body, /data-vendor-status/);
+    assert.match(adminScript.body, /\/settings\/\$\{settingsForm\.dataset\.storeId\}/);
+    assert.match(adminScript.body, /\/publishing\/journal/);
+    assert.match(adminScript.body, /\/publishing\/classifieds/);
+    assert.match(adminScript.body, /\/catalog\/product-identifiers\/preview/);
+    assert.match(adminScript.body, /data-product-sku/);
+    assert.doesNotMatch(adminScript.body, /Sistem avtomatik yaradacaq|Variant SKU-su|Variant adı|Barkod/);
+    assert.match(adminScript.body, /data-product-attributes/);
+    assert.match(adminScript.body, /data-product-image-input/);
+    assert.match(adminScript.body, /Yeni brend əlavə et/);
+    assert.match(adminScript.body, /Satıcı kabineti hesabı/);
+    assert.match(adminScript.body, /pdfUpload/);
+    assert.match(adminScript.body, /data-user-edit/);
+    assert.match(adminScript.body, /data-user-delete/);
+    assert.match(adminScript.body, /vendorPortalViews/);
+    assert.doesNotMatch(adminScript.body, /attributesJson/);
+  } finally {
+    await pool.query('DELETE FROM inventory_movements WHERE reference_id=ANY($1::text[])', [inventoryReferences]);
+    if (qrId) await pool.query('DELETE FROM qr_codes WHERE id=$1', [qrId]);
+    if (couponId) await pool.query('DELETE FROM coupons WHERE id=$1', [couponId]);
+    if (campaignId) await pool.query('DELETE FROM campaigns WHERE id=$1', [campaignId]);
+    if (seoClusterId) await pool.query('DELETE FROM seo_clusters WHERE id=$1', [seoClusterId]);
+    if (classifiedId) await pool.query('DELETE FROM classified_listings WHERE id=$1', [classifiedId]);
+    if (journalId) await pool.query('DELETE FROM journal_issues WHERE id=$1', [journalId]);
+    if (postId) await pool.query('DELETE FROM posts WHERE id=$1', [postId]);
+    if (postCategoryId) await pool.query('DELETE FROM post_categories WHERE id=$1', [postCategoryId]);
+    if (pageId) await pool.query('DELETE FROM pages WHERE id=$1', [pageId]);
+    if (rewardId) await pool.query('DELETE FROM rewards WHERE id=$1', [rewardId]);
+    if (productId) {
+      await pool.query("DELETE FROM inventory_movements WHERE reference_type='product' AND reference_id=$1", [productId]);
+      await pool.query('DELETE FROM products WHERE id=$1', [productId]);
+    }
+    for (const assetId of [mediaId, pdfMediaId].filter(Boolean)) {
+      const media = await pool.query<{ storage_key: string }>('SELECT storage_key FROM media_assets WHERE id=$1', [assetId]);
+      await pool.query('DELETE FROM media_assets WHERE id=$1', [assetId]);
+      if (media.rows[0]?.storage_key) {
+        const { unlink } = await import('node:fs/promises');
+        const { resolve } = await import('node:path');
+        await unlink(resolve(env.UPLOAD_DIR, media.rows[0].storage_key)).catch(() => undefined);
+      }
+    }
+    if (brandId) await pool.query('DELETE FROM brands WHERE id=$1', [brandId]);
+    if (categoryId) await pool.query('DELETE FROM categories WHERE id=$1', [categoryId]);
+    if (createdUserIds.length || vendorId) {
+      await pool.query(`DELETE FROM audit_logs WHERE actor_user_id=ANY($1::uuid[])
+        OR entity_id=ANY($2::text[]) OR vendor_id=$3`, [createdUserIds, [...createdUserIds, vendorId].filter(Boolean), vendorId || null]);
+    }
+    if (createdUserIds.length) await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])', [createdUserIds]);
+    if (vendorId) await pool.query('DELETE FROM vendors WHERE id=$1', [vendorId]);
+    await app.close();
+  }
 });

@@ -7,7 +7,8 @@ const demoCategories = [
   ['Elektrik alətləri', 'elektrik-aletleri', 'Peşəkar və məişət üçün elektrik alətləri'],
   ['Ölçü cihazları', 'olcu-cihazlari', 'Dəqiq ölçmə və nəzarət cihazları'],
   ['Bağ və emalatxana', 'bag-ve-emalatxana', 'Ev, bağ və emalatxana üçün avadanlıqlar'],
-  ['Aksesuarlar', 'aksesuarlar', 'Alətlər üçün tamamlayıcı hissə və aksesuarlar']
+  ['Aksesuarlar', 'aksesuarlar', 'Alətlər üçün tamamlayıcı hissə və aksesuarlar'],
+  ['Hədiyyələr', 'hediyyeler', 'Hədiyyə üçün seçilmiş promo məhsullar və xüsusi təkliflər']
 ] as const;
 
 const demoProducts = [
@@ -97,16 +98,19 @@ async function seed(): Promise<void> {
     const menuId = menuResult.rows[0]!.id;
 
     const topItems = [
-      ['Mağaza', '/magaza/'], ['Endirimlər və Kuponlar', '/endirimler/'],
+      ['Mağaza', '/magaza/'], ['Endirimlər', '/endirimler/'], ['Kuponlar', '/kuponlar/'],
       ['Kampaniyalar', '/kampaniyalar/'], ['Jurnal və Blog', '/jurnal/'],
       ['Bakı Club', '/baki-club/'], ['Elanlar', '/elanlar/'], ['Biznes üçün', '/biznes/']
     ];
     for (const [position, item] of topItems.entries()) {
       await client.query(`
+        UPDATE navigation_items
+        SET label=$2, position=$4, is_visible=true
+        WHERE menu_id=$1 AND parent_id IS NULL AND url=$3;
         INSERT INTO navigation_items (menu_id, label, url, position)
         SELECT $1, $2, $3, $4
         WHERE NOT EXISTS (
-          SELECT 1 FROM navigation_items WHERE menu_id = $1 AND parent_id IS NULL AND label = $2
+          SELECT 1 FROM navigation_items WHERE menu_id = $1 AND parent_id IS NULL AND url = $3
         )
       `, [menuId, item![0], item![1], position]);
     }
@@ -136,15 +140,15 @@ async function seed(): Promise<void> {
 
     const warehouseResult = await client.query<{ id: string }>(`
       INSERT INTO warehouses (store_id, vendor_id, name, code, address, status)
-      VALUES ($1, $2, 'Bakı əsas anbarı', 'DEMO-BAKU-01', $3, 'active')
-      ON CONFLICT (store_id, code) DO UPDATE SET vendor_id=EXCLUDED.vendor_id, name=EXCLUDED.name, status='active'
+      VALUES ($1, NULL, 'Bakı əsas anbarı', 'DEMO-BAKU-01', $2, 'active')
+      ON CONFLICT (store_id, code) DO UPDATE SET vendor_id=NULL, name=EXCLUDED.name, status='active'
       RETURNING id
-    `, [storeId, vendorId, JSON.stringify({ city: 'Bakı', district: 'Nərimanov', address: 'Ağa Neymətulla küçəsi 24' })]);
+    `, [storeId, JSON.stringify({ city: 'Bakı', district: 'Nərimanov', address: 'Ağa Neymətulla küçəsi 24' })]);
     const warehouseId = warehouseResult.rows[0]!.id;
 
     const brandIds = new Map<string, string>();
     const seededProducts: Array<{ productId: string; variantId: string; title: string; sku: string; price: number }> = [];
-    for (const item of demoProducts) {
+    for (const [productIndex, item] of demoProducts.entries()) {
       let brandId = brandIds.get(item.brandSlug);
       if (!brandId) {
         const brandResult = await client.query<{ id: string }>(`
@@ -176,20 +180,29 @@ async function seed(): Promise<void> {
 
       await client.query(`
         INSERT INTO product_listings (store_id, product_id, locale, title, slug, short_description, description, price,
-          compare_at_price, currency, status, seo_title, seo_description, canonical_url, schema_data, published_at)
-        VALUES ($1, $2, 'az-AZ', $3, $4, $5, $6, $7, $8, 'AZN', 'published', $9, $10, $11, $12, now())
+          compare_at_price, currency, status, seo_title, seo_description, canonical_url, schema_data, published_at,
+          is_featured, is_popular, is_top_pick, display_position, merchandising_badge)
+        VALUES ($1, $2, 'az-AZ', $3, $4, $5, $6, $7, $8, 'AZN', 'published', $9, $10, $11, $12, now(), true, true, true, $13, $14)
         ON CONFLICT (store_id, product_id, locale) DO UPDATE SET
           title=EXCLUDED.title, slug=EXCLUDED.slug, short_description=EXCLUDED.short_description,
           description=EXCLUDED.description, price=EXCLUDED.price, compare_at_price=EXCLUDED.compare_at_price,
           status='published', seo_title=EXCLUDED.seo_title, seo_description=EXCLUDED.seo_description,
-          canonical_url=EXCLUDED.canonical_url, schema_data=EXCLUDED.schema_data, published_at=coalesce(product_listings.published_at, now())
-      `, [storeId, productId, item.title, item.slug, item.short, `${item.short} Məhsul stokdadır, təhlükəsiz sifariş və sürətli çatdırılma mümkündür.`, item.price, item.compareAt, `${item.title} — qiymət və sifariş`, `${item.title}. Xüsusiyyətləri, aktual qiyməti və Gündəlik Bakı kampaniyasını yoxlayın.`, `/mehsul/${item.slug}/`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Product', name: item.title, sku: item.sku, offers: { '@type': 'Offer', price: item.price, priceCurrency: 'AZN', availability: 'https://schema.org/InStock' } })]);
+          canonical_url=EXCLUDED.canonical_url, schema_data=EXCLUDED.schema_data, published_at=coalesce(product_listings.published_at, now()),
+          is_featured=true,is_popular=true,is_top_pick=true,display_position=EXCLUDED.display_position,merchandising_badge=EXCLUDED.merchandising_badge
+      `, [storeId, productId, item.title, item.slug, item.short, `${item.short} Məhsul stokdadır, təhlükəsiz sifariş və sürətli çatdırılma mümkündür.`, item.price, item.compareAt, `${item.title} — qiymət və sifariş`, `${item.title}. Xüsusiyyətləri, aktual qiyməti və Gündəlik Bakı kampaniyasını yoxlayın.`, `/mehsul/${item.slug}/`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Product', name: item.title, sku: item.sku, offers: { '@type': 'Offer', price: item.price, priceCurrency: 'AZN', availability: 'https://schema.org/InStock' } }),productIndex,productIndex===3||productIndex===13?'hot':productIndex===7||productIndex===17?'new':[0,6,10,15].includes(productIndex)?'recommended':[1,8].includes(productIndex)?'sale':'none']);
 
       await client.query(`
         INSERT INTO product_categories (product_id, category_id, is_primary)
         VALUES ($1, $2, true)
         ON CONFLICT (product_id, category_id) DO UPDATE SET is_primary=true
       `, [productId, categoryIds.get(item.category)]);
+      if ([0, 1, 3, 6, 7, 8, 10, 13, 15, 17].includes(productIndex)) {
+        await client.query(`
+          INSERT INTO product_categories (product_id, category_id, is_primary)
+          VALUES ($1, $2, false)
+          ON CONFLICT (product_id, category_id) DO NOTHING
+        `, [productId, categoryIds.get('hediyyeler')]);
+      }
       await client.query(`
         INSERT INTO product_media (product_id, media_asset_id, position, is_primary)
         VALUES ($1, $2, 0, true)
@@ -371,17 +384,33 @@ async function seed(): Promise<void> {
         ]
       }
     ] as const;
+    const postImageUrls: Record<string,string> = {
+      'duzgun-elektrik-aleti-nece-secilmelidir':'/assets/images/categories/jurnal/alis-veris-meslehetleri.jpg',
+      'endirim-kampaniyasinda-agilli-alis-veris':'/assets/images/categories/kampaniyalar/movsumi-endirimler.jpg',
+      'baku-pro-market-reqemsal-inkisaf-hekayesi':'/assets/images/categories/jurnal/brend-hekayeleri.jpg',
+      'yay-fursetleri-alis-veris-plani':'/assets/images/categories/endirimler.jpg',
+      'daily-baku-yeni-reqemsal-buraxilis':'/assets/images/categories/jurnal/son-buraxilis.jpg',
+      'yerli-brendler-reqemsal-vitrin':'/assets/images/categories/biznes/brend-vitrini.jpg',
+      'baki-club-yeni-hediyyeler':'/assets/images/categories/baki-club/giveawayler.jpg',
+      'ayin-en-cox-oxunan-hekayeleri':'/assets/images/categories/jurnal/arxiv.jpg'
+    };
     const seededPostIds: string[] = [];
     for (const post of demoPosts) {
+      const postMedia=await client.query<{id:string}>(`
+        INSERT INTO media_assets(store_id,uploaded_by,storage_key,public_url,mime_type,byte_size,alt_text,title,metadata)
+        VALUES($1,$2,$3,$4,'image/jpeg',1,$5,$6,$7)
+        ON CONFLICT(storage_key) DO UPDATE SET public_url=EXCLUDED.public_url,alt_text=EXCLUDED.alt_text,title=EXCLUDED.title
+        RETURNING id
+      `,[storeId,userResult.rows[0]!.id,`seed/posts/${post.slug}.jpg`,postImageUrls[post.slug],`${post.title} — Gündəlik Bakı yeniliyi`,post.title,JSON.stringify({seeded:true,source:'theme-export'})]);
       const result = await client.query<{ id: string }>(`
-        INSERT INTO posts (store_id, category_id, locale, post_type, title, slug, excerpt, content, status,
+        INSERT INTO posts (store_id, category_id, featured_asset_id, locale, post_type, title, slug, excerpt, content, status,
           seo_title, seo_description, robots_directive, schema_data, author_id, reviewed_by, published_at)
-        VALUES ($1, $2, 'az-AZ', $3, $4, $5, $6, $7, 'published', $8, $9, 'index,follow', $10, $11, $11, now())
+        VALUES ($1, $2, $3, 'az-AZ', $4, $5, $6, $7, $8, 'published', $9, $10, 'index,follow', $11, $12, $12, now())
         ON CONFLICT (store_id, locale, slug) DO UPDATE SET title=EXCLUDED.title, excerpt=EXCLUDED.excerpt,
           content=EXCLUDED.content, status='published', seo_title=EXCLUDED.seo_title,
-          seo_description=EXCLUDED.seo_description, deleted_at=NULL, published_at=coalesce(posts.published_at,now())
+          seo_description=EXCLUDED.seo_description, featured_asset_id=coalesce(posts.featured_asset_id,EXCLUDED.featured_asset_id),deleted_at=NULL, published_at=coalesce(posts.published_at,now())
         RETURNING id
-      `, [storeId, postCategoryId, post.type, post.title, post.slug, post.excerpt, JSON.stringify(post.blocks), `${post.title} | Gündəlik Bakı`, `${post.excerpt} Gündəlik Bakı jurnalında ətraflı oxuyun.`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article', headline: post.title, keywords: post.keyword }), userResult.rows[0]!.id]);
+      `, [storeId, postCategoryId,postMedia.rows[0]!.id, post.type, post.title, post.slug, post.excerpt, JSON.stringify(post.blocks), `${post.title} | Gündəlik Bakı`, `${post.excerpt} Gündəlik Bakı jurnalında ətraflı oxuyun.`, JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article', headline: post.title, keywords: post.keyword }), userResult.rows[0]!.id]);
       seededPostIds.push(result.rows[0]!.id);
     }
 

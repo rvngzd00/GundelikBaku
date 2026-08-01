@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { pool } from '../db/pool.js';
-import { forbidden } from '../core/errors.js';
+import { AppError, forbidden } from '../core/errors.js';
 import type { ActorContext } from '../types/fastify.js';
 
 interface ContextRow {
@@ -52,8 +52,14 @@ async function authPlugin(app: FastifyInstance): Promise<void> {
 
   app.decorate('authenticate', async (request: FastifyRequest, _reply: FastifyReply) => {
     await request.jwtVerify({ onlyCookie: true });
+    const session = await pool.query(`
+      SELECT 1 FROM refresh_sessions
+      WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL
+        AND rotated_at IS NULL AND expires_at>now()
+    `, [request.user.sessionId, request.user.sub]);
+    if (!session.rows[0]) throw new AppError(401, 'SESSION_INVALID', 'Sessiya etibarsızdır və ya bitib');
     const actor = await loadActorContext(request.user.sub);
-    if (!actor) throw forbidden('Sessiya istifadəçisi aktiv deyil');
+    if (!actor) throw new AppError(401, 'SESSION_USER_INACTIVE', 'Sessiya istifadəçisi aktiv deyil');
     request.actor = actor;
   });
 

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
-import { navigationSections, type NavigationChild, type NavigationSection } from './navigation.js';
+import { findNavigationSection, navigationSections, type NavigationChild, type NavigationSection } from './navigation.js';
 import { renderProductDetail, type ProductReviewView } from './product-detail.js';
 import { accountShell, breadcrumb, categoryNavigation, emptyState, escapeHtml, layout, money, productCard, type ProductView } from './templates.js';
 
@@ -16,6 +16,11 @@ const productSelect = `SELECT pl.id,pl.title,pl.slug,pl.short_description,pl.des
   LEFT JOIN media_assets ma ON ma.id=pm.media_asset_id`;
 const searchLetterMap: Record<string, string> = { 'ə': 'e', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'ç': 'c' };
 const normalizeSearchTerm = (value: string) => value.toLocaleLowerCase('az-AZ').replace(/[əğıöşüç]/g, (letter) => searchLetterMap[letter] ?? letter);
+const requiredNavigationSection = (key: string): NavigationSection => {
+  const section = findNavigationSection(key);
+  if (!section) throw new Error(`Navigation section is missing: ${key}`);
+  return section;
+};
 
 function sendHtml(reply: FastifyReply, html: string, status = 200, cacheControl?: string) {
   return reply.code(status).type('text/html; charset=utf-8').header(
@@ -112,12 +117,8 @@ async function renderCategoryChild(section: NavigationSection, child: Navigation
   }
 
   if (section.key === 'endirimler') {
-    const [coupons, products] = await Promise.all([
-      pool.query(`SELECT c.*,v.display_name AS vendor_name FROM coupons c LEFT JOIN vendors v ON v.id=c.vendor_id JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.status='active' AND now() BETWEEN c.starts_at AND c.expires_at ORDER BY c.created_at DESC`, [env.DEFAULT_STORE_CODE]),
-      pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id WHERE s.code=$1 AND pl.status='published' AND pl.compare_at_price>pl.price ORDER BY (pl.compare_at_price-pl.price) DESC LIMIT 12`, [env.DEFAULT_STORE_CODE])
-    ]);
-    const couponCards = coupons.rows.map((coupon) => `<article><p>${escapeHtml(coupon.vendor_name || 'Gündəlik Bakı')}</p><h2>${escapeHtml(coupon.name)}</h2><strong>${coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `${money(coupon.discount_value)} `} ENDİRİM</strong><code>${escapeHtml(coupon.code_prefix)}</code><small>${new Intl.DateTimeFormat('az-AZ').format(new Date(coupon.expires_at))} tarixinədək</small></article>`).join('');
-    return `${lead}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>AKTİV KUPONLAR</p><h2>${escapeHtml(child.label)} fürsətləri</h2></div><a href="${section.href}">Bütün endirimlər →</a></div>${couponCards ? `<div class="page-coupon-grid">${couponCards}</div>` : emptyState('Aktiv kupon yoxdur', 'Bu bölmə üçün yeni kuponlar tezliklə əlavə ediləcək.', section.href, 'Bütün endirimlərə bax')}${products.rows.length ? `<div class="page-section-title"><div><p>ENDİRİMLİ SEÇİMLƏR</p><h2>Sərfəli məhsullar</h2></div></div><div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : ''}</div></section>`;
+    const products = await pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id WHERE s.code=$1 AND pl.status='published' AND pl.compare_at_price>pl.price ORDER BY (pl.compare_at_price-pl.price) DESC LIMIT 20`, [env.DEFAULT_STORE_CODE]);
+    return `${lead}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>ENDİRİMLİ SEÇİMLƏR</p><h2>${escapeHtml(child.label)} fürsətləri</h2></div><a href="${section.href}">Bütün endirimlər →</a></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Endirimli məhsul tapılmadı', 'Bu bölmə üçün yeni endirimlər tezliklə əlavə ediləcək.', section.href, 'Bütün endirimlərə bax')}</div></section>`;
   }
 
   if (section.key === 'kampaniyalar') {
@@ -167,8 +168,9 @@ const staticPages: Record<string, { active?: string; title: string; description:
 };
 
 export async function webRoutes(app: FastifyInstance): Promise<void> {
-  const accountPaths = ['/hesabim', '/hesabim/secilmisler', '/hesabim/sifarisler', '/hesabim/tarixce', '/hesabim/unvanlar', '/hesabim/hesab-melumatlari'];
-  const slashed = [...navigationSections.map((section) => section.href.slice(0, -1)), '/sebet', ...accountPaths, '/haqqimizda', '/elaqe', '/faq', '/catdirilma', '/geri-qaytarma', '/mexfilik', '/istifade-sertleri'];
+  const accountPaths = ['/hesabim', '/hesabim/secilmisler', '/hesabim/sifarisler', '/hesabim/tarixce', '/hesabim/baki-club', '/hesabim/bildirisler', '/hesabim/unvanlar', '/hesabim/hesab-melumatlari'];
+  const authPaths = ['/giris', '/qeydiyyat', '/sifre-berpasi', '/sifre-yenile', '/deveti-qebul-et'];
+  const slashed = [...navigationSections.map((section) => section.href.slice(0, -1)), '/sebet', ...accountPaths, ...authPaths, '/haqqimizda', '/elaqe', '/faq', '/catdirilma', '/geri-qaytarma', '/mexfilik', '/istifade-sertleri'];
   for (const path of slashed) app.get(path, async (_request, reply) => reply.redirect(`${path}/`, 308));
 
   for (const section of navigationSections) {
@@ -191,7 +193,7 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   }
 
   app.get('/magaza/', async (request, reply) => {
-    const query = z.object({ axtaris: z.string().trim().max(100).optional(), kateqoriya: z.string().trim().max(100).optional(), brend: z.string().trim().max(100).optional() }).parse(request.query);
+    const query = z.object({ axtaris: z.string().trim().max(100).optional(), kateqoriya: z.string().trim().max(100).optional(), brend: z.string().trim().max(100).optional(), mense: z.string().trim().max(100).optional() }).parse(request.query);
     const params: unknown[] = [env.DEFAULT_STORE_CODE];
     const where = [`s.code=$1`, `pl.status='published'`, `p.deleted_at IS NULL`];
     let joins = '';
@@ -222,12 +224,13 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
     }
     if (query.kateqoriya) { joins = ' JOIN product_categories pc ON pc.product_id=p.id JOIN categories c ON c.id=pc.category_id'; params.push(query.kateqoriya); where.push(`c.slug=$${params.length}`); }
     if (query.brend) { params.push(query.brend); where.push(`b.slug=$${params.length}`); }
+    if (query.mense) { params.push(query.mense); where.push(`EXISTS (SELECT 1 FROM jsonb_each_text(p.attributes) attribute WHERE translate(lower(attribute.key),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC') IN ('mense','mense olkesi','country of origin') AND trim(both '-' FROM regexp_replace(translate(lower(attribute.value),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC'),'[^a-z0-9]+','-','g'))=$${params.length})`); }
     const [products, categories] = await Promise.all([
       pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id ${joins} WHERE ${where.join(' AND ')} ORDER BY ${orderBy}`, params),
       pool.query(`SELECT c.name,c.slug,count(pc.product_id)::int AS product_count FROM categories c JOIN stores s ON s.id=c.store_id LEFT JOIN product_categories pc ON pc.category_id=c.id WHERE s.code=$1 AND c.status='active' GROUP BY c.id ORDER BY c.position,c.name`, [env.DEFAULT_STORE_CODE])
     ]);
     const heading = query.axtaris ? `“${query.axtaris}” üçün nəticələr` : 'Bütün məhsullar';
-    const section = navigationSections[0];
+    const section = requiredNavigationSection('magaza');
     const content = `${pageHero('GÜNDƏLİK BAKI MAĞAZA', heading, 'Etibarlı satıcılardan seçilmiş məhsullar, aktual qiymətlər və kampaniyalar.')}${categoryNavigation(section)}
       <section class="page-section"><div class="page-container page-shop-layout"><aside class="page-filter"><h2>Kateqoriyalar</h2><a href="/magaza/"${!query.kateqoriya ? ' aria-current="page"' : ''}>Hamısı</a>${categories.rows.map((c) => `<a href="/magaza/?kateqoriya=${encodeURIComponent(c.slug)}"${query.kateqoriya === c.slug ? ' aria-current="page"' : ''}>${escapeHtml(c.name)} <span>${c.product_count}</span></a>`).join('')}</aside><div><div class="page-results-head"><p><strong>${products.rowCount ?? 0}</strong> məhsul tapıldı</p></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Məhsul tapılmadı', 'Axtarış və ya filtr seçimini dəyişərək yenidən yoxlayın.')}</div></div></section>`;
     return sendHtml(reply, layout({ title: `${heading} | Gündəlik Bakı`, description: 'Gündəlik Bakı mağazasında məhsullar, qiymətlər və endirimlər.', path: '/magaza/', active: 'magaza', schema: categorySchemas(section), ...(query.axtaris ? { robots: 'noindex,follow' } : {}), content }));
@@ -287,18 +290,23 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/endirimler/', async (_request, reply) => {
-    const [coupons, products] = await Promise.all([
-      pool.query(`SELECT c.*,v.display_name AS vendor_name FROM coupons c LEFT JOIN vendors v ON v.id=c.vendor_id JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.status='active' AND now() BETWEEN c.starts_at AND c.expires_at ORDER BY c.created_at DESC`, [env.DEFAULT_STORE_CODE]),
-      pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id WHERE s.code=$1 AND pl.status='published' AND pl.compare_at_price>pl.price ORDER BY (pl.compare_at_price-pl.price) DESC LIMIT 12`, [env.DEFAULT_STORE_CODE])
-    ]);
-    const section = navigationSections[1];
-    const content = `${pageHero('ENDİRİM MƏRKƏZİ', 'Endirimlər və kuponlar', 'Aktiv kuponları götürün, seçilmiş məhsullarda sərfəli qiymətləri qaçırmayın.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container"><div class="page-coupon-grid">${coupons.rows.map((c)=>`<article><p>${escapeHtml(c.vendor_name || 'Gündəlik Bakı')}</p><h2>${escapeHtml(c.name)}</h2><strong>${c.discount_type==='percentage'?`${c.discount_value}%`:`${money(c.discount_value)} `} ENDİRİM</strong><code>${escapeHtml(c.code_prefix)}</code><small>${new Intl.DateTimeFormat('az-AZ').format(new Date(c.expires_at))} tarixinədək</small></article>`).join('')}</div><div class="page-section-title"><div><p>SEÇİLMİŞ FÜRSƏTLƏR</p><h2>Endirimli məhsullar</h2></div></div><div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div></div></section>`;
-    return sendHtml(reply, layout({ title: 'Endirimlər və kuponlar | Gündəlik Bakı', description: 'Gündəlik Bakı aktiv kuponları və endirimli məhsulları.', path: '/endirimler/', active: 'endirimler', schema: categorySchemas(section), content }));
+    const products = await pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id WHERE s.code=$1 AND pl.status='published' AND pl.compare_at_price>pl.price ORDER BY (pl.compare_at_price-pl.price) DESC LIMIT 20`, [env.DEFAULT_STORE_CODE]);
+    const section = requiredNavigationSection('endirimler');
+    const content = `${pageHero('ENDİRİM MƏRKƏZİ', 'Endirimlər', 'Seçilmiş məhsullarda aktual endirimləri və sərfəli qiymətləri qaçırmayın.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>SEÇİLMİŞ FÜRSƏTLƏR</p><h2>Endirimli məhsullar</h2></div><a href="/kuponlar/">Kuponlara bax →</a></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Endirimli məhsul tapılmadı', 'Yeni endirimlər tezliklə əlavə ediləcək.')}</div></section>`;
+    return sendHtml(reply, layout({ title: 'Endirimlər | Gündəlik Bakı', description: 'Gündəlik Bakı mağazasında aktiv endirimlər və sərfəli məhsullar.', path: '/endirimler/', active: 'endirimler', schema: categorySchemas(section), content }));
+  });
+
+  app.get('/kuponlar/', async (_request, reply) => {
+    const coupons = await pool.query(`SELECT c.*,v.display_name AS vendor_name FROM coupons c LEFT JOIN vendors v ON v.id=c.vendor_id JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.status='active' AND now() BETWEEN c.starts_at AND c.expires_at ORDER BY c.created_at DESC`, [env.DEFAULT_STORE_CODE]);
+    const section = requiredNavigationSection('kuponlar');
+    const couponCards = coupons.rows.map((coupon) => `<article><p>${escapeHtml(coupon.vendor_name || 'Gündəlik Bakı')}</p><h2>${escapeHtml(coupon.name)}</h2><strong>${coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `${money(coupon.discount_value)} `} ENDİRİM</strong><code>${escapeHtml(coupon.code_prefix)}</code><small>${new Intl.DateTimeFormat('az-AZ').format(new Date(coupon.expires_at))} tarixinədək</small></article>`).join('');
+    const content = `${pageHero('AKTİV KUPONLAR', 'Kuponlar', 'Aktiv kupon kodlarını, istifadə şərtlərini və son tarixlərini ayrıca izləyin.')}<section class="page-section"><div class="page-container">${couponCards ? `<div class="page-coupon-grid">${couponCards}</div>` : emptyState('Aktiv kupon yoxdur', 'Yeni kuponlar əlavə edilən kimi burada görünəcək.', '/endirimler/', 'Endirimlərə bax')}</div></section>`;
+    return sendHtml(reply, layout({ title: 'Kuponlar | Gündəlik Bakı', description: 'Gündəlik Bakı tərəfdaşlarının aktiv kupon kodları və istifadə müddətləri.', path: '/kuponlar/', active: 'kuponlar', schema: categorySchemas(section), content }));
   });
 
   app.get('/kampaniyalar/', async (_request, reply) => {
     const campaigns = await pool.query(`SELECT c.*,v.display_name AS vendor_name FROM campaigns c LEFT JOIN vendors v ON v.id=c.vendor_id JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.status IN ('active','scheduled') AND c.ends_at>now() ORDER BY c.starts_at DESC`, [env.DEFAULT_STORE_CODE]);
-    const section = navigationSections[2];
+    const section = requiredNavigationSection('kampaniyalar');
     const content = `${pageHero('AKTİV FÜRSƏTLƏR', 'Kampaniyalar', 'Günün təklifləri, mövsümi endirimlər və məhdud kampaniyaları bir yerdə izləyin.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container"><div class="page-campaign-grid">${renderCampaignCards(campaigns.rows) || emptyState('Aktiv kampaniya yoxdur','Yeni kampaniyalar tezliklə əlavə ediləcək.')}</div></div></section>`;
     return sendHtml(reply, layout({ title: 'Kampaniyalar | Gündəlik Bakı', description: 'Gündəlik Bakıda aktiv kampaniyalar, günün təklifləri və mövsümi endirimlər.', path: '/kampaniyalar/', active: 'kampaniyalar', schema: categorySchemas(section), content }));
   });
@@ -306,7 +314,7 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   app.get('/jurnal/', async (request, reply) => {
     const query=z.object({nov:z.enum(['beledci','brend-hekayesi']).optional()}).parse(request.query);const params:unknown[]=[env.DEFAULT_STORE_CODE];let filter='';if(query.nov){params.push(query.nov==='beledci'?'guide':'brand_story');filter=` AND p.post_type=$${params.length}`;}
     const posts = await pool.query(`SELECT p.*,pc.name AS category_name,ma.public_url AS image_url FROM posts p JOIN stores s ON s.id=p.store_id LEFT JOIN post_categories pc ON pc.id=p.category_id LEFT JOIN media_assets ma ON ma.id=p.featured_asset_id WHERE s.code=$1 AND p.status='published' AND p.deleted_at IS NULL${filter} ORDER BY p.published_at DESC`, params);
-    const section = navigationSections[3];
+    const section = requiredNavigationSection('jurnal');
     const content = `${pageHero('GÜNDƏLİK BAKI JURNAL', 'Şəhər, alış-veriş və brend hekayələri', 'Düzgün seçimlər, kampaniya bələdçiləri və şəhərin maraqlı biznes hekayələri.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container">${posts.rows.length?`<div class="page-post-grid">${renderPostCards(posts.rows)}</div>`:emptyState('Jurnal hazırlanır','İlk məqalələr tezliklə dərc olunacaq.')}</div></section>`;
     return sendHtml(reply, layout({ title: 'Jurnal və Bloq | Gündəlik Bakı', description: 'Gündəlik Bakı jurnalında brend hekayələri, alış-veriş məsləhətləri və şəhər yenilikləri.', path: '/jurnal/', active: 'jurnal', schema: categorySchemas(section), content }));
   });
@@ -324,10 +332,51 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   app.get('/elanlar/', async (request, reply) => {
     const query=z.object({nov:z.enum(['product','service','property','vehicle']).optional()}).parse(request.query);const params:unknown[]=[env.DEFAULT_STORE_CODE];let filter='';if(query.nov){params.push(query.nov);filter=` AND cl.category=$${params.length}`;}
     const listings=await pool.query(`SELECT cl.*,v.display_name AS vendor_name,ma.public_url AS image_url FROM classified_listings cl JOIN stores s ON s.id=cl.store_id LEFT JOIN vendors v ON v.id=cl.vendor_id LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id WHERE s.code=$1 AND cl.status='published' AND cl.deleted_at IS NULL${filter} ORDER BY cl.created_at DESC`,params);
-    const section = navigationSections[5];
+    const section = requiredNavigationSection('elanlar');
     const content=`${pageHero('ŞƏHƏR ELANLARI','Elanlar','Məhsul, xidmət, əmlak və avtomobil elanlarını rahat şəkildə kəşf edin.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container">${listings.rows.length?`<div class="page-listing-grid">${renderListingCards(listings.rows)}</div>`:emptyState('Aktiv elan yoxdur','Yeni elanlar moderasiyadan sonra burada görünəcək.','/elaqe/','Elan yerləşdirmək üçün əlaqə')}</div></section>`;
     return sendHtml(reply,layout({title:'Elanlar | Gündəlik Bakı',description:'Bakı üzrə məhsul, xidmət, əmlak və avtomobil elanları.',path:'/elanlar/',active:'elanlar',schema:categorySchemas(section),content}));
   });
+
+  const authPage = (path: string, title: string, subtitle: string, form: string) => {
+    app.get(path, async (_request, reply) => sendHtml(reply, layout({
+      title: `${title} | Gündəlik Bakı`,
+      description: subtitle,
+      path,
+      robots: 'noindex,follow',
+      content: `<section class="db-auth-page"><div class="page-container">${breadcrumb([[title]])}<div class="db-auth-layout">
+        <aside class="db-auth-promo"><span>GÜNDƏLİK BAKI HESABI</span><h1>Alış-verişiniz hər cihazda sizinlə qalsın.</h1><p>Səbət, seçilmişlər, sifarişlər və Bakı Club xalları təhlükəsiz hesabınızda sinxronlaşdırılır.</p><ul><li>Sifarişləri bir yerdən izləyin</li><li>Seçilmiş məhsulları itirməyin</li><li>Xal və hədiyyələr qazanın</li></ul></aside>
+        <div class="db-auth-card"><div class="db-auth-card-head"><p>TƏHLÜKƏSİZ HESAB</p><h2>${escapeHtml(title)}</h2><span>${escapeHtml(subtitle)}</span></div>${form}</div>
+      </div></div></section>`
+    }), 200, 'private, no-store'));
+  };
+
+  authPage('/giris/', 'Daxil ol', 'Hesabınıza e-poçt və şifrənizlə daxil olun.', `
+    <form class="db-auth-form" data-auth-form="login" novalidate>
+      <label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label>
+      <label>Şifrə<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <div class="db-auth-options"><label><input name="remember" type="checkbox" checked> Məni xatırla</label><a href="/sifre-berpasi/">Şifrəni unutmusunuz?</a></div>
+      <button type="submit">DAXİL OL</button><p class="db-auth-status" role="status" aria-live="polite"></p>
+    </form><p class="db-auth-switch">Hesabınız yoxdur? <a href="/qeydiyyat/">Qeydiyyatdan keçin</a></p>`);
+
+  authPage('/qeydiyyat/', 'Qeydiyyat', 'Bir dəqiqə ərzində şəxsi hesabınızı yaradın.', `
+    <form class="db-auth-form" data-auth-form="register" novalidate>
+      <div class="db-auth-form-grid"><label>Ad<input name="firstName" autocomplete="given-name" minlength="2" required></label><label>Soyad<input name="lastName" autocomplete="family-name" minlength="2" required></label></div>
+      <label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label>
+      <label>Telefon <small>(istəyə bağlı)</small><input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="+994 12 345 67 89" maxlength="17" pattern="\\+994 [0-9]{2} [0-9]{3} [0-9]{2} [0-9]{2}" data-az-phone></label>
+      <label>Şifrə<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>Ən az 12 simvol istifadə edin.</small></label>
+      <label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+      <label class="db-auth-consent"><input name="terms" type="checkbox" required><span><a href="/istifade-sertleri/">İstifadə şərtləri</a> və <a href="/mexfilik/">məxfilik siyasəti</a> ilə razıyam.</span></label>
+      <button type="submit">HESAB YARAT</button><p class="db-auth-status" role="status" aria-live="polite"></p>
+    </form><p class="db-auth-switch">Artıq hesabınız var? <a href="/giris/">Daxil olun</a></p>`);
+
+  authPage('/sifre-berpasi/', 'Şifrəni bərpa et', 'E-poçtunuza bir dəfə istifadə edilən təhlükəsiz keçid göndərəcəyik.', `
+    <form class="db-auth-form" data-auth-form="forgot-password" novalidate><label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label><button type="submit">BƏRPA KEÇİDİ GÖNDƏR</button><p class="db-auth-status" role="status" aria-live="polite"></p></form><p class="db-auth-switch"><a href="/giris/">Daxil ol səhifəsinə qayıt</a></p>`);
+
+  authPage('/sifre-yenile/', 'Yeni şifrə təyin et', 'Yeni və güclü şifrənizi daxil edin.', `
+    <form class="db-auth-form" data-auth-form="reset-password" novalidate><input name="token" type="hidden"><label>Yeni şifrə<input name="password" type="password" autocomplete="new-password" minlength="12" required></label><label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">ŞİFRƏNİ YENİLƏ</button><p class="db-auth-status" role="status" aria-live="polite"></p></form>`);
+
+  authPage('/deveti-qebul-et/', 'Dəvəti qəbul et', 'Hesabınızı aktivləşdirərək Gündəlik Bakı idarəetmə mühitinə daxil olun.', `
+    <form class="db-auth-form" data-auth-form="accept-invite" novalidate><input name="token" type="hidden"><div class="db-auth-token-copy" data-auth-token-copy>Keçid yoxlanılır…</div><label>Yeni şifrə<input name="password" type="password" autocomplete="new-password" minlength="12" required></label><label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">HESABI AKTİVLƏŞDİR</button><p class="db-auth-status" role="status" aria-live="polite"></p></form>`);
 
   const accountPage = (
     path: string,
@@ -356,6 +405,15 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
 
   accountPage('/hesabim/sifarisler/', 'orders', 'Sifarişlər', `
     <div data-account-orders><div class="db-account-loading">Sifarişlər yüklənir…</div></div>
+  `);
+
+  accountPage('/hesabim/baki-club/', 'club', 'Bakı Club', `
+    <div data-account-club><div class="db-account-loading">Bakı Club məlumatları yüklənir…</div></div>
+  `);
+
+  accountPage('/hesabim/bildirisler/', 'notifications', 'Bildirişlər', `
+    <div class="db-account-notification-head"><div><h2>Bildirişlər</h2><p>Sifariş, kupon və Bakı Club yenilikləri burada görünür.</p></div><button class="db-account-action" type="button" data-notifications-read-all>Hamısını oxunmuş et</button></div>
+    <div data-account-notifications><div class="db-account-loading">Bildirişlər yüklənir…</div></div>
   `);
 
   app.get('/hesabim/tarixce/', async (_request, reply) => reply.redirect('/hesabim/sifarisler/'));
@@ -393,18 +451,22 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   `);
 
   accountPage('/hesabim/hesab-melumatlari/', 'details', 'Hesab məlumatları', `
-    <p class="db-account-notice">Gündəlik Bakı hesab məlumatlarınız təhlükəsiz saxlanılır. Şifrə sahələri sistemə daxil olmuş hesablar üçün aktivdir.</p>
+    <p class="db-account-notice">Gündəlik Bakı hesab məlumatlarınız təhlükəsiz saxlanılır. Profil və şifrə dəyişiklikləri ayrı-ayrılıqda yadda saxlanılır.</p>
     <form class="db-account-form" data-account-profile-form>
       <label>Ad *<input name="firstName" autocomplete="given-name" required></label>
       <label>Soyad *<input name="lastName" autocomplete="family-name" required></label>
       <label>Görünən ad *<input name="displayName" autocomplete="nickname" required><small>Adınız hesab bölməsində və rəylərdə bu formada göstəriləcək.</small></label>
       <label>E-poçt ünvanı *<input name="email" type="email" autocomplete="email" required></label>
-      <label>Telefon<input name="phone" type="tel" autocomplete="tel"></label>
+      <label>Telefon<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="+994 12 345 67 89" maxlength="17" pattern="\\+994 [0-9]{2} [0-9]{3} [0-9]{2} [0-9]{2}" data-az-phone></label>
+      <button class="db-account-action" type="submit">Profil məlumatlarını yadda saxla</button>
+      <p class="db-account-form-status" role="status" aria-live="polite"></p>
+    </form>
+    <form class="db-account-form db-account-password-form" data-account-password-form>
       <h3>Şifrəni dəyiş</h3>
-      <label>Cari şifrə (dəyişmirsə boş saxlayın)<input name="currentPassword" type="password" autocomplete="current-password"></label>
-      <label>Yeni şifrə (dəyişmirsə boş saxlayın)<input name="newPassword" type="password" autocomplete="new-password" minlength="8"></label>
-      <label>Yeni şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8"></label>
-      <button class="db-account-action" type="submit">Dəyişiklikləri yadda saxla</button>
+      <label>Cari şifrə<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+      <label>Yeni şifrə<input name="newPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+      <label>Yeni şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+      <button class="db-account-action" type="submit">Şifrəni yenilə</button>
       <p class="db-account-form-status" role="status" aria-live="polite"></p>
     </form>
   `);

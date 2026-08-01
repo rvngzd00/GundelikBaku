@@ -1,70 +1,8 @@
 const api = '/api/v1/public';
 
-const demoProducts = [
-  ['Milwaukee M18 zərbəli drel dəsti', 'milwaukee-m18-zerbeli-drel-desti', 'Milwaukee', 549, 629, 'milwaukee-brand-product.webp'],
-  ['DeWalt XR simsiz vintaçan', 'dewalt-xr-simsiz-vintacan', 'DeWalt', 389, 449, 'dewolt-brand-product-2.webp'],
-  ['Makita peşəkar bucaq cilalayıcı', 'makita-pesekar-bucaq-cilalayici', 'Makita', 279, 319, 'makitta-brand-product.webp'],
-  ['Bosch Professional alət dəsti', 'bosch-professional-alet-desti', 'Bosch', 699, 789, 'bosch-brand-product-2.webp'],
-  ['Festool dəqiq kəsim mişarı', 'festool-deqiq-kesim-misari', 'Festool', 1199, 1349, 'festool-brand-product.webp'],
-  ['Metabo universal emalatxana dəsti', 'metabo-universal-emalatxana-desti', 'Metabo', 459, 519, 'melabo-brand-product.webp'],
-  ['JET masaüstü ağac dəzgahı', 'jet-masaustu-agac-dezgahi', 'JET', 949, 1099, 'jet-brand-product.webp'],
-  ['MAX pnevmatik mismar tapançası', 'max-pnevmatik-mismar-tapancasi', 'MAX', 429, 479, 'max-brand-product.webp'],
-  ['Milwaukee yüksək torklu zərbəli açar', 'milwaukee-yuksek-torklu-zerbeli-acar', 'Milwaukee', 619, 699, 'impact-wrenches.webp'],
-  ['Bosch yaşıl lazer səviyyəölçən', 'bosch-yasil-lazer-seviyyeolcen', 'Bosch', 239, 279, 'laser-levels.webp'],
-  ['Makita akkumulyatorlu dairəvi mişar', 'makita-akkumulyatorlu-dairevi-misar', 'Makita', 489, 559, 'saws.webp'],
-  ['DeWalt orbital zımpara cihazı', 'dewalt-orbital-zimpara-cihazi', 'DeWalt', 219, 259, 'sanders.webp'],
-  ['Klein Tools elektrikçi alət dəsti', 'klein-tools-elektrikci-alet-desti', 'Klein Tools', 329, 379, 'hand-tools.webp'],
-  ['Stabila maqnitli su tərəzisi', 'stabila-maqnitli-su-terezisi', 'Stabila', 149, 179, 'levels.webp'],
-  ['RIKON dəzgahüstü qazma dəzgahı', 'rikon-dezgahustu-qazma-dezgahi', 'RIKON', 799, 899, 'drills.webp'],
-  ['Rolair səssiz hava kompressoru', 'rolair-sessiz-hava-kompressoru', 'Rolair', 729, 829, 'air-compressors.webp'],
-  ['ToughBuilt modul alət çantası', 'toughbuilt-modul-alet-cantasi', 'ToughBuilt', 189, 229, 'Tool-Accessories-1.webp'],
-  ['Triton dəqiq frez aləti', 'triton-deqiq-frez-aleti', 'Triton', 579, 649, 'power-tools.webp'],
-  ['Stanley çəkic və toxmaq dəsti', 'stanley-cekic-ve-toxmaq-desti', 'Stanley', 119, 149, 'hammers-mallets.webp'],
-  ['Milwaukee Shockwave burğu dəsti', 'milwaukee-shockwave-burgu-desti', 'Milwaukee', 169, 199, 'drill-bits.webp']
-].map(([title, slug, brandName, price, compareAtPrice, image]) => ({
-  title,
-  slug,
-  sku: slug.split('-').map((part) => part[0]).join('').toUpperCase().slice(0, 8),
-  brand_name: brandName,
-  vendor_name: 'Baku Pro Market',
-  short_description: `${brandName} brendinin seçilmiş peşəkar məhsulu.`,
-  description: `${title} gündəlik və peşəkar istifadə üçün etibarlı performans, rahat idarəetmə və davamlı konstruksiya təqdim edir.`,
-  attributes: { Brend: brandName, Zəmanət: '12 ay', Çatdırılma: 'Bakı daxili' },
-  product_type: 'Fiziki məhsul',
-  stock: 12,
-  price,
-  compare_at_price: compareAtPrice,
-  currency: 'AZN',
-  image_url: `/assets/wp-content/uploads/${image}`,
-  alt_text: `${title} — məhsul şəkli`
-}));
-
-const demoNews = [
-  ['2026-cı ildə düzgün elektrik aləti necə seçilməlidir?', 'duzgun-elektrik-aleti-nece-secilmelidir', 'Alış-veriş bələdçisi', '2026-07-20', 'jurnal/alis-veris-meslehetleri.jpg'],
-  ['Endirim kampaniyasında ağıllı alış-verişin 7 qaydası', 'endirim-kampaniyasinda-agilli-alis-veris', 'Kampaniyalar', '2026-07-18', 'kampaniyalar/movsumi-endirimler.jpg'],
-  ['Baku Pro Market: yerli satıcının rəqəmsal inkişaf hekayəsi', 'baku-pro-market-reqemsal-inkisaf-hekayesi', 'Brend hekayəsi', '2026-07-15', 'jurnal/brend-hekayeleri.jpg'],
-  ['Yay fürsətlərini qaçırmamaq üçün praktik alış-veriş planı', 'yay-fursetleri-alis-veris-plani', 'Məsləhətlər', '2026-07-12', 'endirimler.jpg'],
-  ['Gündəlik Bakı jurnalının yeni rəqəmsal buraxılışı yayımlandı', 'daily-baku-yeni-reqemsal-buraxilis', 'Gündəlik Bakı jurnalı', '2026-07-10', 'jurnal/son-buraxilis.jpg'],
-  ['Yerli brendlər rəqəmsal vitrində necə fərqlənə bilər?', 'yerli-brendler-reqemsal-vitrin', 'Biznes', '2026-07-08', 'biznes/brend-vitrini.jpg'],
-  ['Bakı Club üzvləri üçün yeni hədiyyə imkanları', 'baki-club-yeni-hediyyeler', 'Bakı Club', '2026-07-05', 'baki-club/giveawayler.jpg'],
-  ['Ayın ən çox oxunan alış-veriş və şəhər hekayələri', 'ayin-en-cox-oxunan-hekayeleri', 'Arxiv', '2026-07-02', 'jurnal/arxiv.jpg']
-].map(([title, slug, categoryName, publishedAt, image]) => ({
-  title,
-  slug,
-  category_name: categoryName,
-  published_at: publishedAt,
-  image_url: `/assets/images/categories/${image}`,
-  alt_text: `${title} — Gündəlik Bakı yeniliyi`
-}));
-
-const defaultWishlist = new Set([
-  'dewalt-xr-simsiz-vintacan',
-  'jet-masaustu-agac-dezgahi',
-  'klein-tools-elektrikci-alet-desti',
-  'triton-deqiq-frez-aleti'
-]);
 const money = new Intl.NumberFormat('az-AZ', { style: 'currency', currency: 'AZN' });
 const compactMoney = new Intl.NumberFormat('az-AZ', { maximumFractionDigits: 0 });
+const cmsBrandLogos = new Map();
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 })[character]);
@@ -81,6 +19,57 @@ function safeImageUrl(value) {
 
 function safeImage(value) {
   return escapeHtml(safeImageUrl(value));
+}
+
+function renderCatalogData(categories = [], brands = []) {
+  cmsBrandLogos.clear();
+  brands.forEach((brand) => {
+    if (brand?.name && brand?.logo_url) cmsBrandLogos.set(String(brand.name).toLocaleLowerCase('az-AZ'), safeImageUrl(brand.logo_url));
+  });
+  const byCategory = new Map(categories.map((category) => [category.slug, category]));
+  const byBrand = new Map(brands.map((brand) => [brand.slug, brand]));
+  document.querySelectorAll('.et__attributes_filter_form').forEach((form) => {
+    const categorySelect = form.querySelector('select[name="product_cat"]');
+    const brandSelect = form.querySelector('select[name="pa_brand"]');
+    if (categorySelect && categories.length) {
+      const current = categorySelect.value;
+      const children = new Map();
+      categories.forEach((category) => {
+        const key = category.parent_id || '';
+        if (!children.has(key)) children.set(key, []);
+        children.get(key).push(category);
+      });
+      const ordered = [];
+      const visit = (parentId = '', depth = 0) => (children.get(parentId) || []).forEach((category) => {
+        ordered.push({ ...category, depth });
+        visit(category.id, depth + 1);
+      });
+      visit();
+      categorySelect.innerHTML = `<option value="">Kateqoriya seçin</option>${ordered.map((category) => `<option value="${escapeHtml(category.slug)}"${category.image_url ? ` data-img="${safeImage(category.image_url)}"` : ''}>${'— '.repeat(category.depth)}${escapeHtml(category.name)}</option>`).join('')}`;
+      categorySelect.value = current;
+    }
+    if (brandSelect && brands.length) {
+      const current = brandSelect.value;
+      brandSelect.innerHTML = `<option value="">Brend seçin</option>${brands.map((brand) => `<option value="${escapeHtml(brand.slug)}"${brand.logo_url ? ` data-img="${safeImage(brand.logo_url)}"` : ''}>${escapeHtml(brand.name)}</option>`).join('')}`;
+      brandSelect.value = current;
+    }
+  });
+  document.querySelectorAll('main a[href*="kateqoriya="]').forEach((link) => {
+    const category = byCategory.get(new URL(link.href, location.origin).searchParams.get('kateqoriya'));
+    const image = link.querySelector('img');
+    if (category?.image_url && image) {
+      image.src = safeImageUrl(category.image_url);
+      image.alt = category.alt_text || category.name;
+    }
+  });
+  document.querySelectorAll('main a[href*="brend="]').forEach((link) => {
+    const brand = byBrand.get(new URL(link.href, location.origin).searchParams.get('brend'));
+    const image = link.querySelector('img');
+    if (brand?.logo_url && image) {
+      image.src = safeImageUrl(brand.logo_url);
+      image.alt = brand.alt_text || `${brand.name} loqosu`;
+    }
+  });
 }
 
 function encodedJson(value) {
@@ -137,7 +126,8 @@ function productCard(product, { featured = false, featuredIndex = 0 } = {}) {
   });
   const quickView = encodedJson(quickViewProduct(product, price, compareAt));
   const liked = false;
-  const picked = featured && [0, 6, 10, 15].includes(featuredIndex);
+  const badgeType = product.merchandising_badge || 'none';
+  const picked = featured && badgeType === 'recommended';
   const actions = featured
     ? `<div class="db-product-actions" aria-label="${title} əməliyyatları">
       <button class="db-product-action db-product-wishlist${liked ? ' active' : ''}" type="button" aria-label="${title} seçilmişlərə əlavə et" aria-pressed="${liked}" data-wishlist="${slug}"${liked ? ' data-default-wishlist="true"' : ''}><span class="db-action-icon" aria-hidden="true"></span><span class="db-action-tooltip">Seçilmişlərə əlavə et</span></button>
@@ -161,7 +151,7 @@ function productCard(product, { featured = false, featuredIndex = 0 } = {}) {
     : `<div class="db-product-content">
       <p class="db-product-brand">${brand}</p>
       <h3 itemprop="name"><a href="/mehsul/${slug}/">${title}</a></h3>
-      <div class="db-product-rating" aria-label="5 ulduzdan 5">★★★★★ <span>(24)</span></div>
+      ${Number(product.review_count || 0) > 0 ? `<div class="db-product-rating" aria-label="5 ulduzdan ${Number(product.review_average || 0).toFixed(1)}">★★★★★ <span>(${Number(product.review_count)})</span></div>` : ''}
       <div class="db-product-bottom" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
         <div class="db-product-price"><strong itemprop="price" content="${price}">${money.format(price)}</strong>${compareAt > price ? `<del>${money.format(compareAt)}</del>` : ''}</div>
         <meta itemprop="priceCurrency" content="AZN"><link itemprop="availability" href="https://schema.org/InStock">
@@ -182,14 +172,20 @@ function productCard(product, { featured = false, featuredIndex = 0 } = {}) {
 
 function completeProductSet(products) {
   const unique = new Map();
-  [...products, ...demoProducts].forEach((product) => {
+  products.forEach((product) => {
     if (product?.slug && !unique.has(product.slug)) unique.set(product.slug, product);
   });
-  return [...unique.values()];
+  return [...unique.values()].sort((left, right) => Number(left.display_position || 0) - Number(right.display_position || 0));
+}
+
+function merchandisingProducts(products, field) {
+  const complete = completeProductSet(products);
+  const selected = complete.filter((product) => product[field] === true);
+  return selected.length ? selected : complete;
 }
 
 function featuredMarkup(products) {
-  const selected = completeProductSet(products).slice(0, 20);
+  const selected = merchandisingProducts(products, 'is_featured').slice(0, 20);
   return `<div class="db-featured-viewport" tabindex="0" aria-label="Seçilmiş fürsətlər məhsul slayderi">
     <div class="db-featured-track">
       ${selected.map((product, index) => productCard(product, { featured: true, featuredIndex: index })).join('')}
@@ -223,13 +219,13 @@ function popularProductCard(product, index, variant = 'popular') {
   const quickView = encodedJson(quickViewProduct(product, price, compareAt));
   const liked = false;
   const topPicks = variant === 'top-picks';
-  const sale = !topPicks && [1, 8, 15].includes(index);
-  const hot = topPicks && index === 3;
-  const fresh = topPicks && index === 7;
-  const picked = topPicks ? index === 5 : [3, 6, 13].includes(index);
-  const ratingIndexes = topPicks ? [0, 5, 6] : [1, 6, 12];
-  const rating = ratingIndexes.includes(index)
-    ? '<span class="db-popular-rating"><span aria-hidden="true">★</span> 5.0 / 1</span>'
+  const badgeType = product.merchandising_badge || 'none';
+  const sale = badgeType === 'sale';
+  const hot = badgeType === 'hot';
+  const fresh = badgeType === 'new';
+  const picked = badgeType === 'recommended';
+  const rating = Number(product.review_count || 0) > 0
+    ? `<span class="db-popular-rating"><span aria-hidden="true">★</span> ${Number(product.review_average || 0).toFixed(1)} / ${Number(product.review_count)}</span>`
     : '';
   const badge = hot
     ? '<span class="db-top-picks-badge hot">HİT!</span>'
@@ -266,7 +262,7 @@ function popularProductCard(product, index, variant = 'popular') {
 }
 
 function popularMarkup(products) {
-  const complete = completeProductSet(products);
+  const complete = merchandisingProducts(products, 'is_popular');
   const selected = [...complete.slice(1), complete[0]].slice(0, 20);
   return `<div class="db-popular-viewport" tabindex="0" aria-label="Ən populyar məhsullar slayderi">
     <div class="db-popular-track">${selected.map(popularProductCard).join('')}</div>
@@ -279,9 +275,8 @@ function popularMarkup(products) {
   <p class="db-popular-status seo-page-title" role="status" aria-live="polite">İlk məhsul sütunu göstərilir</p>`;
 }
 
-function topPicksMarkup(products, offset) {
-  const complete = completeProductSet(products);
-  const selected = [...complete.slice(offset), ...complete.slice(0, offset)].slice(0, 12);
+function topPicksMarkup(products) {
+  const selected = merchandisingProducts(products, 'is_top_pick').slice(0, 20);
   return `<div class="db-top-picks-viewport" tabindex="0" aria-label="Ən çox seçilən məhsullar slayderi">
     <div class="db-top-picks-track">${selected.map((product, index) => popularProductCard(product, index, 'top-picks')).join('')}</div>
   </div>
@@ -294,22 +289,19 @@ function topPicksMarkup(products, offset) {
 }
 
 function completeNewsSet(posts) {
-  const fallbacks = new Map(demoNews.map((post) => [post.slug, post]));
   const unique = new Map();
-  [...posts, ...demoNews].forEach((post) => {
+  posts.forEach((post) => {
     if (!post?.slug || unique.has(post.slug)) return;
-    const fallback = fallbacks.get(post.slug);
     unique.set(post.slug, {
-      ...fallback,
       ...post,
-      category_name: post.category_name || fallback?.category_name || ({
+      category_name: post.category_name || ({
         guide: 'Alış-veriş bələdçisi',
         brand_story: 'Brend hekayəsi',
         news: 'Yeniliklər',
         sponsored: 'Tərəfdaş materialı'
       })[post.post_type] || 'Gündəlik Bakı',
-      image_url: post.image_url || fallback?.image_url || demoNews[unique.size % demoNews.length].image_url,
-      alt_text: post.alt_text || fallback?.alt_text || `${post.title} — Gündəlik Bakı yeniliyi`
+      image_url: post.image_url || '/assets/wp-content/uploads/other-cat.webp',
+      alt_text: post.alt_text || `${post.title} — Gündəlik Bakı yeniliyi`
     });
   });
   return [...unique.values()].slice(0, 8);
@@ -317,7 +309,7 @@ function completeNewsSet(posts) {
 
 function newsDateParts(value) {
   const parsed = new Date(`${String(value || '').slice(0, 10)}T12:00:00`);
-  const date = Number.isNaN(parsed.getTime()) ? new Date('2026-07-20T12:00:00') : parsed;
+  const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   return {
     iso: date.toISOString().slice(0, 10),
     day: new Intl.DateTimeFormat('az-AZ', { day: '2-digit' }).format(date),
@@ -362,18 +354,23 @@ function renderNews(posts) {
   if (!container) return;
   container.className = 'db-news-slider';
   container.dataset.cmsNews = 'ready';
-  container.innerHTML = newsMarkup(posts);
-  initializeNewsSlider(container);
+  container.innerHTML = posts.length ? newsMarkup(posts) : '<div class="db-cms-empty" role="status"><strong>Yenilik tapılmadı</strong><span>Yeni məqalələr dərc edildikdə burada görünəcək.</span></div>';
+  if (posts.length) initializeNewsSlider(container);
 }
 
 function renderProducts(products) {
-  if (!Array.isArray(products) || products.length === 0) return;
+  if (!Array.isArray(products)) return;
   const complete = completeProductSet(products);
   document.querySelectorAll('.et__products_ajax, [data-cms-products]').forEach((container, containerIndex) => {
     const isFeatured = container.hasAttribute('data-featured-products') || container.dataset.id === '4dee5e4';
     const isPopular = container.hasAttribute('data-popular-products') || container.dataset.id === '52657d1';
-    const topPicksOffsets = { dcbe431: 2, '47e695a': 3, a66ade4: 4, d6aa696: 5 };
-    const isTopPicks = container.hasAttribute('data-top-picks-products') || Object.hasOwn(topPicksOffsets, container.dataset.id);
+    const topPicksCategories = { dcbe431: 'power-tools', '47e695a': 'hand-tools', a66ade4: 'air-tools', d6aa696: 'machine-tools' };
+    const isTopPicks = container.hasAttribute('data-top-picks-products') || Object.hasOwn(topPicksCategories, container.dataset.id);
+    if (!complete.length) {
+      container.innerHTML = '<div class="db-cms-empty" role="status"><strong>Məhsul tapılmadı</strong><span>Dərc edilmiş məhsullar burada avtomatik görünəcək.</span></div>';
+      container.dataset.cmsProducts = 'empty';
+      return;
+    }
     if (isFeatured) {
       container.className = 'db-featured-products';
       container.dataset.featuredProducts = '';
@@ -387,7 +384,9 @@ function renderProducts(products) {
     } else if (isTopPicks) {
       container.className = 'db-top-picks-products';
       container.dataset.topPicksProducts = '';
-      container.innerHTML = topPicksMarkup(complete, topPicksOffsets[container.dataset.id] || 0);
+      const category = topPicksCategories[container.dataset.id];
+      const categorized = category ? complete.filter((product) => Array.isArray(product.category_slugs) && product.category_slugs.includes(category)) : complete;
+      container.innerHTML = topPicksMarkup(categorized.length ? categorized : complete);
       initializeTopPicksSlider(container);
     } else {
       const rotated = [...complete.slice(containerIndex % complete.length), ...complete.slice(0, containerIndex % complete.length)];
@@ -969,8 +968,26 @@ function enhanceTopPicksTabs() {
       panels[index].hidden = !active;
     });
   };
+  const activate = (index, focus = false) => {
+    tabs.forEach((tab, tabIndex) => tab.classList.toggle('active', tabIndex === index));
+    panels.forEach((panel, panelIndex) => {
+      const active = panelIndex === index;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+    });
+    synchronize();
+    requestAnimationFrame(() => {
+      const products = panels[index]?.querySelector('[data-top-picks-products], .db-top-picks-products');
+      if (products && !products.topPicksSliderCleanup) initializeTopPicksSlider(products);
+      else window.dispatchEvent(new Event('resize'));
+      if (focus) tabs[index]?.focus();
+    });
+  };
   const handleClick = (event) => {
-    if (event.target.closest('.section-tabset .tab')) requestAnimationFrame(synchronize);
+    const selected = event.target.closest('.section-tabset .tab');
+    if (!selected) return;
+    event.preventDefault();
+    activate(tabs.indexOf(selected));
   };
   const handleKeydown = (event) => {
     const current = event.target.closest('.section-tabset .tab');
@@ -982,10 +999,7 @@ function enhanceTopPicksTabs() {
       : event.key === 'End'
         ? tabs.length - 1
         : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    current.tabIndex = -1;
-    tabs[nextIndex].tabIndex = 0;
-    tabs[nextIndex].click();
-    tabs[nextIndex].focus();
+    activate(nextIndex, true);
   };
   const observer = new MutationObserver(synchronize);
   tabs.forEach((tab) => observer.observe(tab, { attributes: true, attributeFilter: ['class'] }));
@@ -996,12 +1010,13 @@ function enhanceTopPicksTabs() {
     root.removeEventListener('click', handleClick);
     root.removeEventListener('keydown', handleKeydown);
   };
-  synchronize();
+  const initial = Math.max(0, tabs.findIndex((tab) => tab.classList.contains('active')));
+  activate(initial);
   return true;
 }
 
 function scheduleTopPicksTabsEnhancement(attempt = 0) {
-  if (enhanceTopPicksTabs() || attempt >= 12) return;
+  if (enhanceTopPicksTabs() || attempt >= 100) return;
   setTimeout(() => scheduleTopPicksTabsEnhancement(attempt + 1), 50);
 }
 
@@ -1033,6 +1048,8 @@ function updateCartCount() {
 
 function brandLogoUrl(brand = '') {
   const normalized = String(brand).toLocaleLowerCase('az-AZ');
+  const managed = [...cmsBrandLogos].find(([name]) => normalized === name || normalized.includes(name) || name.includes(normalized))?.[1];
+  if (managed) return managed;
   const logos = [
     ['milwaukee', '/assets/wp-content/uploads/milwaukee-logo.webp'],
     ['dewalt', '/assets/wp-content/uploads/dewolt-logo.webp'],
@@ -1182,26 +1199,27 @@ function openQuickView(button) {
 }
 
 async function hydrateHome() {
-  renderProducts(demoProducts);
-  renderNews(demoNews);
   scheduleTopPicksTabsEnhancement();
   updateCartCount();
-  document.documentElement.dataset.cms = 'demo-fallback';
+  document.documentElement.dataset.cms = 'loading';
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2500);
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const response = await fetch(`${api}/home`, { headers: { Accept: 'application/json' }, signal: controller.signal });
     if (!response.ok) throw new Error(`CMS ${response.status}`);
     const { data } = await response.json();
-    if (data?.products?.length) renderProducts(data.products);
-    if (data?.posts?.length) renderNews(data.posts);
+    renderProducts(data?.products || []);
+    renderNews(data?.posts || []);
+    renderCatalogData(data?.categories || [], data?.brands || []);
     scheduleTopPicksTabsEnhancement();
     document.documentElement.dataset.cms = 'connected';
     window.dailyBaku = { ...(window.dailyBaku || {}), home: data };
     document.dispatchEvent(new CustomEvent('dailybaku:content', { detail: data }));
   } catch {
-    document.documentElement.dataset.cms = 'demo-fallback';
+    renderProducts([]);
+    renderNews([]);
+    document.documentElement.dataset.cms = 'unavailable';
   } finally {
     clearTimeout(timeout);
   }
@@ -1210,6 +1228,21 @@ async function hydrateHome() {
 document.addEventListener('click', (event) => {
   const quickViewButton = event.target.closest('[data-quick-view]');
   if (quickViewButton) openQuickView(quickViewButton);
+});
+
+document.addEventListener('submit', (event) => {
+  const form = event.target.closest('.et__attributes_filter_form');
+  if (!form) return;
+  event.preventDefault();
+  const fields = new FormData(form);
+  const query = new URLSearchParams();
+  const category = String(fields.get('product_cat') || '').trim();
+  const brand = String(fields.get('pa_brand') || '').trim();
+  const origin = String(fields.get('pa_country-of-origin') || '').trim();
+  if (category) query.set('kateqoriya', category);
+  if (brand) query.set('brend', brand);
+  if (origin) query.set('mense', origin);
+  location.assign(`/magaza/${query.size ? `?${query}` : ''}`);
 });
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hydrateHome, { once: true });

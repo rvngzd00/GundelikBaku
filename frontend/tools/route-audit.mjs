@@ -6,7 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const base = process.env['DAILY_BAKU_TEST_URL'] || 'http://127.0.0.1:3000';
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
 const categoryTree = {
-  magaza: ['elektronika', 'ev-metbex', 'moda', 'gozellik-saglamliq', 'qida', 'usaq', 'avtomobil', 'xidmetler'],
+  magaza: ['elektronika', 'ev-metbex', 'moda', 'gozellik-saglamliq', 'qida', 'usaq', 'avtomobil', 'xidmetler', 'hediyyeler'],
   endirimler: ['restoranlar', 'marketler', 'geyim', 'gozellik-saglamliq', 'eylence', 'seyahet'],
   kampaniyalar: ['gunun-teklifi', 'heftenin-kampaniyasi', 'mehdud-sayda', 'movsumi-endirimler'],
   jurnal: ['son-buraxilis', 'arxiv', 'brend-hekayeleri', 'alis-veris-meslehetleri'],
@@ -18,9 +18,11 @@ const categoryRoots = Object.keys(categoryTree).map((section) => `/${section}/`)
 const categoryPaths = Object.entries(categoryTree).flatMap(([section, children]) => children.map((child) => `/${section}/${child}/`));
 const categoryMediaPaths = Object.entries(categoryTree).flatMap(([section, children]) => [
   `/assets/images/categories/${section}.jpg`,
-  ...children.map((child) => `/assets/images/categories/${section}/${child}.jpg`)
+  ...children.map((child) => section === 'magaza' && child === 'hediyyeler'
+    ? '/assets/images/categories/baki-club/hediyyeler.jpg'
+    : `/assets/images/categories/${section}/${child}.jpg`)
 ]);
-const paths = new Set([...categoryRoots, ...categoryPaths, '/sebet/']);
+const paths = new Set([...categoryRoots, ...categoryPaths, '/sebet/', '/satici-paneli/']);
 
 for (const match of html.matchAll(/href="([^"]+)"/g)) {
   const href = match[1];
@@ -41,7 +43,8 @@ for (const path of [...paths].sort()) {
   const contentType = response.headers.get('content-type') || '';
   const body = contentType.includes('text/html') ? await response.text() : '';
   if (body) {
-    if (/Daily\s+Baku/i.test(body)) failures.push(`Köhnə brend adı render olunur: ${path}`);
+    const brandingBody = body.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', '');
+    if (/Daily\s+Baku/i.test(brandingBody)) failures.push(`Köhnə brend adı render olunur: ${path}`);
     if (!body.includes('Gündəlik Bakı')) failures.push(`Gündəlik Bakı brendi yoxdur: ${path}`);
   }
 

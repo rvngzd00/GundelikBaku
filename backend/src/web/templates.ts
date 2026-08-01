@@ -121,12 +121,14 @@ export function breadcrumb(items: Array<[string, string?]>): string {
   return `<nav class="page-breadcrumb" aria-label="Səhifə yolu"><a href="/">Ana səhifə</a><span aria-hidden="true">›</span>${visible}</nav>`;
 }
 
-type AccountSection = 'dashboard' | 'wishlist' | 'orders' | 'addresses' | 'details';
+type AccountSection = 'dashboard' | 'wishlist' | 'orders' | 'club' | 'notifications' | 'addresses' | 'details';
 
 const accountIcons: Record<AccountSection | 'logout', string> = {
   dashboard: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4.5 21v-2.5a7.5 7.5 0 0 1 15 0V21Z"/></svg>',
   wishlist: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg>',
   orders: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16l-1 14H5L4 7Z"/><path d="M9 10V5a3 3 0 0 1 6 0v5M8 14h.01M16 14h.01"/></svg>',
+  club: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16v11H4zM3 9h18V5H3zM12 5v15M7 5c-2.5-2.2 1-5 5 0M17 5c2.5-2.2-1-5-5 0"/></svg>',
+  notifications: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/></svg>',
   addresses: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/><path d="M5 21h14"/></svg>',
   details: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 10.5-6M15 19l5-5 2 2-5 5-3 1 1-3Z"/></svg>',
   logout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M5.6 5.6a9 9 0 1 0 12.8 0"/></svg>'
@@ -137,6 +139,8 @@ function accountNavigation(active: AccountSection): string {
     ['dashboard', 'İdarə paneli', '/hesabim/'],
     ['wishlist', 'Seçilmişlər', '/hesabim/secilmisler/'],
     ['orders', 'Sifarişlər', '/hesabim/sifarisler/'],
+    ['club', 'Bakı Club', '/hesabim/baki-club/'],
+    ['notifications', 'Bildirişlər', '/hesabim/bildirisler/'],
     ['addresses', 'Ünvanlar', '/hesabim/unvanlar/'],
     ['details', 'Hesab məlumatları', '/hesabim/hesab-melumatlari/']
   ];
@@ -157,6 +161,7 @@ export function accountShell(active: AccountSection, content: string): string {
 }
 
 export function categoryNavigation(section: NavigationSection, activeChildSlug?: string): string {
+  if (!section.children.length) return '';
   const headingId = `${section.key}-categories-title`;
   const items = section.children.map((child) => {
     const active = child.slug === activeChildSlug;
@@ -181,10 +186,13 @@ export function layout(options: LayoutOptions): string {
     : `${origin}/assets/wp-content/uploads/revslider/slider-1/slider-back.webp`;
   const schemas = Array.isArray(options.schema) ? options.schema : options.schema ? [options.schema] : [];
   const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', logo: { '@type': 'ImageObject', url: `${origin}/assets/images/categories/logoSite.png`, width: 1536, height: 1024 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
-  const navigationHtml = navigationSections.map((section) => `<li class="page-navigation-item">
-    <a href="${section.href}" aria-haspopup="true" aria-expanded="false"${options.active === section.key ? ' class="is-active-section"' : ''}${options.path === section.href ? ' aria-current="page"' : ''}><span>${escapeHtml(section.label)}</span><i class="page-nav-arrow" aria-hidden="true"></i></a>
-    <ul class="page-submenu" aria-label="${escapeHtml(section.label)} alt kateqoriyaları">${section.children.map((child) => `<li><a href="${child.href}"${options.path === child.href ? ' aria-current="page"' : ''}>${escapeHtml(child.label)}</a></li>`).join('')}<li class="page-submenu-all"><a href="${section.href}">Hamısına bax <span aria-hidden="true">›</span></a></li></ul>
-  </li>`).join('');
+  const navigationHtml = navigationSections.map((section) => {
+    const hasChildren = section.children.length > 0;
+    return `<li class="page-navigation-item${hasChildren ? '' : ' page-navigation-leaf'}">
+    <a href="${section.href}"${hasChildren ? ' aria-haspopup="true" aria-expanded="false"' : ''}${options.active === section.key ? ' class="is-active-section"' : ''}${options.path === section.href ? ' aria-current="page"' : ''}><span>${escapeHtml(section.label)}</span>${hasChildren ? '<i class="page-nav-arrow" aria-hidden="true"></i>' : ''}</a>
+    ${hasChildren ? `<ul class="page-submenu" aria-label="${escapeHtml(section.label)} alt kateqoriyaları">${section.children.map((child) => `<li><a href="${child.href}"${options.path === child.href ? ' aria-current="page"' : ''}>${escapeHtml(child.label)}</a></li>`).join('')}<li class="page-submenu-all"><a href="${section.href}">Hamısına bax <span aria-hidden="true">›</span></a></li></ul>` : ''}
+  </li>`;
+  }).join('');
   const storeNavigationHtml = navigationSections[0].children.map((child) =>
     `<li><a href="${child.href}"${options.path === child.href ? ' aria-current="page"' : ''}><span class="page-mobile-menu-thumb"><img src="${child.image}" width="40" height="40" alt="" loading="lazy" decoding="async"></span><span>${escapeHtml(child.label)}</span></a></li>`
   ).join('');
@@ -215,6 +223,7 @@ export function layout(options: LayoutOptions): string {
   <script type="application/ld+json">${safeJson(websiteSchema)}</script>
   ${schemas.map((schema) => `<script type="application/ld+json">${safeJson(schema)}</script>`).join('\n')}
   <script src="/assets/js/commerce.js" defer></script>
+  <script src="/assets/js/auth.js" defer></script>
   <script src="/assets/js/mobile-panels.js" defer></script>
   <script src="/assets/js/search.js" defer></script>
   <script src="/assets/js/pages.js" defer></script>
@@ -226,7 +235,7 @@ export function layout(options: LayoutOptions): string {
     <span class="page-topbar-item"><i class="page-shell-icon pin" aria-hidden="true"></i>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</span>
     <a class="page-topbar-item page-topbar-contact" href="/elaqe/"><i class="page-shell-icon mail" aria-hidden="true"></i>Əlaqə</a>
     <span class="page-topbar-item page-topbar-delivery"><i class="page-shell-icon truck" aria-hidden="true"></i>99 AZN-dən yuxarı pulsuz çatdırılma</span>
-    <a class="page-login" href="/hesabim/"><i class="page-shell-icon user" aria-hidden="true"></i><span>Daxil ol</span></a>
+    <a class="page-login" href="/giris/" data-auth-link><i class="page-shell-icon user" aria-hidden="true"></i><span>Daxil ol</span></a>
   </div></div>
   <header class="page-header">
     <div class="page-container page-header-main">
@@ -249,7 +258,7 @@ export function layout(options: LayoutOptions): string {
   <main id="main-content">${options.content}</main>
   <footer class="page-footer">
     <div class="page-container page-footer-main">
-      <div class="page-footer-brand"><span class="page-footer-logo"><img src="/assets/images/categories/logoSite.png" width="261" height="81" alt="Gündəlik Bakı"></span><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Sosial şəbəkələr"><a class="facebook" href="/elaqe/" aria-label="Facebook"></a><a class="instagram" href="#" aria-label="Instagram"></a><a class="linkedin" href="#" aria-label="LinkedIn"></a><a class="telegram" href="#" aria-label="Telegram"></a><a class="twitter" href="#" aria-label="X"></a><a class="whatsapp" href="/elaqe/" aria-label="WhatsApp"></a></div></div>
+      <div class="page-footer-brand"><span class="page-footer-logo"><img src="/assets/images/categories/logoSite.png" width="261" height="81" alt="Gündəlik Bakı"></span><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Əlaqə kanalları"><a class="facebook" href="/elaqe/" aria-label="Sosial şəbəkələr üzrə əlaqə"></a><a class="whatsapp" href="https://wa.me/994502645400" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"></a></div></div>
       <div class="page-footer-links">
         <section><h2>Platforma haqqında</h2><a href="/haqqimizda/">Biz kimik</a><a href="/baki-club/">Bakı Club</a><a href="/biznes/">Biznes üçün</a></section>
         <section><h2>Müştəri dəstəyi</h2><a href="/faq/">Tez-tez verilən suallar</a><a href="/elaqe/">Əlaqə</a><a href="/catdirilma/">Çatdırılma siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma</a></section>
@@ -265,7 +274,7 @@ export function layout(options: LayoutOptions): string {
     <div class="page-footer-bottom"><div class="page-container page-footer-legal"><div class="db-footer-identity"><p>Copyright © 2026 Gündəlik Bakı Poçtu-Daily Baku Mail. Bütün hüquqlar qorunur.</p><p class="db-footer-company"><span>"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır.</span><span>VÖEN 2007614681</span></p></div><nav aria-label="Hüquqi keçidlər"><a href="/mexfilik/">Məxfilik siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma siyasəti</a><a href="/istifade-sertleri/">İstifadə şərtləri</a></nav></div></div>
   </footer>
   <nav class="page-mobile-dashboard" aria-label="Mobil sürətli keçidlər">
-    <a href="/hesabim/"><i class="page-shell-icon account" aria-hidden="true"></i><span>Hesab</span><b data-wishlist-count>0</b></a>
+    <a href="/giris/" data-mobile-account data-auth-link><i class="page-shell-icon account" aria-hidden="true"></i><span>Hesab</span><b data-wishlist-count>0</b></a>
     <a href="/magaza/"><i class="page-shell-icon grid" aria-hidden="true"></i><span>Kateqoriyalar</span></a>
     <a href="/sebet/" data-mini-cart-toggle><i class="page-shell-icon cart" aria-hidden="true"></i><span>Səbət</span><b data-cart-count>0</b></a>
     <a href="#site-search" data-mobile-search><i class="page-shell-icon search" aria-hidden="true"></i><span>Axtarış</span></a>

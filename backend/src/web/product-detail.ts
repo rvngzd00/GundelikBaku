@@ -246,9 +246,9 @@ export function renderProductDetail(options: ProductDetailOptions): string {
         ${purchasePanel(product, cartJson)}
         <div class="db-product-trust">
           <article><i class="money" aria-hidden="true"></i><strong>Pulun geri qaytarılması</strong><small>Əminliklə alış-veriş edin!</small></article>
-          <article><i class="secure" aria-hidden="true"></i><strong>Təhlükəsiz ödəniş</strong><small>Təhlükəsiz alış-veriş edin.</small></article>
+          <article><i class="secure" aria-hidden="true"></i><strong>Rahat ödəniş</strong><small>Nağd, POS və ya bank köçürməsi.</small></article>
         </div>
-        <div class="db-product-payments"><strong>Ödəniş üsulları</strong><img src="/assets/wp-content/uploads/payment-options.webp" alt="Dəstəklənən ödəniş kartları" width="313" height="46"></div>
+        <div class="db-product-payments"><strong>Ödəniş üsulları</strong><div><span>Çatdırılmada nağd</span><span>Çatdırılmada POS</span><span>Bank köçürməsi</span></div></div>
       </aside>
     </section>
 

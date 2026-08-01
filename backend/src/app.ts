@@ -1,5 +1,5 @@
 import { dirname, join, resolve } from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -29,6 +29,10 @@ import { publicRoutes } from './routes/public.js';
 import { mediaRoutes } from './routes/media.js';
 import { checkoutRoutes } from './routes/checkout.js';
 import { customerRoutes } from './routes/customer.js';
+import { settingsRoutes } from './routes/settings.js';
+import { loyaltyRoutes } from './routes/loyalty.js';
+import { notificationRoutes } from './routes/notifications.js';
+import { publishingRoutes } from './routes/publishing.js';
 import { webRoutes } from './web/routes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -107,7 +111,13 @@ export async function buildApp(): Promise<FastifyInstance> {
       throw new AppError(403, 'ORIGIN_REJECTED', 'Sorğunun origin-i qəbul edilmir');
     }
 
-    const publicMutation = request.url.startsWith('/api/v1/auth/login') || request.url.startsWith('/api/v1/auth/refresh') || request.url.startsWith('/api/wp-compat');
+    const publicMutation = request.url.startsWith('/api/v1/auth/login')
+      || request.url.startsWith('/api/v1/auth/register')
+      || request.url.startsWith('/api/v1/auth/refresh')
+      || request.url.startsWith('/api/v1/auth/forgot-password')
+      || request.url.startsWith('/api/v1/auth/reset-password')
+      || request.url.startsWith('/api/v1/auth/accept-invite')
+      || request.url.startsWith('/api/wp-compat');
     if (!publicMutation && request.cookies[cookieNames.access]) {
       const cookieToken = request.cookies[cookieNames.csrf];
       const headerToken = request.headers['x-csrf-token'];
@@ -115,6 +125,35 @@ export async function buildApp(): Promise<FastifyInstance> {
         throw new AppError(403, 'CSRF_REJECTED', 'CSRF token uyğun deyil');
       }
     }
+  });
+
+  // Register the shared error handler before encapsulated route plugins so every
+  // API module returns the same stable error envelope.
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        error: { code: 'VALIDATION_ERROR', message: 'Göndərilən məlumat yanlışdır', details: error.issues },
+        requestId: request.id
+      });
+    }
+    if (error instanceof AppError) {
+      return reply.code(error.statusCode).send({
+        error: { code: error.code, message: error.message, details: error.details },
+        requestId: request.id
+      });
+    }
+    const candidate = error as Error & { code?: string; statusCode?: number; cause?: { code?: string } };
+    if (candidate.code === '23505' || candidate.cause?.code === '23505') {
+      return reply.code(409).send({ error: { code: 'DUPLICATE', message: 'Bu məlumat artıq mövcuddur' }, requestId: request.id });
+    }
+    if (candidate.statusCode && candidate.statusCode < 500) {
+      return reply.code(candidate.statusCode).send({
+        error: { code: candidate.code ?? 'REQUEST_ERROR', message: candidate.message },
+        requestId: request.id
+      });
+    }
+    request.log.error({ err: error }, 'Unhandled request error');
+    return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Daxili server xətası' }, requestId: request.id });
   });
 
   await app.register(healthRoutes, { prefix: '/api/v1' });
@@ -130,6 +169,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(publicRoutes, { prefix: '/api/v1/public' });
   await app.register(checkoutRoutes, { prefix: '/api/v1/checkout' });
   await app.register(customerRoutes, { prefix: '/api/v1/customer' });
+  await app.register(settingsRoutes, { prefix: '/api/v1/settings' });
+  await app.register(loyaltyRoutes, { prefix: '/api/v1/loyalty' });
+  await app.register(notificationRoutes, { prefix: '/api/v1/notifications' });
+  await app.register(publishingRoutes, { prefix: '/api/v1/publishing' });
   await app.register(webRoutes);
 
   app.route({
@@ -143,6 +186,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.redirect(`/api/v1/marketing/scan/${code}`);
   });
   app.get('/sitemap.xml', async (_request, reply) => reply.redirect('/api/v1/public/sitemap.xml'));
+
+  app.get('/satici-paneli', async (_request, reply) => reply.redirect('/satici-paneli/'));
+  app.get('/satici-paneli/', async (_request, reply) => {
+    const html = await readFile(join(here, '../admin/index.html'), 'utf8');
+    return reply.type('text/html; charset=utf-8').send(html);
+  });
 
   await app.register(fastifyStatic, {
     root: join(here, '../admin'),
@@ -161,30 +210,6 @@ export async function buildApp(): Promise<FastifyInstance> {
     prefix: '/',
     wildcard: false,
     index: ['index.html']
-  });
-
-  app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ZodError) {
-      return reply.code(400).send({
-        error: { code: 'VALIDATION_ERROR', message: 'Göndərilən məlumat yanlışdır', details: error.issues },
-        requestId: request.id
-      });
-    }
-    if (error instanceof AppError) {
-      return reply.code(error.statusCode).send({
-        error: { code: error.code, message: error.message, details: error.details },
-        requestId: request.id
-      });
-    }
-    const candidate = error as Error & { code?: string; statusCode?: number };
-    if (candidate.code === '23505') {
-      return reply.code(409).send({ error: { code: 'DUPLICATE', message: 'Bu məlumat artıq mövcuddur' }, requestId: request.id });
-    }
-    if (candidate.statusCode && candidate.statusCode < 500) {
-      return reply.code(candidate.statusCode).send({ error: { code: 'REQUEST_ERROR', message: candidate.message }, requestId: request.id });
-    }
-    request.log.error({ err: error }, 'Unhandled request error');
-    return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Daxili server xətası' }, requestId: request.id });
   });
 
   return app;

@@ -66,7 +66,60 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keep the account dropdown above sticky headers, carousels and overlays. */
+.et__header.desktop {
+  z-index:10040;
+}
+
+.elementor-element-10f5538,
+.elementor-element-10f5538 > .elementor-widget-container,
+.et__login {
+  position:relative;
+  z-index:10050 !important;
+}
+
+.et__login .login-box {
+  z-index:10051 !important;
+}
+
+.et__login .db-auth-status {
+  min-height:16px;
+  margin:8px 0 0;
+  color:#16804c;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.45;
+}
+
+.et__login .db-auth-status:empty {
+  display:none;
+}
+
+.et__login .db-auth-status.is-error {
+  color:#c90032;
+}
+
+.et__footer .elementor-element-5542e5f .et__heading {
+  margin-bottom:12px !important;
+  font-size:13px !important;
+  line-height:20px !important;
+}
+
+@media(max-width:767px) {
+  .et__footer .elementor-element-5542e5f {
+    margin-bottom:8px !important;
+  }
+
+  .et__footer .elementor-element-5542e5f .et__heading {
+    margin-bottom:14px !important;
+    font-size:12px !important;
+    line-height:18px !important;
+  }
+}
 .et__currency-switcher,.et__language-switcher{display:none!important}
+
+.db-cms-empty{display:grid;width:100%;min-height:180px;padding:32px;place-content:center;gap:7px;text-align:center;color:#68707a;background:#f7f8fa;border:1px solid #e7e9ed;border-radius:10px}.db-cms-empty strong{color:#171a1f;font-size:17px}.db-cms-empty span{font-size:12px;line-height:1.6}
 
 /* Keep the original logo slots while centering the visible artwork in logoSite.png. */
 .header-logo a {

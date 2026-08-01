@@ -141,6 +141,14 @@
     stroke-width:1.6;
   }
 
+  .db-mobile-panel-guest{max-width:520px;margin:4vh auto 0;padding:28px 20px;text-align:center}
+  .db-mobile-panel-guest h2{margin:0 0 10px;font-size:24px}
+  .db-mobile-panel-guest p{max-width:390px;margin:0 auto 24px;color:#6c727c;font-size:12px;line-height:1.65}
+  .db-mobile-panel-guest>a{display:flex;width:100%;min-height:49px;margin-top:9px;align-items:center;justify-content:center;border-radius:5px;font:800 11px/1 Poppins,Arial,sans-serif;text-decoration:none}
+  .db-mobile-panel-primary{color:#fff;background:#2349df}
+  .db-mobile-panel-secondary{color:#2349df;background:#eef3ff;border:1px solid #cad7ff}
+  .db-mobile-panel-guest .db-mobile-panel-forgot{min-height:auto;margin-top:20px;color:#2349df;background:transparent;font-weight:600}
+
   .db-mobile-category-grid {
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));

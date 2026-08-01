@@ -57,7 +57,29 @@
     if (heroPointer?.id === event.pointerId) heroPointer = null;
   }, { passive: true });
 
+  const separateDiscountAndCouponMenus = () => {
+    document.querySelectorAll('#menu-mobile-menu, #menu-desktop-menu-with-categories').forEach((menu) => {
+      const storeSubmenu = menu.querySelector(':scope > .menu-item > a[href="/magaza/"] + .sub-menu');
+      if (storeSubmenu && !storeSubmenu.querySelector(':scope > .menu-item > a[href="/magaza/hediyyeler/"]')) {
+        const giftsItem = document.createElement('li');
+        giftsItem.className = 'menu-item depth-1 db-gifts-menu-item';
+        giftsItem.innerHTML = '<a href="/magaza/hediyyeler/" class="mi-link"><span class="txt">Hədiyyələr</span><span class="effect"></span></a>';
+        storeSubmenu.append(giftsItem);
+      }
+      const discountLink = menu.querySelector(':scope > .menu-item > a[href="/endirimler/"]');
+      const discountItem = discountLink?.parentElement;
+      if (!discountLink || !discountItem?.classList.contains('menu-item')) return;
+      discountLink.querySelector(':scope > .txt')?.replaceChildren(document.createTextNode('Endirimlər'));
+      if (menu.querySelector(':scope > .menu-item > a[href="/kuponlar/"]')) return;
+      const couponItem = document.createElement('li');
+      couponItem.className = 'menu-item depth-0 db-coupons-menu-item';
+      couponItem.innerHTML = '<a href="/kuponlar/" class="mi-link"><span class="txt">Kuponlar</span><span class="effect"></span></a>';
+      discountItem.after(couponItem);
+    });
+  };
+
   const initializeMobileNavigation = () => {
+    separateDiscountAndCouponMenus();
     const container = document.querySelector('.mobile-container');
     const navigation = container?.querySelector('#menu-mobile-menu');
     if (!container || !navigation) return;

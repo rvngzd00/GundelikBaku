@@ -707,6 +707,8 @@
   object-fit:contain;
 }
 
+.db-product-payments>div{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px}.db-product-payments>div span{display:inline-flex;min-height:27px;padding:6px 9px;align-items:center;color:#3b414a;background:#f4f5f7;border:1px solid #dfe2e7;border-radius:4px;font-size:8px;font-weight:700;white-space:nowrap}
+
 .db-product-tabs {
   width:100%;
   margin:0 0 66px;

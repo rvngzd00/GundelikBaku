@@ -721,8 +721,14 @@
     syncUI,
     syncBackend,
     refreshCustomerState,
+    request: api,
     getServerState: () => state.server,
     saveProfile: (payload) => api('/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+    savePassword: (payload) => api('/profile/password', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

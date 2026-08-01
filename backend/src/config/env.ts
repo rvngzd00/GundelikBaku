@@ -27,7 +27,10 @@ const schema = z.object({
   MAX_UPLOAD_BYTES: z.coerce.number().int().min(1024).max(50 * 1024 * 1024).default(10 * 1024 * 1024),
   DEFAULT_STORE_CODE: z.string().regex(/^[a-z0-9-]+$/).default('daily-baku'),
   BOOTSTRAP_ADMIN_EMAIL: z.email().default('admin@dailybaku.az'),
-  BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).default('change-this-immediately')
+  BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).default('change-this-immediately'),
+  EMAIL_PROVIDER: z.enum(['disabled', 'resend']).default('disabled'),
+  RESEND_API_KEY: z.string().trim().optional(),
+  EMAIL_FROM: z.string().trim().default('Gündəlik Bakı <noreply@dailybaku.az>')
 });
 
 const parsed = schema.safeParse(process.env);
@@ -48,6 +51,12 @@ if (parsed.data.NODE_ENV === 'production') {
   }
   if (!parsed.data.PUBLIC_ORIGIN.startsWith('https://')) {
     throw new Error('PUBLIC_ORIGIN must use HTTPS in production');
+  }
+  if (parsed.data.EMAIL_PROVIDER === 'disabled') {
+    throw new Error('EMAIL_PROVIDER must be configured in production');
+  }
+  if (!parsed.data.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is required when EMAIL_PROVIDER=resend');
   }
 }
 

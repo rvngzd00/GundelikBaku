@@ -112,6 +112,16 @@
   }
 }
 
+@media(max-width:1023px) {
+  html.db-cart-open .sticky-dashboard,
+  html.db-cart-open .page-mobile-dashboard {
+    opacity:0 !important;
+    visibility:hidden !important;
+    transform:translateY(100%) !important;
+    pointer-events:none !important;
+  }
+}
+
 /* Shared, state-driven cart drawer. */
 html.db-cart-open {
   overflow:hidden;

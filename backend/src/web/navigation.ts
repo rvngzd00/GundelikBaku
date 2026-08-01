@@ -40,25 +40,36 @@ export const navigationSections = [
       { slug: 'qida', label: 'Qida', href: '/magaza/qida/', image: `${categoryImages}/magaza/qida.jpg`, description: 'Gündəlik qida məhsullarını və yerli mağazaların aktual təkliflərini kəşf edin.' },
       { slug: 'usaq', label: 'Uşaq', href: '/magaza/usaq/', image: `${categoryImages}/magaza/usaq.jpg`, description: 'Uşaqlar üçün məhsul, oyun, qulluq və ailə seçimlərini rahatlıqla tapın.' },
       { slug: 'avtomobil', label: 'Avtomobil', href: '/magaza/avtomobil/', image: `${categoryImages}/magaza/avtomobil.jpg`, description: 'Avtomobil aksesuarları, qulluq vasitələri və sürücülər üçün faydalı məhsullar.' },
-      { slug: 'xidmetler', label: 'Xidmətlər', href: '/magaza/xidmetler/', image: `${categoryImages}/magaza/xidmetler.jpg`, description: 'Bakı üzrə gündəlik ehtiyaclara uyğun peşəkar xidmət təkliflərini nəzərdən keçirin.' }
+      { slug: 'xidmetler', label: 'Xidmətlər', href: '/magaza/xidmetler/', image: `${categoryImages}/magaza/xidmetler.jpg`, description: 'Bakı üzrə gündəlik ehtiyaclara uyğun peşəkar xidmət təkliflərini nəzərdən keçirin.' },
+      { slug: 'hediyyeler', label: 'Hədiyyələr', href: '/magaza/hediyyeler/', image: `${categoryImages}/baki-club/hediyyeler.jpg`, description: 'Hədiyyə üçün seçilmiş promo məhsulları və xüsusi təklifləri bir səhifədə kəşf edin.' }
     ]
   },
   {
     key: 'endirimler',
     slug: 'endirimler',
-    label: 'Endirimlər & Kuponlar',
+    label: 'Endirimlər',
     href: '/endirimler/',
     image: `${categoryImages}/endirimler.jpg`,
     kicker: 'ENDİRİM MƏRKƏZİ',
-    description: 'Restoran, market, moda, gözəllik, əyləncə və səyahət üçün aktiv endirim və kuponları kəşf edin.',
+    description: 'Restoran, market, moda, gözəllik, əyləncə və səyahət üçün aktiv endirimləri kəşf edin.',
     children: [
-      { slug: 'restoranlar', label: 'Restoranlar', href: '/endirimler/restoranlar/', image: `${categoryImages}/endirimler/restoranlar.jpg`, description: 'Bakı restoranlarında aktual menyu endirimləri və istifadə edilə bilən kuponlar.' },
-      { slug: 'marketler', label: 'Marketlər', href: '/endirimler/marketler/', image: `${categoryImages}/endirimler/marketler.jpg`, description: 'Market alış-verişində qənaət yaradan kampaniya, kupon və xüsusi qiymətlər.' },
+      { slug: 'restoranlar', label: 'Restoranlar', href: '/endirimler/restoranlar/', image: `${categoryImages}/endirimler/restoranlar.jpg`, description: 'Bakı restoranlarında aktual menyu endirimləri və xüsusi qiymətlər.' },
+      { slug: 'marketler', label: 'Marketlər', href: '/endirimler/marketler/', image: `${categoryImages}/endirimler/marketler.jpg`, description: 'Market alış-verişində qənaət yaradan endirimlər və xüsusi qiymətlər.' },
       { slug: 'geyim', label: 'Geyim', href: '/endirimler/geyim/', image: `${categoryImages}/endirimler/geyim.jpg`, description: 'Geyim və aksesuar mağazalarında mövsümün sərfəli endirimlərini tapın.' },
-      { slug: 'gozellik-saglamliq', label: 'Gözəllik & Sağlamlıq', href: '/endirimler/gozellik-saglamliq/', image: `${categoryImages}/endirimler/gozellik-saglamliq.jpg`, description: 'Gözəllik salonu, qulluq və sağlamlıq xidmətləri üzrə aktual kuponlar.' },
+      { slug: 'gozellik-saglamliq', label: 'Gözəllik & Sağlamlıq', href: '/endirimler/gozellik-saglamliq/', image: `${categoryImages}/endirimler/gozellik-saglamliq.jpg`, description: 'Gözəllik salonu, qulluq və sağlamlıq xidmətləri üzrə aktual endirimlər.' },
       { slug: 'eylence', label: 'Əyləncə', href: '/endirimler/eylence/', image: `${categoryImages}/endirimler/eylence.jpg`, description: 'Ailə və dostlarla istirahət üçün əyləncə məkanlarının xüsusi təklifləri.' },
-      { slug: 'seyahet', label: 'Səyahət', href: '/endirimler/seyahet/', image: `${categoryImages}/endirimler/seyahet.jpg`, description: 'Səyahət, otel və şəhər təcrübələri üçün sərfəli kupon və paketlər.' }
+      { slug: 'seyahet', label: 'Səyahət', href: '/endirimler/seyahet/', image: `${categoryImages}/endirimler/seyahet.jpg`, description: 'Səyahət, otel və şəhər təcrübələri üçün sərfəli endirim və paketlər.' }
     ]
+  },
+  {
+    key: 'kuponlar',
+    slug: 'kuponlar',
+    label: 'Kuponlar',
+    href: '/kuponlar/',
+    image: `${categoryImages}/endirimler.jpg`,
+    kicker: 'AKTİV KUPONLAR',
+    description: 'Gündəlik Bakı tərəfdaşlarının aktiv kupon kodlarını, istifadə şərtlərini və son tarixlərini bir səhifədə izləyin.',
+    children: []
   },
   {
     key: 'kampaniyalar',

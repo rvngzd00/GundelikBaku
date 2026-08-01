@@ -2,6 +2,14 @@ const readCart = () => window.DailyBakuCommerce?.readCart() || [];
 const writeCart = (items) => window.DailyBakuCommerce?.writeCart(items);
 const formatMoney = (value) => new Intl.NumberFormat('az-AZ', { style: 'currency', currency: 'AZN' }).format(Number(value));
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+let activeCouponCode = '';
+let checkoutQuote = null;
+let quoteRequestVersion = 0;
+
+function csrfToken() {
+  const part = document.cookie.split('; ').find((item) => item.startsWith('db_csrf=') || item.startsWith('__Host-db_csrf='));
+  return part ? decodeURIComponent(part.slice(part.indexOf('=') + 1)) : '';
+}
 
 function updateCartCount() {
   window.DailyBakuCommerce?.syncUI();
@@ -229,8 +237,14 @@ function checkoutForm(total) {
       <label class="page-form-wide">Ünvan<input name="addressLine1" autocomplete="street-address" minlength="5" maxlength="300" required></label>
       <label class="page-form-wide">Sifariş qeydi <span>(istəyə bağlı)</span><textarea name="customerNote" maxlength="1000" rows="3"></textarea></label>
     </div>
+    <fieldset class="db-checkout-payment" data-checkout-payments>
+      <legend>Ödəniş üsulu</legend>
+      <label><input type="radio" name="paymentMethod" value="cash_on_delivery" checked><span><b>Çatdırılmada nağd</b><small>Sifarişi təhvil alarkən nağd ödəyin.</small></span></label>
+      <label><input type="radio" name="paymentMethod" value="card_on_delivery"><span><b>Çatdırılmada kartla</b><small>Kuryerin POS terminalı ilə təhlükəsiz ödəyin.</small></span></label>
+      <label><input type="radio" name="paymentMethod" value="bank_transfer"><span><b>Bank köçürməsi</b><small>Sifarişdən sonra təqdim edilən rekvizitlərlə ödəyin.</small></span></label>
+    </fieldset>
     <label class="page-terms"><input name="terms" type="checkbox" required> <span><a href="/istifade-sertleri/">İstifadə şərtləri</a> və <a href="/mexfilik/">məxfilik siyasəti</a> ilə razıyam.</span></label>
-    <button class="page-checkout-button" type="submit">SİFARİŞİ TƏSDİQLƏ — ${formatMoney(total)}</button>
+    <button class="page-checkout-button" type="submit">SİFARİŞİ TƏSDİQLƏ — <span data-checkout-button-total>${formatMoney(total)}</span></button>
     <p class="page-form-status" data-checkout-status role="status" aria-live="polite"></p>
   </form>`;
 }
@@ -281,17 +295,83 @@ function renderCart() {
     </section>
     <aside class="db-cart-summary">
       <h2>SƏBƏT CƏMİ</h2>
-      <details class="db-cart-coupon"><summary>Kuponlar <span aria-hidden="true">⌄</span></summary><p>Aktiv kupon kodu ödəniş mərhələsində tətbiq edilə bilər.</p></details>
-      <div class="db-cart-summary-row"><span>Ara cəm</span><strong>${formatMoney(total)}</strong></div>
+      <details class="db-cart-coupon"><summary>Kuponlar <span aria-hidden="true">⌄</span></summary><div class="db-cart-coupon-form"><label class="sr-only" for="db-cart-coupon-code">Kupon kodu</label><input id="db-cart-coupon-code" value="${escapeHtml(activeCouponCode)}" maxlength="80" placeholder="Kupon kodu"><button type="button" data-apply-coupon>TƏTBİQ ET</button></div><p data-coupon-status>Kupon kodunuz varsa daxil edin.</p></details>
+      <div class="db-cart-summary-row"><span>Ara cəm</span><strong data-quote-subtotal>${formatMoney(total)}</strong></div>
+      <div class="db-cart-summary-row db-cart-discount" data-quote-discount-row hidden><span>Endirim</span><strong data-quote-discount>− ${formatMoney(0)}</strong></div>
       <div class="db-cart-delivery-row">
         <span>Çatdırılma</span>
         <label><i aria-hidden="true"></i><span>Sabit tarif:<small>Bütün sifarişlər üçün sabit çatdırılma</small></span><strong>Pulsuz</strong></label>
       </div>
-      <div class="db-cart-estimated"><span>Təxmini yekun</span><strong>${formatMoney(total)}</strong></div>
+      <div class="db-cart-estimated"><span>Təxmini yekun</span><strong data-quote-total>${formatMoney(total)}</strong></div>
       <button class="db-cart-checkout-trigger" type="button" data-open-checkout>SİFARİŞİ TAMAMLA</button>
     </aside>
   </div>${checkoutForm(total)}`;
   hydrateCartDetails(items);
+  prefillCheckoutForm();
+  void requestCheckoutQuote(items, activeCouponCode);
+}
+
+function prefillCheckoutForm() {
+  const form = document.querySelector('[data-checkout-form]');
+  const state = window.DailyBakuCommerce?.getServerState?.();
+  if (!form || !state) return;
+  const profile = state.profile || {};
+  const address = state.addresses?.find((item) => item.addressType === 'shipping') || state.addresses?.[0] || {};
+  fillForm(form, {
+    customerName: [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.displayName || address.recipientName,
+    customerPhone: profile.phone || address.phone,
+    customerEmail: profile.email,
+    city: address.city || 'Bakı',
+    addressLine1: address.addressLine1
+  });
+}
+
+function updateQuoteUI(quote, statusMessage = '') {
+  checkoutQuote = quote;
+  if (!quote) return;
+  document.querySelectorAll('[data-quote-subtotal]').forEach((item) => { item.textContent = formatMoney(quote.subtotal); });
+  document.querySelectorAll('[data-quote-total],[data-checkout-button-total]').forEach((item) => { item.textContent = formatMoney(quote.grandTotal); });
+  const discountRow = document.querySelector('[data-quote-discount-row]');
+  if (discountRow) discountRow.hidden = Number(quote.discountTotal) <= 0;
+  document.querySelectorAll('[data-quote-discount]').forEach((item) => { item.textContent = `− ${formatMoney(quote.discountTotal)}`; });
+  const status = document.querySelector('[data-coupon-status]');
+  if (status) {
+    status.textContent = statusMessage || (quote.coupon ? `${quote.coupon.label} tətbiq edildi.` : 'Kupon kodunuz varsa daxil edin.');
+    status.classList.toggle('is-success', Boolean(quote.coupon));
+  }
+  const payments = document.querySelector('[data-checkout-payments]');
+  if (payments && Array.isArray(quote.paymentMethods)) {
+    const selected = payments.querySelector('input:checked')?.value || 'cash_on_delivery';
+    payments.innerHTML = `<legend>Ödəniş üsulu</legend>${quote.paymentMethods.map((method, index) => `<label><input type="radio" name="paymentMethod" value="${escapeHtml(method.id)}" ${method.id === selected || (!quote.paymentMethods.some((item) => item.id === selected) && index === 0) ? 'checked' : ''}><span><b>${escapeHtml(method.label)}</b><small>${escapeHtml(method.description)}</small></span></label>`).join('')}`;
+  }
+}
+
+async function requestCheckoutQuote(items = readCart(), couponCode = '') {
+  if (!items.length) return null;
+  const requestVersion = ++quoteRequestVersion;
+  try {
+    const checkoutItems = await resolveCheckoutItems(items);
+    const token = csrfToken();
+    const response = await fetch('/api/v1/checkout/quote', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(token ? { 'X-CSRF-Token': token } : {}) },
+      body: JSON.stringify({ items: checkoutItems, ...(couponCode ? { couponCode } : {}) })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result?.error?.message || 'Məbləği hesablamaq mümkün olmadı.');
+    if (requestVersion === quoteRequestVersion) updateQuoteUI(result.data);
+    return result.data;
+  } catch (error) {
+    if (requestVersion === quoteRequestVersion && couponCode) {
+      activeCouponCode = '';
+      const status = document.querySelector('[data-coupon-status]');
+      if (status) {
+        status.textContent = error instanceof Error ? error.message : 'Kuponu tətbiq etmək mümkün olmadı.';
+        status.classList.remove('is-success');
+      }
+    }
+    return null;
+  }
 }
 
 async function resolveCheckoutItems(items) {
@@ -325,12 +405,17 @@ async function submitCheckout(form) {
       customerEmail: String(fields.get('customerEmail') || '').trim(),
       customerNote: String(fields.get('customerNote') || '').trim(),
       shippingAddress: { recipientName: customerName, phone: customerPhone, countryCode: 'AZ', city: String(fields.get('city') || '').trim(), addressLine1: String(fields.get('addressLine1') || '').trim() },
-      items: checkoutItems
+      items: checkoutItems,
+      paymentMethod: String(fields.get('paymentMethod') || 'cash_on_delivery'),
+      ...(activeCouponCode ? { couponCode: activeCouponCode } : {})
     };
-    const response = await fetch('/api/v1/checkout/', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify(payload) });
+    const token = csrfToken();
+    const response = await fetch('/api/v1/checkout/', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': crypto.randomUUID(), ...(token ? { 'X-CSRF-Token': token } : {}) }, body: JSON.stringify(payload) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result?.error?.message || result?.message || 'Sifarişi yaratmaq mümkün olmadı.');
     writeCart([]);
+    activeCouponCode = '';
+    checkoutQuote = null;
     const order = result.data;
     document.querySelector('[data-cart-page]').innerHTML = `<section class="page-order-success"><div>✓</div><p>SİFARİŞ QƏBUL EDİLDİ</p><h2>Təşəkkür edirik!</h2><span>Sifariş nömrəniz: <strong>${escapeHtml(order.orderNumber)}</strong></span><small>Operatorumuz sifarişi təsdiqləmək üçün sizinlə əlaqə saxlayacaq.</small><a class="page-primary" href="/magaza/">Alış-verişə davam et</a></section>`;
     toast('Sifariş uğurla yaradıldı');
@@ -404,20 +489,73 @@ function renderAccountOrders(serverState) {
       const localizedStatus = statusLabels[order.status] || order.status;
       const heading = `Sifariş №${order.orderNumber}`;
       const items = Array.isArray(order.items) ? order.items : [];
+      const cancellable = ['pending', 'confirmed'].includes(order.status);
+      const paymentLabels = { cash_on_delivery: 'Çatdırılmada nağd', card_on_delivery: 'Çatdırılmada kartla', bank_transfer: 'Bank köçürməsi' };
       return `<section class="db-account-order">
-        <div class="db-account-order-head"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(date)} · ${escapeHtml(localizedStatus)} · ${formatMoney(order.grandTotal)}</span></div>
+        <div class="db-account-order-head"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(date)} · ${escapeHtml(localizedStatus)} · ${formatMoney(order.grandTotal)}${order.paymentMethod ? ` · ${escapeHtml(paymentLabels[order.paymentMethod] || order.paymentMethod)}` : ''}</span></div>
+        ${Number(order.discountTotal) > 0 ? `<p class="db-account-order-saving">Kupon endirimi: <strong>− ${formatMoney(order.discountTotal)}</strong></p>` : ''}
         ${items.length ? `<div class="db-account-product-grid">${items.map((item) => accountProductCard(item)).join('')}</div>` : accountEmpty('Bu sifarişdə göstəriləcək məhsul yoxdur.')}
+        ${cancellable ? `<div class="db-account-order-actions"><button class="db-order-cancel" type="button" data-cancel-order="${escapeHtml(order.id)}">SİFARİŞİ LƏĞV ET</button></div>` : ''}
       </section>`;
     }).join('');
     window.DailyBakuCommerce?.syncUI();
   });
 }
 
+function accountLoginPrompt(message) {
+  return `<section class="db-account-login-prompt"><div aria-hidden="true">DB</div><h2>Hesabınıza daxil olun</h2><p>${escapeHtml(message)}</p><span><a class="page-primary" href="/giris/">DAXİL OL</a><a href="/qeydiyyat/">HESAB YARAT</a></span></section>`;
+}
+
+function renderAccountClub(serverState) {
+  const container = document.querySelector('[data-account-club]');
+  if (!container) return;
+  const club = serverState?.club;
+  if (!club?.authenticated) {
+    container.innerHTML = accountLoginPrompt('Xallarınızı, kuponlarınızı, hədiyyələri və çəkilişləri idarə etmək üçün hesabınıza daxil olun.');
+    return;
+  }
+  const account = club.account || {};
+  const rewards = Array.isArray(club.rewards) ? club.rewards : [];
+  const coupons = Array.isArray(club.coupons) ? club.coupons : [];
+  const giveaways = Array.isArray(club.giveaways) ? club.giveaways : [];
+  const ledger = Array.isArray(club.ledger) ? club.ledger : [];
+  const rewardCards = rewards.length ? rewards.map((reward) => {
+    const affordable = Number(account.balance || 0) >= Number(reward.pointsCost || 0) && reward.stock !== 0;
+    return `<article class="db-club-card"><div class="db-club-card-media"><img src="${escapeHtml(reward.image || '/assets/wp-content/uploads/other-cat.webp')}" alt="${escapeHtml(reward.name)}" width="240" height="180" loading="lazy"></div><h3>${escapeHtml(reward.name)}</h3><p>${escapeHtml(reward.description || 'Topladığınız xallarla bu hədiyyəni əldə edin.')}</p><div class="db-club-card-bottom"><strong>${Number(reward.pointsCost || 0)} xal</strong><button type="button" data-redeem-reward="${escapeHtml(reward.id)}" ${affordable ? '' : 'disabled'}>${reward.stock === 0 ? 'BİTİB' : affordable ? 'ƏLDƏ ET' : 'XAL ÇATMIR'}</button></div></article>`;
+  }).join('') : accountEmpty('Hazırda aktiv hədiyyə yoxdur.');
+  const couponCards = coupons.length ? coupons.map((coupon) => `<article class="db-club-coupon"><span>${escapeHtml(coupon.name)}</span><h3>${coupon.discountType === 'percentage' ? `${Number(coupon.discountValue)}% endirim` : coupon.discountType === 'fixed_amount' ? `${formatMoney(coupon.discountValue)} endirim` : 'Pulsuz çatdırılma'}</h3><code>${escapeHtml(coupon.code)}</code></article>`).join('') : accountEmpty('Hazırda aktiv kuponunuz yoxdur.');
+  const giveawayCards = giveaways.length ? giveaways.map((campaign) => `<article class="db-club-giveaway"><h3>${escapeHtml(campaign.name)}</h3><p>${escapeHtml(campaign.description || 'Gündəlik Bakı Club üzvləri üçün xüsusi çəkiliş.')}</p><time>${new Intl.DateTimeFormat('az-AZ', { dateStyle: 'medium' }).format(new Date(campaign.endsAt))}-dək</time><button type="button" data-join-giveaway="${escapeHtml(campaign.id)}" ${campaign.entryStatus === 'active' ? 'disabled' : ''}>${campaign.entryStatus === 'active' ? 'QOŞULMUSUNUZ' : 'ÇƏKİLİŞƏ QOŞUL'}</button></article>`).join('') : accountEmpty('Hazırda aktiv çəkiliş yoxdur.');
+  const ledgerRows = ledger.length ? ledger.map((entry) => `<div><span>${escapeHtml(entry.reason)}</span><strong class="${Number(entry.points) >= 0 ? 'is-positive' : 'is-negative'}">${Number(entry.points) >= 0 ? '+' : ''}${Number(entry.points)} xal</strong><time>${new Intl.DateTimeFormat('az-AZ', { dateStyle: 'medium' }).format(new Date(entry.createdAt))}</time></div>`).join('') : accountEmpty('Xal əməliyyatınız hələ yoxdur.');
+  const tier = String(account.tier || 'Standart').toLocaleLowerCase('az-AZ');
+  const tierLabel = tier ? `${tier.charAt(0).toLocaleUpperCase('az-AZ')}${tier.slice(1)}` : 'Standart';
+  container.innerHTML = `<section class="db-club-summary"><div><span>Cari balans</span><strong>${Number(account.balance || 0)} xal</strong><small>Alış-veriş etdikcə balansınız artır</small></div><div><span>Səviyyə</span><strong>${escapeHtml(tierLabel)}</strong></div><div><span>Ümumi qazanılan</span><strong>${Number(account.lifetimeEarned || 0)}</strong></div></section><div class="db-club-heading"><div><h2>Hədiyyələr</h2><p>Xallarınızı seçdiyiniz hədiyyəyə dəyişin.</p></div></div><div class="db-club-rewards">${rewardCards}</div><div class="db-club-heading"><div><h2>Kuponlarım</h2><p>Checkout zamanı kodu daxil edərək istifadə edin.</p></div></div><div class="db-club-coupons">${couponCards}</div><div class="db-club-heading"><div><h2>Çəkilişlər</h2><p>Aktiv kampaniyalara bir toxunuşla qoşulun.</p></div></div><div class="db-club-giveaways">${giveawayCards}</div><div class="db-club-heading"><div><h2>Xal tarixçəsi</h2></div></div><div class="db-club-ledger">${ledgerRows}</div>`;
+}
+
+function renderAccountNotifications(serverState) {
+  const container = document.querySelector('[data-account-notifications]');
+  if (!container) return;
+  if (!serverState?.profile?.authenticated) {
+    container.innerHTML = accountLoginPrompt('Sifariş və kampaniya bildirişlərinizi görmək üçün hesabınıza daxil olun.');
+    document.querySelector('[data-notifications-read-all]')?.setAttribute('hidden', '');
+    return;
+  }
+  document.querySelector('[data-notifications-read-all]')?.removeAttribute('hidden');
+  const notifications = Array.isArray(serverState.notifications) ? serverState.notifications : [];
+  if (!notifications.length) {
+    container.innerHTML = accountEmpty('Yeni bildirişiniz yoxdur.');
+    return;
+  }
+  container.innerHTML = `<div class="db-account-notifications">${notifications.map((notification) => `<article class="db-account-notification${notification.readAt ? '' : ' is-unread'}" data-notification-id="${escapeHtml(notification.id)}"><span class="db-account-notification-icon" aria-hidden="true">${notification.type === 'order' ? '✓' : notification.type === 'reward' ? '★' : 'i'}</span><div><h3>${escapeHtml(notification.title)}</h3><p>${escapeHtml(notification.message)}</p></div><time>${new Intl.DateTimeFormat('az-AZ', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(notification.createdAt))}</time>${notification.actionUrl ? `<a href="${escapeHtml(notification.actionUrl)}" aria-label="${escapeHtml(notification.title)}" data-read-notification="${escapeHtml(notification.id)}"></a>` : `<button class="sr-only" type="button" data-read-notification="${escapeHtml(notification.id)}">Oxunmuş et</button>`}</article>`).join('')}</div>`;
+}
+
 function fillForm(form, values) {
   if (!form || !values) return;
   Object.entries(values).forEach(([key, value]) => {
     const field = form.elements.namedItem(key);
-    if (field && 'value' in field && value !== null && value !== undefined) field.value = String(value);
+    if (field && 'value' in field && value !== null && value !== undefined) {
+      field.value = String(value);
+      if (field.matches?.('[data-az-phone]')) field.dispatchEvent(new Event('input'));
+    }
   });
 }
 
@@ -428,10 +566,11 @@ function renderAccountProfile(serverState) {
   document.querySelectorAll('[data-account-name]').forEach((element) => { element.textContent = displayName; });
   const form = document.querySelector('[data-account-profile-form]');
   fillForm(form, profile);
-  if (form && !profile.authenticated) {
-    form.querySelectorAll('input[type="password"]').forEach((input) => {
+  const passwordForm = document.querySelector('[data-account-password-form]');
+  if (passwordForm && !profile.authenticated) {
+    passwordForm.querySelectorAll('input, button').forEach((input) => {
       input.disabled = true;
-      input.placeholder = 'Şifrə dəyişmək üçün hesaba daxil olun';
+      if (input instanceof HTMLInputElement) input.placeholder = 'Şifrə dəyişmək üçün hesaba daxil olun';
     });
   }
 }
@@ -452,21 +591,21 @@ function renderAccountAddresses(serverState) {
 }
 
 function renderAccount(serverState = window.DailyBakuCommerce?.getServerState()) {
+  const dashboard=document.querySelector('[data-account-section="dashboard"]');
+  if(dashboard&&serverState?.profile&&!serverState.profile.authenticated)dashboard.innerHTML=accountLoginPrompt('Sifariş, ünvan, seçilmişlər və Bakı Club məlumatlarınızı təhlükəsiz saxlamaq üçün hesab yaradın və ya daxil olun.');
   renderAccountWishlist();
   renderAccountOrders(serverState);
   renderAccountProfile(serverState);
   renderAccountAddresses(serverState);
+  renderAccountClub(serverState);
+  renderAccountNotifications(serverState);
 }
 
 async function submitAccountProfile(form) {
+  if (!form.reportValidity()) return;
   const status = form.querySelector('.db-account-form-status');
   const button = form.querySelector('button[type="submit"]');
   const fields = Object.fromEntries(new FormData(form));
-  if (fields.newPassword && fields.newPassword !== fields.confirmPassword) {
-    status.textContent = 'Yeni şifrələr uyğun gəlmir.';
-    return;
-  }
-  delete fields.confirmPassword;
   button.disabled = true;
   status.textContent = 'Məlumatlar yadda saxlanılır…';
   try {
@@ -475,6 +614,28 @@ async function submitAccountProfile(form) {
     status.textContent = 'Dəyişikliklər yadda saxlanıldı.';
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : 'Məlumatları saxlamaq mümkün olmadı.';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function submitAccountPassword(form) {
+  const status = form.querySelector('.db-account-form-status');
+  const button = form.querySelector('button[type="submit"]');
+  const fields = Object.fromEntries(new FormData(form));
+  if (fields.newPassword !== fields.confirmPassword) {
+    status.textContent = 'Yeni şifrələr uyğun gəlmir.';
+    return;
+  }
+  delete fields.confirmPassword;
+  button.disabled = true;
+  status.textContent = 'Şifrə yenilənir…';
+  try {
+    await window.DailyBakuCommerce.savePassword(fields);
+    form.reset();
+    status.textContent = 'Şifrəniz uğurla yeniləndi.';
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : 'Şifrəni yeniləmək mümkün olmadı.';
   } finally {
     button.disabled = false;
   }
@@ -613,6 +774,84 @@ document.addEventListener('click', (event) => {
     }
     return;
   }
+  const applyCoupon = event.target.closest('[data-apply-coupon]');
+  if (applyCoupon) {
+    const input = document.querySelector('#db-cart-coupon-code');
+    activeCouponCode = String(input?.value || '').trim().toUpperCase();
+    applyCoupon.disabled = true;
+    applyCoupon.textContent = 'YOXLANIR…';
+    void requestCheckoutQuote(readCart(), activeCouponCode).finally(() => {
+      if (applyCoupon.isConnected) {
+        applyCoupon.disabled = false;
+        applyCoupon.textContent = 'TƏTBİQ ET';
+      }
+    });
+    return;
+  }
+  const cancelOrder = event.target.closest('[data-cancel-order]');
+  if (cancelOrder) {
+    if (!window.confirm('Bu sifarişi ləğv etmək istədiyinizə əminsiniz?')) return;
+    cancelOrder.disabled = true;
+    cancelOrder.textContent = 'LƏĞV EDİLİR…';
+    void window.DailyBakuCommerce.request(`/orders/${encodeURIComponent(cancelOrder.dataset.cancelOrder)}/cancel`, { method: 'POST' })
+      .then(async () => {
+        toast('Sifariş ləğv edildi');
+        await window.DailyBakuCommerce.refreshCustomerState();
+      }).catch((error) => {
+        toast(error instanceof Error ? error.message : 'Sifarişi ləğv etmək mümkün olmadı');
+        cancelOrder.disabled = false;
+        cancelOrder.textContent = 'SİFARİŞİ LƏĞV ET';
+      });
+    return;
+  }
+  const reward = event.target.closest('[data-redeem-reward]');
+  if (reward) {
+    reward.disabled = true;
+    reward.textContent = 'GÖZLƏYİN…';
+    void window.DailyBakuCommerce.request(`/club/rewards/${encodeURIComponent(reward.dataset.redeemReward)}/redeem`, { method: 'POST' })
+      .then(async (result) => {
+        toast(`${result.rewardName} hədiyyəsi sifariş edildi`);
+        await window.DailyBakuCommerce.refreshCustomerState();
+      }).catch((error) => {
+        toast(error instanceof Error ? error.message : 'Hədiyyəni əldə etmək mümkün olmadı');
+        reward.disabled = false;
+        reward.textContent = 'ƏLDƏ ET';
+      });
+    return;
+  }
+  const giveaway = event.target.closest('[data-join-giveaway]');
+  if (giveaway) {
+    giveaway.disabled = true;
+    giveaway.textContent = 'GÖZLƏYİN…';
+    void window.DailyBakuCommerce.request(`/club/giveaways/${encodeURIComponent(giveaway.dataset.joinGiveaway)}/join`, { method: 'POST' })
+      .then(async () => {
+        toast('Çəkilişə uğurla qoşuldunuz');
+        await window.DailyBakuCommerce.refreshCustomerState();
+      }).catch((error) => {
+        toast(error instanceof Error ? error.message : 'Çəkilişə qoşulmaq mümkün olmadı');
+        giveaway.disabled = false;
+        giveaway.textContent = 'ÇƏKİLİŞƏ QOŞUL';
+      });
+    return;
+  }
+  const readNotification = event.target.closest('[data-read-notification]');
+  if (readNotification) {
+    event.preventDefault();
+    const destination = readNotification.getAttribute('href');
+    void window.DailyBakuCommerce.request(`/notifications/${encodeURIComponent(readNotification.dataset.readNotification)}/read`, { method: 'PATCH' })
+      .catch(() => null)
+      .finally(() => destination ? window.location.assign(destination) : window.DailyBakuCommerce.refreshCustomerState());
+    return;
+  }
+  const readAll = event.target.closest('[data-notifications-read-all]');
+  if (readAll) {
+    readAll.disabled = true;
+    void window.DailyBakuCommerce.request('/notifications/read-all', { method: 'POST' })
+      .then(() => window.DailyBakuCommerce.refreshCustomerState())
+      .catch((error) => toast(error instanceof Error ? error.message : 'Bildirişləri yeniləmək mümkün olmadı'))
+      .finally(() => { readAll.disabled = false; });
+    return;
+  }
   const removeWishlist = event.target.closest('[data-remove-wishlist]');
   if (removeWishlist) {
     window.DailyBakuCommerce?.removeWishlist(removeWishlist.dataset.removeWishlist);
@@ -629,6 +868,7 @@ document.addEventListener('click', (event) => {
   }
   const logout = event.target.closest('[data-account-logout]');
   if (logout) {
+    if (event.defaultPrevented) return;
     event.preventDefault();
     void Promise.resolve(window.DailyBakuCommerce?.logout()).finally(() => window.location.assign('/'));
   }
@@ -647,11 +887,23 @@ document.addEventListener('submit', (event) => {
     void submitAccountProfile(profile);
     return;
   }
+  const password = event.target.closest('[data-account-password-form]');
+  if (password) {
+    event.preventDefault();
+    void submitAccountPassword(password);
+    return;
+  }
   const address = event.target.closest('[data-account-address-form]');
   if (address) {
     event.preventDefault();
     void submitAccountAddress(address);
   }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || !event.target.matches('#db-cart-coupon-code')) return;
+  event.preventDefault();
+  document.querySelector('[data-apply-coupon]')?.click();
 });
 
 document.addEventListener('dailybaku:customer-state', (event) => renderAccount(event.detail));

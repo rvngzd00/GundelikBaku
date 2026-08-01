@@ -2,7 +2,7 @@
   'use strict';
 
   const MOBILE_MAX = 1023;
-  const categories = [
+  let categories = [
     ['Elektrik alətləri', '/magaza/elektronika/', '/assets/wp-content/uploads/Power-Tools-1.webp'],
     ['Ölçü cihazları', '/magaza/elektronika/', '/assets/wp-content/uploads/Measuring.webp'],
     ['Alət aksesuarları', '/magaza/elektronika/', '/assets/wp-content/uploads/Tool-Accessories-1.webp'],
@@ -17,12 +17,36 @@
     ['İdarə paneli', '/hesabim/', 'dashboard'],
     ['Seçilmişlər', '/hesabim/secilmisler/', 'heart'],
     ['Sifarişlər', '/hesabim/sifarisler/', 'orders'],
+    ['Bakı Club', '/hesabim/baki-club/', 'club'],
+    ['Bildirişlər', '/hesabim/bildirisler/', 'notifications'],
     ['Ünvanlar', '/hesabim/unvanlar/', 'pin'],
     ['Hesab məlumatları', '/hesabim/hesab-melumatlari/', 'account']
   ];
   const closeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
   let trigger = null;
   let panel = null;
+  const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]);
+
+  async function loadCategories() {
+    try {
+      const response = await fetch('/api/v1/public/home', { credentials:'same-origin', headers:{ Accept:'application/json' } });
+      if (!response.ok) return;
+      const body = await response.json();
+      const records = Array.isArray(body?.data?.categories) ? body.data.categories : [];
+      const mapped = records.filter((item) => item?.name && item?.slug).map((item) => [
+        item.name,
+        `/magaza/?kateqoriya=${encodeURIComponent(item.slug)}`,
+        item.image_url || '/assets/wp-content/uploads/other-cat.webp'
+      ]);
+      if (!mapped.length) return;
+      categories = mapped;
+      if (panel?.dataset.panel === 'categories' && panel.classList.contains('is-open')) {
+        panel.querySelector('.db-mobile-panel-content').innerHTML = categoryContent();
+      }
+    } catch {
+      // Server əlçatmaz olduqda hazır dizayn kateqoriyaları təhlükəsiz fallback kimi qalır.
+    }
+  }
 
   function icon(name) {
     const paths = {
@@ -31,12 +55,22 @@
       orders:'<path d="M5 8h14v12H5zM8 8V6h8v2M8 12h8M8 16h5"/>',
       pin:'<path d="M12 21s6-5.6 6-11a6 6 0 1 0-12 0c0 5.4 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/>',
       account:'<circle cx="12" cy="8" r="4"/><path d="M5 21c.5-5 3-7 7-7s6.5 2 7 7"/>',
+      club:'<path d="M4 9h16v11H4zM3 9h18V5H3zM12 5v15M7 5c-2.5-2.2 1-5 5 0M17 5c2.5-2.2-1-5-5 0"/>',
+      notifications:'<path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/>',
       logout:'<path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/>'
     };
     return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.dashboard}</svg>`;
   }
 
   function accountContent() {
+    const authenticated = Boolean(window.DailyBakuCommerce?.getServerState?.()?.profile?.authenticated);
+    if (!authenticated) return `<div class="db-mobile-panel-account db-mobile-panel-guest">
+      <h2 id="db-mobile-panel-title">Hesabınıza daxil olun</h2>
+      <p>Sifarişlərinizi, seçilmişləri və Bakı Club xallarını hər cihazda izləyin.</p>
+      <a class="db-mobile-panel-primary" href="/giris/">DAXİL OL</a>
+      <a class="db-mobile-panel-secondary" href="/qeydiyyat/">YENİ HESAB YARAT</a>
+      <a class="db-mobile-panel-forgot" href="/sifre-berpasi/">Şifrəni unutmusunuz?</a>
+    </div>`;
     return `<div class="db-mobile-panel-account">
       <h2 class="sr-only" id="db-mobile-panel-title">Mənim hesabım</h2>
       <nav aria-labelledby="db-mobile-panel-title">
@@ -50,9 +84,9 @@
     return `<div class="db-mobile-panel-categories">
       <h2 class="sr-only" id="db-mobile-panel-title">Kateqoriyalar</h2>
       <div class="db-mobile-category-grid">
-        ${categories.map(([label, href, image]) => `<a href="${href}">
-          <span><img src="${image}" alt="" width="180" height="180" loading="lazy" decoding="async"></span>
-          <b>${label}</b>
+        ${categories.map(([label, href, image]) => `<a href="${escapeHtml(href)}">
+          <span><img src="${escapeHtml(image)}" alt="" width="180" height="180" loading="lazy" decoding="async"></span>
+          <b>${escapeHtml(label)}</b>
         </a>`).join('')}
       </div>
     </div>`;
@@ -172,4 +206,5 @@
   }, { passive:true });
 
   window.DailyBakuMobilePanels = { open, close };
+  void loadCategories();
 })();

@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const root = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '..'));
 const entry = join(root, 'index.html');
 const html = readFileSync(entry, 'utf8');
+const themeController = readFileSync(join(root, 'assets/wp-content/themes/bigxon/js/controller.js'), 'utf8');
+const cms = readFileSync(join(root, 'assets/js/cms.js'), 'utf8');
+const auth = readFileSync(join(root, 'assets/js/auth.js'), 'utf8');
 const errors = [];
 const warnings = [];
 const checked = new Set();
@@ -98,6 +101,10 @@ const required = [
   ['footer Sitemap link removed', !/<a href="\/sitemap\.xml"[^>]*>/i.test(html)],
   ['footer payment logos disabled', /<!-- Payment method logos are intentionally disabled\.[\s\S]*?elementor-element-6d02874[\s\S]*?-->/i.test(html)],
   ['footer company identity', /Gündəlik Bakı Poçtu-Daily Baku Mail/.test(html) && /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/.test(html) && /VÖEN 2007614681/.test(html)],
+  ['header login uses customer auth fields', /<form[^>]+data-auth-form="login"[^>]*>[\s\S]*?name="email"[\s\S]*?name="password"[\s\S]*?<\/form>/i.test(html)],
+  ['vendor accounts enter the dedicated seller portal', /vendor_owner/.test(auth) && /vendor_staff/.test(auth) && /destination = '\/satici-paneli\/'/.test(auth)],
+  ['header login theme validation supports email inputs', /input\[type="email"\], input\[type="text"\]/.test(themeController)],
+  ['Slider Revolution keyboard listener preserves editable fields', /__dailyBakuPatched/.test(html) && /hasKeyboardEvent/.test(html) && /active\.matches\('input, textarea, select/.test(html) && /defer data-wp-strategy="defer" id="tp-tools-js"/.test(html)],
   ['public contact phone', (html.match(/\+994 50 264 54 00/g) || []).length >= 3 && !/tel:(?:55555555|\+994120000000)/.test(html) && !/37499833889/.test(html)],
   ['public contact address', (html.match(/Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/g) || []).length >= 2 && !/Bakı şəhəri, Azərbaycan/.test(html)],
   ['demo product cards', (html.match(/class="db-product-card"/g) || []).length >= 20],
@@ -106,6 +113,7 @@ const required = [
   ['popular and top-picks sliders have 68 horizontal products', (html.match(/class="db-popular-card"/g) || []).length === 68],
   ['top-picks has four category sliders', (html.match(/data-top-picks-products/g) || []).length === 4 && (html.match(/class="db-top-picks-track"/g) || []).length === 4],
   ['top-picks category controls', /data-section-tab-title="Power Tools"/.test(html) && /data-section-tab-title="Hand Tools"/.test(html) && /data-section-tab-title="Air Tools"/.test(html) && /data-section-tab-title="Machine tools"/.test(html)],
+  ['top-picks category controller updates panels directly', /function enhanceTopPicksTabs/.test(cms) && /panel\.classList\.toggle\('active', active\)/.test(cms) && /activate\(tabs\.indexOf\(selected\)\)/.test(cms)],
   ['Gündəlik Bakı news slider', /class="db-news-track"/.test(html) && /data-news-prev/.test(html) && /data-news-next/.test(html) && /class="db-news-pagination"/.test(html)],
   ['Gündəlik Bakı news slider has eight cards', (html.match(/class="db-news-card"/g) || []).length === 8],
   ['Gündəlik Bakı news cards have no hover actions', !/db-news-(?:actions?|wishlist|quick-view|whatsapp)/.test(html)],

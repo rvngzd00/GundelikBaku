@@ -25,13 +25,13 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   admin: PERMISSIONS.filter((permission) => permission !== 'platform.manage'),
   editor: ['dashboard.read', 'cms.read', 'cms.create', 'cms.update', 'cms.publish', 'media.read', 'media.manage', 'seo.read'],
   seo: ['dashboard.read', 'cms.read', 'cms.update', 'seo.read', 'seo.manage', 'seo.audit', 'analytics.read'],
-  moderator: ['dashboard.read', 'cms.read', 'classifieds.read', 'classifieds.moderate', 'vendors.read', 'catalog.read'],
+  moderator: ['dashboard.read', 'cms.read', 'classifieds.read', 'classifieds.moderate', 'vendors.read', 'catalog.read', 'media.read'],
   vendor_owner: [
     'dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'catalog.delete',
     'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage',
     'campaigns.read', 'campaigns.manage', 'coupons.read', 'coupons.manage',
-    'qr.read', 'qr.manage', 'qr.analytics', 'analytics.read'
+    'qr.read', 'qr.manage', 'qr.analytics', 'analytics.read', 'media.read', 'media.manage', 'loyalty.read', 'loyalty.manage'
   ],
-  vendor_staff: ['dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage'],
+  vendor_staff: ['dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage', 'media.read', 'media.manage', 'loyalty.read'],
   customer: []
 };
