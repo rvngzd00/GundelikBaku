@@ -33,6 +33,7 @@ import { settingsRoutes } from './routes/settings.js';
 import { loyaltyRoutes } from './routes/loyalty.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { publishingRoutes } from './routes/publishing.js';
+import { publicSiteEditorRoutes, siteEditorRoutes } from './routes/site-editor.js';
 import { webRoutes } from './web/routes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -167,6 +168,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(marketingRoutes, { prefix: '/api/v1/marketing' });
   await app.register(mediaRoutes, { prefix: '/api/v1/media' });
   await app.register(publicRoutes, { prefix: '/api/v1/public' });
+  await app.register(publicSiteEditorRoutes, { prefix: '/api/v1/public/site-editor' });
+  await app.register(siteEditorRoutes, { prefix: '/api/v1/editor' });
   await app.register(checkoutRoutes, { prefix: '/api/v1/checkout' });
   await app.register(customerRoutes, { prefix: '/api/v1/customer' });
   await app.register(settingsRoutes, { prefix: '/api/v1/settings' });

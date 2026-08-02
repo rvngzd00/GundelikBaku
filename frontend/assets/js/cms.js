@@ -21,13 +21,22 @@ function safeImage(value) {
   return escapeHtml(safeImageUrl(value));
 }
 
-function renderCatalogData(categories = [], brands = []) {
+function orderedSelection(items, ids = []) {
+  if (!Array.isArray(ids) || !ids.length) return items;
+  const byId = new Map(items.map((item) => [item.product_id || item.id, item]));
+  const selected = ids.map((id) => byId.get(id)).filter(Boolean);
+  return selected.length ? selected : items;
+}
+
+function renderCatalogData(categories = [], brands = [], editorConfig = null) {
   cmsBrandLogos.clear();
   brands.forEach((brand) => {
     if (brand?.name && brand?.logo_url) cmsBrandLogos.set(String(brand.name).toLocaleLowerCase('az-AZ'), safeImageUrl(brand.logo_url));
   });
   const byCategory = new Map(categories.map((category) => [category.slug, category]));
+  const byCategoryId = new Map(categories.map((category) => [category.id, category]));
   const byBrand = new Map(brands.map((brand) => [brand.slug, brand]));
+  const byBrandId = new Map(brands.map((brand) => [brand.id, brand]));
   document.querySelectorAll('.et__attributes_filter_form').forEach((form) => {
     const categorySelect = form.querySelector('select[name="product_cat"]');
     const brandSelect = form.querySelector('select[name="pa_brand"]');
@@ -62,6 +71,21 @@ function renderCatalogData(categories = [], brands = []) {
       image.alt = category.alt_text || category.name;
     }
   });
+  const selectedCategories = editorConfig?.categories?.categoryIds || [];
+  if (selectedCategories.length) {
+    const order = new Map(selectedCategories.map((id, index) => [id, index]));
+    document.querySelectorAll('main a[href*="kateqoriya="]').forEach((link) => {
+      const category = byCategory.get(new URL(link.href, location.origin).searchParams.get('kateqoriya'));
+      const item = link.closest('li, .item, .swiper-slide, .elementor-element');
+      if (!item || !category) return;
+      item.hidden = !order.has(category.id);
+      if (order.has(category.id)) item.style.order = String(order.get(category.id));
+    });
+    const sidebar = document.querySelector('#menu-categories-1');
+    if (sidebar) {
+      sidebar.innerHTML = selectedCategories.map((id) => byCategoryId.get(id)).filter(Boolean).map((category) => `<li class="menu-item depth-0"><a href="/magaza/${escapeHtml(category.slug)}/" class="mi-link"><span class="txt">${escapeHtml(category.name)}</span><span class="arrow"></span></a></li>`).join('');
+    }
+  }
   document.querySelectorAll('main a[href*="brend="]').forEach((link) => {
     const brand = byBrand.get(new URL(link.href, location.origin).searchParams.get('brend'));
     const image = link.querySelector('img');
@@ -70,6 +94,31 @@ function renderCatalogData(categories = [], brands = []) {
       image.alt = brand.alt_text || `${brand.name} loqosu`;
     }
   });
+  const selectedBrands = editorConfig?.brands?.brandIds || [];
+  if (selectedBrands.length) {
+    const order = new Map(selectedBrands.map((id, index) => [id, index]));
+    document.querySelectorAll('main a[href*="brend="]').forEach((link) => {
+      const brand = byBrand.get(new URL(link.href, location.origin).searchParams.get('brend'));
+      const item = link.closest('.swiper-slide, .item');
+      if (!item || !brand) return;
+      item.hidden = !order.has(brand.id);
+      if (order.has(brand.id)) item.style.order = String(order.get(brand.id));
+    });
+    selectedBrands.forEach((id) => {
+      const brand = byBrandId.get(id);
+      if (!brand) return;
+      document.querySelectorAll(`main a[href*="brend=${CSS.escape(brand.slug)}"]`).forEach((link) => { link.closest('.swiper-slide, .item')?.removeAttribute('hidden'); });
+    });
+  }
+  const topPickCategoryIds = editorConfig?.topPicks?.categoryIds || [];
+  if (topPickCategoryIds.length) {
+    const slugs = new Set(topPickCategoryIds.map((id) => byCategoryId.get(id)?.slug).filter(Boolean));
+    const topPicksCategories = { dcbe431: 'power-tools', '47e695a': 'hand-tools', a66ade4: 'air-tools', d6aa696: 'machine-tools' };
+    Object.entries(topPicksCategories).forEach(([widgetId, slug]) => {
+      const widget = document.querySelector(`[data-id="${widgetId}"][data-top-picks-products]`);
+      if (widget) widget.closest('.section-tab-item')?.toggleAttribute('hidden', !slugs.has(slug));
+    });
+  }
 }
 
 function encodedJson(value) {
@@ -178,14 +227,15 @@ function completeProductSet(products) {
   return [...unique.values()].sort((left, right) => Number(left.display_position || 0) - Number(right.display_position || 0));
 }
 
-function merchandisingProducts(products, field) {
+function merchandisingProducts(products, field, configuredIds = []) {
   const complete = completeProductSet(products);
+  if (Array.isArray(configuredIds) && configuredIds.length) return orderedSelection(complete, configuredIds);
   const selected = complete.filter((product) => product[field] === true);
   return selected.length ? selected : complete;
 }
 
-function featuredMarkup(products) {
-  const selected = merchandisingProducts(products, 'is_featured').slice(0, 20);
+function featuredMarkup(products, configuredIds = []) {
+  const selected = merchandisingProducts(products, 'is_featured', configuredIds).slice(0, 40);
   return `<div class="db-featured-viewport" tabindex="0" aria-label="Seçilmiş fürsətlər məhsul slayderi">
     <div class="db-featured-track">
       ${selected.map((product, index) => productCard(product, { featured: true, featuredIndex: index })).join('')}
@@ -261,9 +311,9 @@ function popularProductCard(product, index, variant = 'popular') {
   </article>`;
 }
 
-function popularMarkup(products) {
-  const complete = merchandisingProducts(products, 'is_popular');
-  const selected = [...complete.slice(1), complete[0]].slice(0, 20);
+function popularMarkup(products, configuredIds = []) {
+  const complete = merchandisingProducts(products, 'is_popular', configuredIds);
+  const selected = configuredIds.length ? complete.slice(0, 40) : [...complete.slice(1), complete[0]].slice(0, 20);
   return `<div class="db-popular-viewport" tabindex="0" aria-label="Ən populyar məhsullar slayderi">
     <div class="db-popular-track">${selected.map(popularProductCard).join('')}</div>
   </div>
@@ -275,8 +325,8 @@ function popularMarkup(products) {
   <p class="db-popular-status seo-page-title" role="status" aria-live="polite">İlk məhsul sütunu göstərilir</p>`;
 }
 
-function topPicksMarkup(products) {
-  const selected = merchandisingProducts(products, 'is_top_pick').slice(0, 20);
+function topPicksMarkup(products, configuredIds = []) {
+  const selected = merchandisingProducts(products, 'is_top_pick', configuredIds).slice(0, 40);
   return `<div class="db-top-picks-viewport" tabindex="0" aria-label="Ən çox seçilən məhsullar slayderi">
     <div class="db-top-picks-track">${selected.map((product, index) => popularProductCard(product, index, 'top-picks')).join('')}</div>
   </div>
@@ -348,8 +398,9 @@ function newsMarkup(posts) {
   <p class="db-news-status seo-page-title" role="status" aria-live="polite">İlk xəbər göstərilir</p>`;
 }
 
-function renderNews(posts) {
+function renderNews(posts, editorConfig = null) {
   if (!Array.isArray(posts)) return;
+  posts = orderedSelection(posts, editorConfig?.news?.postIds || []);
   const container = document.querySelector('#bf72957, [data-id="bf72957"], [data-cms-news]');
   if (!container) return;
   container.className = 'db-news-slider';
@@ -358,7 +409,7 @@ function renderNews(posts) {
   if (posts.length) initializeNewsSlider(container);
 }
 
-function renderProducts(products) {
+function renderProducts(products, editorConfig = null) {
   if (!Array.isArray(products)) return;
   const complete = completeProductSet(products);
   document.querySelectorAll('.et__products_ajax, [data-cms-products]').forEach((container, containerIndex) => {
@@ -374,19 +425,19 @@ function renderProducts(products) {
     if (isFeatured) {
       container.className = 'db-featured-products';
       container.dataset.featuredProducts = '';
-      container.innerHTML = featuredMarkup(complete);
+      container.innerHTML = featuredMarkup(complete, editorConfig?.featured?.productIds || []);
       initializeFeaturedSlider(container);
     } else if (isPopular) {
       container.className = 'db-popular-products';
       container.dataset.popularProducts = '';
-      container.innerHTML = popularMarkup(complete);
+      container.innerHTML = popularMarkup(complete, editorConfig?.popular?.productIds || []);
       initializePopularSlider(container);
     } else if (isTopPicks) {
       container.className = 'db-top-picks-products';
       container.dataset.topPicksProducts = '';
       const category = topPicksCategories[container.dataset.id];
       const categorized = category ? complete.filter((product) => Array.isArray(product.category_slugs) && product.category_slugs.includes(category)) : complete;
-      container.innerHTML = topPicksMarkup(categorized.length ? categorized : complete);
+      container.innerHTML = topPicksMarkup(categorized.length ? categorized : complete, editorConfig?.topPicks?.productIds || []);
       initializeTopPicksSlider(container);
     } else {
       const rotated = [...complete.slice(containerIndex % complete.length), ...complete.slice(0, containerIndex % complete.length)];
@@ -1209,9 +1260,10 @@ async function hydrateHome() {
     const response = await fetch(`${api}/home`, { headers: { Accept: 'application/json' }, signal: controller.signal });
     if (!response.ok) throw new Error(`CMS ${response.status}`);
     const { data } = await response.json();
-    renderProducts(data?.products || []);
-    renderNews(data?.posts || []);
-    renderCatalogData(data?.categories || [], data?.brands || []);
+    const editorConfig = window.dailyBakuEditor?.index || data?.editor?.index;
+    renderProducts(data?.products || [], editorConfig);
+    renderNews(data?.posts || [], editorConfig);
+    renderCatalogData(data?.categories || [], data?.brands || [], editorConfig);
     scheduleTopPicksTabsEnhancement();
     document.documentElement.dataset.cms = 'connected';
     window.dailyBaku = { ...(window.dailyBaku || {}), home: data };
@@ -1228,6 +1280,15 @@ async function hydrateHome() {
 document.addEventListener('click', (event) => {
   const quickViewButton = event.target.closest('[data-quick-view]');
   if (quickViewButton) openQuickView(quickViewButton);
+});
+
+document.addEventListener('dailybaku:editor', (event) => {
+  const home = window.dailyBaku?.home;
+  const config = event.detail?.index;
+  if (!home || !config) return;
+  renderProducts(home.products || [], config);
+  renderNews(home.posts || [], config);
+  renderCatalogData(home.categories || [], home.brands || [], config);
 });
 
 document.addEventListener('submit', (event) => {

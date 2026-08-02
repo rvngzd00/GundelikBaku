@@ -414,6 +414,7 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
   let campaignId = '';
   let couponId = '';
   let qrId = '';
+  let editorStoreId = '';
   const inventoryReferences = [`audit-add-${suffix}`, `audit-revert-${suffix}`];
 
   type CookieJar = Record<string, string>;
@@ -470,6 +471,53 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     const adminMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(adminJar) });
     assert.equal(adminMe.statusCode, 200);
     assert.ok(adminMe.json().data.roles.includes('super_admin'));
+    assert.ok(adminMe.json().data.permissions.includes('editor.read'));
+    assert.ok(adminMe.json().data.permissions.includes('editor.manage'));
+    assert.ok(adminMe.json().data.permissions.includes('editor.publish'));
+
+    const editorOptions = await app.inject({ method: 'GET', url: '/api/v1/editor/options', headers: authHeaders(adminJar) });
+    assert.equal(editorOptions.statusCode, 200, editorOptions.body);
+    assert.equal(editorOptions.json().data.storeId, storeRow.id);
+    assert.ok(Array.isArray(editorOptions.json().data.products));
+    assert.ok(Array.isArray(editorOptions.json().data.categories));
+    assert.ok(Array.isArray(editorOptions.json().data.media));
+    const navEditor = await app.inject({ method: 'GET', url: '/api/v1/editor/nav', headers: authHeaders(adminJar) });
+    assert.equal(navEditor.statusCode, 200, navEditor.body);
+    assert.equal(navEditor.json().data.scope, 'nav');
+    assert.ok(Array.isArray(navEditor.json().data.draft.menuItems));
+    const editorPreview = await app.inject({ method: 'GET', url: '/api/v1/editor/preview?scope=index', headers: authHeaders(adminJar) });
+    assert.equal(editorPreview.statusCode, 200, editorPreview.body);
+    assert.equal(editorPreview.json().data.previewScope, 'index');
+    assert.ok(editorPreview.json().data.index.hero.slides.length > 0);
+    const publicEditor = await app.inject({ method: 'GET', url: '/api/v1/public/site-editor' });
+    assert.equal(publicEditor.statusCode, 200, publicEditor.body);
+    assert.ok(Object.hasOwn(publicEditor.json().data, 'nav'));
+
+    const isolatedEditorStore = await pool.query<{ id: string }>(`
+      INSERT INTO stores(code,name,primary_domain) VALUES($1,$2,$3) RETURNING id
+    `, [`editor-${suffix}`, `Editor audit ${suffix}`, `editor-${suffix}.example.test`]);
+    editorStoreId = isolatedEditorStore.rows[0]!.id;
+    const isolatedNav = await app.inject({ method: 'GET', url: `/api/v1/editor/nav?storeId=${editorStoreId}`, headers: authHeaders(adminJar) });
+    assert.equal(isolatedNav.statusCode, 200, isolatedNav.body);
+    const navDraft = isolatedNav.json().data.draft;
+    navDraft.announcement.deliveryText = `Editor preview ${suffix}`;
+    const savedNav = await app.inject({
+      method: 'PATCH', url: '/api/v1/editor/nav/draft', headers: authHeaders(adminJar),
+      payload: { storeId: editorStoreId, expectedVersion: isolatedNav.json().data.draftVersion, content: navDraft }
+    });
+    assert.equal(savedNav.statusCode, 200, savedNav.body);
+    assert.equal(savedNav.json().data.draft.announcement.deliveryText, `Editor preview ${suffix}`);
+    const staleNav = await app.inject({
+      method: 'PATCH', url: '/api/v1/editor/nav/draft', headers: authHeaders(adminJar),
+      payload: { storeId: editorStoreId, expectedVersion: isolatedNav.json().data.draftVersion, content: navDraft }
+    });
+    assert.equal(staleNav.statusCode, 409);
+    const publishedNav = await app.inject({
+      method: 'POST', url: '/api/v1/editor/nav/publish', headers: authHeaders(adminJar),
+      payload: { storeId: editorStoreId, expectedVersion: savedNav.json().data.draftVersion }
+    });
+    assert.equal(publishedNav.statusCode, 200, publishedNav.body);
+    assert.equal(publishedNav.json().data.hasUnpublishedChanges, false);
 
     const csrfRejected = await app.inject({
       method: 'POST', url: '/api/v1/vendors', headers: authHeaders(adminJar, false),
@@ -982,6 +1030,12 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.match(adminScript.body, /data-user-delete/);
     assert.match(adminScript.body, /vendorPortalViews/);
     assert.doesNotMatch(adminScript.body, /attributesJson/);
+    assert.match(adminScript.body, /mountSiteEditor/);
+    const editorScript = await app.inject({ method: 'GET', url: '/admin/site-editor.js' });
+    assert.equal(editorScript.statusCode, 200);
+    assert.match(editorScript.body, /Qaralamanı saxla/);
+    assert.match(editorScript.body, /data-editor-preview/);
+    assert.match(editorScript.body, /data-editor-selection/);
   } finally {
     await pool.query('DELETE FROM inventory_movements WHERE reference_id=ANY($1::text[])', [inventoryReferences]);
     if (qrId) await pool.query('DELETE FROM qr_codes WHERE id=$1', [qrId]);
@@ -1012,6 +1066,10 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     if (createdUserIds.length || vendorId) {
       await pool.query(`DELETE FROM audit_logs WHERE actor_user_id=ANY($1::uuid[])
         OR entity_id=ANY($2::text[]) OR vendor_id=$3`, [createdUserIds, [...createdUserIds, vendorId].filter(Boolean), vendorId || null]);
+    }
+    if (editorStoreId) {
+      await pool.query('DELETE FROM audit_logs WHERE store_id=$1', [editorStoreId]);
+      await pool.query('DELETE FROM stores WHERE id=$1', [editorStoreId]);
     }
     if (createdUserIds.length) await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])', [createdUserIds]);
     if (vendorId) await pool.query('DELETE FROM vendors WHERE id=$1', [vendorId]);

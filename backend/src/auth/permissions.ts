@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   'customers.read', 'customers.manage',
   'cms.read', 'cms.create', 'cms.update', 'cms.delete', 'cms.publish',
   'media.read', 'media.manage',
+  'editor.read', 'editor.manage', 'editor.publish',
   'seo.read', 'seo.manage', 'seo.audit',
   'campaigns.read', 'campaigns.manage',
   'coupons.read', 'coupons.manage',
@@ -23,7 +24,7 @@ export type Permission = typeof PERMISSIONS[number];
 export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   super_admin: PERMISSIONS,
   admin: PERMISSIONS.filter((permission) => permission !== 'platform.manage'),
-  editor: ['dashboard.read', 'cms.read', 'cms.create', 'cms.update', 'cms.publish', 'media.read', 'media.manage', 'seo.read'],
+  editor: ['dashboard.read', 'cms.read', 'cms.create', 'cms.update', 'cms.publish', 'media.read', 'media.manage', 'editor.read', 'editor.manage', 'editor.publish', 'seo.read'],
   seo: ['dashboard.read', 'cms.read', 'cms.update', 'seo.read', 'seo.manage', 'seo.audit', 'analytics.read'],
   moderator: ['dashboard.read', 'cms.read', 'classifieds.read', 'classifieds.moderate', 'vendors.read', 'catalog.read', 'media.read'],
   vendor_owner: [

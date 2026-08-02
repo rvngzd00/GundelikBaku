@@ -1,3 +1,5 @@
+import { mountSiteEditor } from './site-editor.js';
+
 const state = { user: null, view: 'dashboard', search: {}, page: {} };
 const isVendorPortal = location.pathname.startsWith('/satici-paneli');
 const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media']);
@@ -18,6 +20,7 @@ const menus = [
     ['vendors', '◇', 'Satıcılar', 'vendors.read']
   ]],
   ['Kontent', [
+    ['editor', '✦', 'Sayt editoru', 'editor.read'],
     ['posts', '≡', 'Məqalələr', 'cms.read'],
     ['post-categories', '▤', 'Məqalə kateqoriyaları', 'cms.read'],
     ['pages', '▱', 'Səhifələr', 'cms.read'],
@@ -60,7 +63,8 @@ const labels = {
   rewards: ['Club hədiyyələri', 'Xalla əldə edilən məhsullar'],
   redemptions: ['Hədiyyə sifarişləri', 'Təhvil və icra statusları'],
   users: ['İstifadəçilər', 'Rol və giriş idarəetməsi'],
-  settings: ['Parametrlər', 'Platforma konfiqurasiyası']
+  settings: ['Parametrlər', 'Platforma konfiqurasiyası'],
+  editor: ['Sayt editoru', 'Nav, ana səhifə və footer idarəetməsi']
 };
 
 const statusLabels = {
@@ -912,6 +916,7 @@ async function render() {
   $('#content').innerHTML = '<div class="loader">Məlumatlar yüklənir…</div>';
   try {
     if (state.view === 'dashboard') $('#content').innerHTML = await dashboard();
+    else if (state.view === 'editor') await mountSiteEditor($('#content'), { api, esc, toast, can, user: state.user });
     else if (state.view === 'settings') $('#content').innerHTML = await settings();
     else if (state.view === 'media') $('#content').innerHTML = await mediaView();
     else if (state.view === 'seo') $('#content').innerHTML = await seoView();

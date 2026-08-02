@@ -228,6 +228,7 @@ export function layout(options: LayoutOptions): string {
   <script src="/assets/js/search.js" defer></script>
   <script src="/assets/js/pages.js" defer></script>
   <script src="/assets/js/product.js" defer></script>
+  <script src="/assets/js/site-editor.js" defer></script>
 </head>
 <body id="top" data-page="${escapeHtml(options.active || '')}">
   <a class="page-skip" href="#main-content">Əsas məzmuna keç</a>

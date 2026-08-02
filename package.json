@@ -14,7 +14,8 @@
     "test:routes": "npm --workspace frontend run test:routes",
     "lint": "npm --workspace backend run lint",
     "db:migrate": "npm --workspace backend run db:migrate",
-    "db:seed": "npm --workspace backend run db:seed"
+    "db:seed": "npm --workspace backend run db:seed",
+    "db:audit-demo": "npm --workspace backend run db:audit-demo"
   },
   "engines": {
     "node": ">=24.0.0",
