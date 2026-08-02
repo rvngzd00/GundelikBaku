@@ -49,7 +49,7 @@ responsivlik problemi var, en asagida olan yekun mebleg ve altindaki button, hes
 
 
 
-
+asdf
 
 ==============
 yuxaridaki hisseden login elemek olmur, 
