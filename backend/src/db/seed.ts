@@ -2,6 +2,7 @@ import { env } from '../config/env.js';
 import { hashPassword } from '../core/password.js';
 import { PERMISSIONS, ROLE_PERMISSIONS } from '../auth/permissions.js';
 import { closePool, withTransaction } from './pool.js';
+import type { PoolClient } from 'pg';
 
 const demoCategories = [
   ['Elektronika', 'elektronika', 'Telefon, kompüter, smart cihaz və gündəlik texnologiya məhsulları'],
@@ -120,6 +121,73 @@ const categoryImageUrls: Record<string, string> = {
   hediyyeler: '/assets/images/categories/baki-club/hediyyeler.jpg'
 };
 
+const operationalModerators = [
+  {
+    email: 'seide@gundelikbaki.az',
+    passwordHash: 'scrypt$32768$8$1$-yj0M6_bvXK5645ts_mQsg$HFc_jqt22bfOyRw0vfjMQ2BzjVC6MThlMkY88RhkjR2B30fog3REOCVcR0taLoxa5jVSDNeWACRTRjayg7AjSA',
+    firstName: 'Səidə',
+    lastName: 'Moderator'
+  },
+  {
+    email: 'dilsad@gundelikbaki.az',
+    passwordHash: 'scrypt$32768$8$1$WKO4uMLXmLnDtgJW1Teahg$Pk9QRtCTlwJeZ0VhF5Ala94Bc08umrhor-kNYE-G06curG8nydxh2C9KOavu71FlYAtE1f6wtiqBXWeOrrB9cw',
+    firstName: 'Dilşad',
+    lastName: 'Moderator'
+  }
+] as const;
+
+async function syncOperationalUsers(client: PoolClient, storeId: string, grantedBy: string): Promise<void> {
+  const moderatorEmails = operationalModerators.map((moderator) => moderator.email);
+  for (const moderator of operationalModerators) {
+    const result = await client.query<{ id: string }>(`
+      INSERT INTO users (email, phone, password_hash, first_name, last_name, status, email_verified_at, phone_verified_at, failed_login_count, locked_until, deleted_at)
+      VALUES ($1, NULL, $2, $3, $4, 'active', now(), NULL, 0, NULL, NULL)
+      ON CONFLICT (email) DO UPDATE SET
+        phone=NULL,
+        password_hash=EXCLUDED.password_hash,
+        first_name=EXCLUDED.first_name,
+        last_name=EXCLUDED.last_name,
+        status='active',
+        email_verified_at=coalesce(users.email_verified_at, now()),
+        phone_verified_at=NULL,
+        failed_login_count=0,
+        locked_until=NULL,
+        deleted_at=NULL
+      RETURNING id
+    `, [moderator.email, moderator.passwordHash, moderator.firstName, moderator.lastName]);
+    const userId = result.rows[0]!.id;
+    await client.query('DELETE FROM user_roles WHERE user_id=$1', [userId]);
+    await client.query(`
+      INSERT INTO user_roles(user_id, role_id, store_id, granted_by)
+      SELECT $1, id, $2, $3 FROM roles WHERE code='moderator'
+      ON CONFLICT DO NOTHING
+    `, [userId, storeId, grantedBy]);
+  }
+
+  await client.query(`
+    UPDATE users u
+    SET email=('deleted+'||u.id::text||'@deleted.invalid')::citext,
+      phone=NULL,
+      status='disabled',
+      failed_login_count=0,
+      locked_until=NULL,
+      deleted_at=coalesce(u.deleted_at, now())
+    WHERE u.deleted_at IS NULL
+      AND lower(u.email::text) <> ALL($1::text[])
+      AND NOT EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN roles r ON r.id=ur.role_id
+        WHERE ur.user_id=u.id AND r.code='super_admin'
+      )
+  `, [moderatorEmails]);
+  await client.query(`
+    UPDATE refresh_sessions rs
+    SET revoked_at=now()
+    WHERE rs.revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM users u WHERE u.id=rs.user_id AND u.deleted_at IS NOT NULL)
+  `);
+}
+
 async function seed(): Promise<void> {
   const passwordHash = await hashPassword(env.BOOTSTRAP_ADMIN_PASSWORD);
 
@@ -155,6 +223,10 @@ async function seed(): Promise<void> {
         RETURNING id
       `, [roleCode, roleCode.replaceAll('_', ' '), `${roleCode} system role`]);
       const roleId = roleResult.rows[0]!.id;
+
+      if (roleCode === 'moderator') {
+        await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+      }
 
       for (const permission of permissions) {
         await client.query(`
@@ -841,6 +913,8 @@ async function seed(): Promise<void> {
         await client.query('INSERT INTO classified_media(listing_id,media_asset_id,position) VALUES($1,$2,0) ON CONFLICT DO NOTHING', [listing.rows[0]!.id, productMedia.rows[0].id]);
       }
     }
+
+    await syncOperationalUsers(client, storeId, userResult.rows[0]!.id);
   });
 
   console.log(`Seed completed. ${demoProducts.length} demo products added. Bootstrap admin: ${env.BOOTSTRAP_ADMIN_EMAIL}`);

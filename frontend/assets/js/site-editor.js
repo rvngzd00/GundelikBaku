@@ -16,6 +16,11 @@
   });
   const mediaUrl = (data, id) => id && data.media?.[id]?.url;
   const visible = (items) => (items || []).filter((item) => item.visible);
+  const socialClass = (item) => {
+    const aliases = { instagram: 'instagram', facebook: 'facebook', x: 'twitter', twitter: 'twitter', tiktok: 'tiktok', linkedin: 'linkedin', whatsapp: 'whatsapp' };
+    const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z]/g, '');
+    return aliases[normalize(item.id)] || aliases[normalize(item.network)] || 'social';
+  };
 
   function menuLink(item, mobile = false) {
     const anchor = document.createElement('a');
@@ -155,7 +160,7 @@
     legalLinks(document.querySelector('#et__footer-16140 .elementor-element-623b767 .et__menu-list'), config.legal.links);
 
     const pageSocials = document.querySelector('.page-socials'); const indexSocials = document.querySelector('#et__footer-16140 .et-social-links');
-    [pageSocials, indexSocials].forEach((container) => { if (!container) return; container.replaceChildren(); visible(config.socialLinks).forEach((item) => { const a = document.createElement('a'); a.href = item.url; a.className = item.network.toLocaleLowerCase('az-AZ').replace(/[^a-z]/g, '') || 'social'; a.setAttribute('aria-label', item.label); a.title = item.label; if (/^https?:/.test(item.url)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; } container.append(a); }); });
+    [pageSocials, indexSocials].forEach((container) => { if (!container) return; container.replaceChildren(); visible(config.socialLinks).forEach((item) => { const a = document.createElement('a'); a.href = item.url; a.className = socialClass(item); a.setAttribute('aria-label', item.label); a.title = item.label; if (/^https?:/.test(item.url)) { a.target = '_blank'; a.rel = 'noopener noreferrer me'; } container.append(a); }); });
   }
 
   function findExactText(text) {

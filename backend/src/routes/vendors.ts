@@ -30,6 +30,24 @@ const vendorUpdate = vendorInput.omit({ storeId: true, ownerFirstName: true, own
 });
 
 export async function vendorRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/options', { preHandler: app.authenticate }, async (request) => {
+    const actor = actorOf(request);
+    if (![...actor.permissions].some((permission) => ['vendors.read', 'catalog.read', 'posts.read'].includes(permission))) {
+      throw forbidden('Satıcı seçimi üçün icazəniz yoxdur');
+    }
+    const query = z.object({ storeId: z.uuid().optional() }).parse(request.query);
+    const storeId = query.storeId ?? actor.storeIds[0];
+    if (!storeId) throw badRequest('STORE_REQUIRED', 'Mağaza seçilməlidir');
+    assertStoreScope(actor, storeId);
+    const result = await pool.query(`
+      SELECT id,store_id,display_name
+      FROM vendors
+      WHERE store_id=$1 AND status='active' AND deleted_at IS NULL
+      ORDER BY display_name
+    `, [storeId]);
+    return { data: result.rows };
+  });
+
   app.get('/', { preHandler: app.requirePermission('vendors.read') }, async (request) => {
     const query = paginationSchema.parse(request.query);
     const actor = actorOf(request);

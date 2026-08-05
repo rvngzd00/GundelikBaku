@@ -412,6 +412,9 @@
 }
 .page-socials .facebook::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/facebook.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/facebook.svg") }
 .page-socials .instagram::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/instagram.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/instagram.svg") }
+.page-socials .twitter::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/twitter.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/twitter.svg") }
+.page-socials .tiktok::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/tiktok.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/tiktok.svg") }
+.page-socials .linkedin::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/linkedin.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/linkedin.svg") }
 .page-socials .youtube::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/youtube.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/youtube.svg") }
 .page-socials .whatsapp::before { mask-image:url("../wp-content/themes/bigxon/images/icons/social/whatsapp.svg");-webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/whatsapp.svg") }
 .page-footer-links {
@@ -1042,6 +1045,10 @@
 .page-socials .twitter::before {
   mask-image:url("../wp-content/themes/bigxon/images/icons/social/twitter.svg");
   -webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/twitter.svg");
+}
+.page-socials .tiktok::before {
+  mask-image:url("../wp-content/themes/bigxon/images/icons/social/tiktok.svg");
+  -webkit-mask-image:url("../wp-content/themes/bigxon/images/icons/social/tiktok.svg");
 }
 .page-footer-links {
   display:grid;

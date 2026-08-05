@@ -180,12 +180,19 @@ export function categoryNavigation(section: NavigationSection, activeChildSlug?:
 
 export function layout(options: LayoutOptions): string {
   const origin = env.PUBLIC_ORIGIN.replace(/\/$/, '');
+  const socialProfiles = [
+    'https://www.instagram.com/gundelikbaki.az?utm_source=qr&igsh=cDd4aGQwZDhlcDM1',
+    'https://www.facebook.com/share/1DH8hF28DT/',
+    'https://x.com/GundelikBaki',
+    'https://www.tiktok.com/@gundelikbaki.az?_r=1&_t=ZS-98bbh3lg7AD',
+    'https://www.linkedin.com/company/gundelikbaki/'
+  ];
   const canonical = `${origin}${options.path}`;
   const shareImage = options.image
     ? (options.image.startsWith('http://') || options.image.startsWith('https://') ? options.image : `${origin}${options.image.startsWith('/') ? '' : '/'}${options.image}`)
     : `${origin}/assets/wp-content/uploads/revslider/slider-1/slider-back.webp`;
   const schemas = Array.isArray(options.schema) ? options.schema : options.schema ? [options.schema] : [];
-  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', logo: { '@type': 'ImageObject', url: `${origin}/assets/images/categories/logoSite.png`, width: 1536, height: 1024 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
+  const websiteSchema = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Gündəlik Bakı', url: origin, publisher: { '@type': 'Organization', name: 'Gündəlik Bakı', url: origin, sameAs: socialProfiles, logo: { '@type': 'ImageObject', url: `${origin}/assets/images/categories/logoSite.png`, width: 1536, height: 1024 } }, potentialAction: { '@type': 'SearchAction', target: `${origin}/magaza/?axtaris={search_term_string}`, 'query-input': 'required name=search_term_string' } };
   const navigationHtml = navigationSections.map((section) => {
     const hasChildren = section.children.length > 0;
     return `<li class="page-navigation-item${hasChildren ? '' : ' page-navigation-leaf'}">
@@ -259,7 +266,7 @@ export function layout(options: LayoutOptions): string {
   <main id="main-content">${options.content}</main>
   <footer class="page-footer">
     <div class="page-container page-footer-main">
-      <div class="page-footer-brand"><span class="page-footer-logo"><img src="/assets/images/categories/logoSite.png" width="261" height="81" alt="Gündəlik Bakı"></span><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Əlaqə kanalları"><a class="facebook" href="/elaqe/" aria-label="Sosial şəbəkələr üzrə əlaqə"></a><a class="whatsapp" href="https://wa.me/994502645400" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"></a></div></div>
+      <div class="page-footer-brand"><span class="page-footer-logo"><img src="/assets/images/categories/logoSite.png" width="261" height="81" alt="Gündəlik Bakı"></span><p>Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.</p><div class="page-socials" aria-label="Gündəlik Bakı sosial media hesabları"><a class="instagram" href="https://www.instagram.com/gundelikbaki.az?utm_source=qr&amp;igsh=cDd4aGQwZDhlcDM1" title="Instagram" target="_blank" rel="noopener noreferrer me" aria-label="Gündəlik Bakı — Instagram"></a><a class="facebook" href="https://www.facebook.com/share/1DH8hF28DT/" title="Facebook" target="_blank" rel="noopener noreferrer me" aria-label="Gündəlik Bakı — Facebook"></a><a class="twitter" href="https://x.com/GundelikBaki" title="X" target="_blank" rel="noopener noreferrer me" aria-label="Gündəlik Bakı — X"></a><a class="tiktok" href="https://www.tiktok.com/@gundelikbaki.az?_r=1&amp;_t=ZS-98bbh3lg7AD" title="TikTok" target="_blank" rel="noopener noreferrer me" aria-label="Gündəlik Bakı — TikTok"></a><a class="linkedin" href="https://www.linkedin.com/company/gundelikbaki/" title="LinkedIn" target="_blank" rel="noopener noreferrer me" aria-label="Gündəlik Bakı — LinkedIn"></a><a class="whatsapp" href="https://wa.me/994502645400" title="WhatsApp" target="_blank" rel="noopener noreferrer" aria-label="Gündəlik Bakı — WhatsApp"></a></div></div>
       <div class="page-footer-links">
         <section><h2>Platforma haqqında</h2><a href="/haqqimizda/">Biz kimik</a><a href="/baki-club/">Bakı Club</a><a href="/biznes/">Biznes üçün</a></section>
         <section><h2>Müştəri dəstəyi</h2><a href="/faq/">Tez-tez verilən suallar</a><a href="/elaqe/">Əlaqə</a><a href="/catdirilma/">Çatdırılma siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma</a></section>

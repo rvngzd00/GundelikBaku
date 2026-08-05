@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool, withTransaction } from '../db/pool.js';
 import { actorOf, assertStoreScope, assertVendorScope } from '../core/scope.js';
-import { badRequest, notFound } from '../core/errors.js';
+import { badRequest, forbidden, notFound } from '../core/errors.js';
 import { writeAudit } from '../core/audit.js';
 
 const extensions = new Map([
@@ -48,7 +48,7 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     return { data: result.rows };
   });
 
-  app.post('/', { preHandler: app.requirePermission('media.manage') }, async (request, reply) => {
+  app.post('/', { preHandler: app.requirePermission('media.upload') }, async (request, reply) => {
     const part = await request.file();
     if (!part) throw badRequest('FILE_REQUIRED', 'Fayl tələb olunur');
     const fields = part.fields as Record<string, { value?: unknown }>;
@@ -116,12 +116,15 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     return { data: result.rows[0] };
   });
 
-  app.delete('/:id', { preHandler: app.requirePermission('media.manage') }, async (request, reply) => {
+  app.delete('/:id', { preHandler: app.authenticate }, async (request, reply) => {
     const id = z.uuid().parse((request.params as { id: string }).id);
     const actor = actorOf(request);
     const current = await pool.query('SELECT * FROM media_assets WHERE id=$1', [id]);
     const row = current.rows[0];
     if (!row) throw notFound('Media');
+    const canManage = actor.permissions.has('media.manage');
+    const canRemoveOwnUpload = actor.permissions.has('media.upload') && row.uploaded_by === actor.userId;
+    if (!canManage && !canRemoveOwnUpload) throw forbidden('Bu media faylını silmək icazəniz yoxdur');
     assertStoreScope(actor, row.store_id);
     if (actor.vendorIds.length) {
       if (!row.vendor_id) throw notFound('Media');

@@ -136,8 +136,12 @@ export const editorDefaults: { nav: NavEditorConfig; index: IndexEditorConfig; f
   footer: {
     branding: { logoAssetId: null, logoAlt: 'Gündəlik Bakı', description: 'Gündəlik Bakı şəhərin fürsətlərini, rəqəmsal jurnalı və etibarlı biznesləri vahid platformada birləşdirir. Oxu. Skan et. Qazan.' },
     socialLinks: [
-      { id: 'facebook', network: 'Facebook', label: 'Facebook', url: '/elaqe/', visible: true },
-      { id: 'whatsapp', network: 'WhatsApp', label: 'WhatsApp', url: 'https://wa.me/994502645400', visible: true }
+      { id: 'instagram', network: 'Instagram', label: 'Gündəlik Bakı — Instagram', url: 'https://www.instagram.com/gundelikbaki.az?utm_source=qr&igsh=cDd4aGQwZDhlcDM1', visible: true },
+      { id: 'facebook', network: 'Facebook', label: 'Gündəlik Bakı — Facebook', url: 'https://www.facebook.com/share/1DH8hF28DT/', visible: true },
+      { id: 'x', network: 'X', label: 'Gündəlik Bakı — X', url: 'https://x.com/GundelikBaki', visible: true },
+      { id: 'tiktok', network: 'TikTok', label: 'Gündəlik Bakı — TikTok', url: 'https://www.tiktok.com/@gundelikbaki.az?_r=1&_t=ZS-98bbh3lg7AD', visible: true },
+      { id: 'linkedin', network: 'LinkedIn', label: 'Gündəlik Bakı — LinkedIn', url: 'https://www.linkedin.com/company/gundelikbaki/', visible: true },
+      { id: 'whatsapp', network: 'WhatsApp', label: 'Gündəlik Bakı — WhatsApp', url: 'https://wa.me/994502645400', visible: true }
     ],
     linkGroups: [
       { id: 'about', title: 'Platforma haqqında', visible: true, links: [

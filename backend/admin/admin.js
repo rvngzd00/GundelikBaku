@@ -3,6 +3,7 @@ import { mountSiteEditor } from './site-editor.js';
 const state = { user: null, view: 'dashboard', search: {}, page: {} };
 const isVendorPortal = location.pathname.startsWith('/satici-paneli');
 const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media']);
+const moderatorViews = new Set(['products', 'reviews', 'categories', 'brands', 'inventory', 'posts', 'post-categories', 'journal']);
 let productImages = [];
 let draggedProductImage = null;
 const $ = (selector) => document.querySelector(selector);
@@ -21,11 +22,11 @@ const menus = [
   ]],
   ['Kontent', [
     ['editor', '✦', 'Sayt editoru', 'editor.read'],
-    ['posts', '≡', 'Məqalələr', 'cms.read'],
-    ['post-categories', '▤', 'Məqalə kateqoriyaları', 'cms.read'],
+    ['posts', '≡', 'Məqalələr', 'posts.read'],
+    ['post-categories', '▤', 'Məqalə kateqoriyaları', 'posts.read'],
     ['pages', '▱', 'Səhifələr', 'cms.read'],
-    ['journal', '▥', 'Jurnal buraxılışları', 'cms.read'],
-    ['media', '▧', 'Media kitabxanası', 'media.read'],
+    ['journal', '▥', 'Jurnal buraxılışları', 'journal.read'],
+    ['media', '▧', 'Media kitabxanası', 'media.manage'],
     ['seo', '⌕', 'SEO klasterləri', 'seo.read']
   ]],
   ['Marketinq', [
@@ -84,9 +85,9 @@ const roleLabels = {
 
 const createPermissions = {
   vendors: 'vendors.manage', products: 'catalog.create', categories: 'catalog.create', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
-  posts: 'cms.create', 'post-categories': 'cms.create', pages: 'cms.create', seo: 'seo.manage',
+  posts: 'posts.create', 'post-categories': 'posts.create', pages: 'cms.create', seo: 'seo.manage',
   campaigns: 'campaigns.manage', coupons: 'coupons.manage', qr: 'qr.manage', rewards: 'loyalty.manage',
-  journal: 'cms.create', classifieds: 'classifieds.moderate'
+  journal: 'journal.create', classifieds: 'classifieds.moderate'
 };
 
 function cookie(name) {
@@ -159,8 +160,15 @@ function can(permission) {
   return state.user?.permissions?.includes(permission);
 }
 
+function isModeratorOnly(user = state.user) {
+  const operationalRoles = (user?.roles || []).filter((role) => role !== 'customer');
+  return operationalRoles.length === 1 && operationalRoles[0] === 'moderator';
+}
+
 function menuItemIsVisible(item) {
-  return can(item[3]) && (!isVendorPortal || vendorPortalViews.has(item[0]));
+  return can(item[3])
+    && (!isVendorPortal || vendorPortalViews.has(item[0]))
+    && (!isModeratorOnly() || moderatorViews.has(item[0]));
 }
 
 function renderNav() {
@@ -183,7 +191,7 @@ async function dashboard() {
   const { data } = await api('/dashboard');
   const quickActions = [
     ['products', 'Yeni məhsul', 'Kataloqa məhsul əlavə et', 'catalog.create'],
-    ['posts', 'Yeni məqalə', 'Redaksiya kontenti hazırla', 'cms.create'],
+    ['posts', 'Yeni məqalə', 'Redaksiya kontenti hazırla', 'posts.create'],
     ['campaigns', 'Kampaniya yarat', 'Endirim aksiyası başlat', 'campaigns.manage'],
     ['qr', 'QR kod yarat', 'Ölçülə bilən QR hazırla', 'qr.manage']
   ].filter((action) => can(action[3]));
@@ -240,9 +248,10 @@ function orderStatus(row) {
 }
 
 function contentStatus(row, type) {
-  return can('cms.publish')
-    ? recordStatus(row, ['draft', 'review', 'published', 'archived'], `/content/${type}/${row.id}/status`, 'cms.publish', 'Kontent statusu')
-    : recordStatus(row, ['draft', 'review'], `/content/${type}/${row.id}/status`, 'cms.update', 'Kontent statusu');
+  const permissionPrefix = type === 'posts' ? 'posts' : 'cms';
+  return can(`${permissionPrefix}.publish`)
+    ? recordStatus(row, ['draft', 'review', 'published', 'archived'], `/content/${type}/${row.id}/status`, `${permissionPrefix}.publish`, 'Kontent statusu')
+    : recordStatus(row, ['draft', 'review'], `/content/${type}/${row.id}/status`, `${permissionPrefix}.update`, 'Kontent statusu');
 }
 
 const configs = {
@@ -299,11 +308,11 @@ const configs = {
   ] },
   posts: { path: '/content/posts', columns: [
     { label: 'Başlıq', key: 'title' }, { label: 'Slug', key: 'slug' }, { label: 'Status', render: (row) => contentStatus(row, 'posts') },
-    { label: 'SEO title', key: 'seo_title' }, { label: 'Yenilənib', render: (row) => date(row.updated_at) }, { label: '', render: (row) => `<button class="table-action" data-content-edit="${esc(row.id)}" data-content-type="posts">Redaktə et</button>${can('cms.delete')?` <button class="table-action danger" data-content-delete="${esc(row.id)}" data-content-type="posts">Sil</button>`:''}` }
+    { label: 'SEO title', key: 'seo_title' }, { label: 'Yenilənib', render: (row) => date(row.updated_at) }, { label: '', render: (row) => can('posts.update') ? `<button class="table-action" data-content-edit="${esc(row.id)}" data-content-type="posts">Redaktə et</button>${can('posts.delete')?` <button class="table-action danger" data-content-delete="${esc(row.id)}" data-content-type="posts">Sil</button>`:''}` : '—' }
   ] },
   'post-categories': { path: '/content/post-categories', columns: [
     { label: 'Kateqoriya', key: 'name' }, { label: 'Slug', key: 'slug' }, { label: 'Məqalə', key: 'post_count' }, { label: 'Status', render: (row) => badge(row.status) },
-    { label: '', render: (row) => `<button class="table-action" data-post-category-edit="${esc(row.id)}">Redaktə et</button>${can('cms.delete')?` <button class="table-action danger" data-post-category-delete="${esc(row.id)}">Sil</button>`:''}` }
+    { label: '', render: (row) => can('posts.update') ? `<button class="table-action" data-post-category-edit="${esc(row.id)}">Redaktə et</button>${can('posts.delete')?` <button class="table-action danger" data-post-category-delete="${esc(row.id)}">Sil</button>`:''}` : '—' }
   ] },
   pages: { path: '/content/pages', columns: [
     { label: 'Başlıq', key: 'title' }, { label: 'Slug', key: 'slug' }, { label: 'Status', render: (row) => contentStatus(row, 'pages') },
@@ -311,8 +320,8 @@ const configs = {
   ] },
   journal: { path: '/publishing/journal', columns: [
     { label: 'Buraxılış', key: 'issue_number' }, { label: 'Başlıq', key: 'title' },
-    { label: 'Status', render: (row) => recordStatus(row,['draft','review','published','archived'],`/publishing/journal/${row.id}/status`,'cms.publish','Jurnal statusu') },
-    { label: 'Dərc tarixi', render: (row) => date(row.published_at) }, { label: '', render: (row) => `<button class="table-action" data-journal-edit="${esc(row.id)}">Redaktə et</button>${can('cms.delete')?` <button class="table-action danger" data-journal-delete="${esc(row.id)}">Arxivlə</button>`:''}` }
+    { label: 'Status', render: (row) => recordStatus(row,['draft','review','published','archived'],`/publishing/journal/${row.id}/status`,'journal.publish','Jurnal statusu') },
+    { label: 'Dərc tarixi', render: (row) => date(row.published_at) }, { label: '', render: (row) => can('journal.update') ? `<button class="table-action" data-journal-edit="${esc(row.id)}">Redaktə et</button>${can('journal.delete')?` <button class="table-action danger" data-journal-delete="${esc(row.id)}">Arxivlə</button>`:''}` : '—' }
   ] },
   campaigns: { path: '/marketing/campaigns', columns: [
     { label: 'Kampaniya', key: 'name' }, { label: 'Növ', key: 'campaign_type' }, { label: 'Status', render: (row) => recordStatus(row, ['draft', 'scheduled', 'active', 'paused', 'ended', 'cancelled'], `/marketing/campaigns/${row.id}/status`, 'campaigns.manage', 'Kampaniya statusu') },
@@ -416,7 +425,7 @@ function synchronizeUserVendorField() {
 
 async function vendorOptions(storeId = state.user.storeIds[0]) {
   if (state.user.vendorIds.length) return state.user.vendorIds.map((id) => [id, 'Mənim satıcı hesabım']);
-  const result = await api('/vendors?limit=100');
+  const result = await api(`/vendors/options?storeId=${encodeURIComponent(storeId)}`);
   return result.data.filter((vendor) => !storeId || vendor.store_id === storeId).map((vendor) => [vendor.id, vendor.display_name]);
 }
 
@@ -905,7 +914,7 @@ $('#closeDialog').addEventListener('click', () => $('#createDialog').close());
 $('#cancelDialog').addEventListener('click', () => $('#createDialog').close());
 
 async function render() {
-  const preferredView = isVendorPortal ? 'products' : 'dashboard';
+  const preferredView = isVendorPortal || isModeratorOnly() ? 'products' : 'dashboard';
   state.view = location.hash.slice(1) || preferredView;
   const accessibleViews = new Set(menus.flatMap(([, items]) => items.filter(menuItemIsVisible).map((item) => item[0])));
   if (!labels[state.view] || !accessibleViews.has(state.view)) state.view = accessibleViews.has(preferredView) ? preferredView : [...accessibleViews][0];
@@ -929,18 +938,20 @@ async function render() {
 async function boot() {
   try {
     const { data } = await api('/auth/me', {}, false);
-    if (!data?.permissions?.includes('dashboard.read')) throw new Error('Bu hesabın idarəetmə panelinə giriş icazəsi yoxdur');
+    state.user = data;
+    const hasPanelAccess = menus.some(([, items]) => items.some(menuItemIsVisible));
+    if (!hasPanelAccess) throw new Error('Bu hesabın idarəetmə panelinə giriş icazəsi yoxdur');
     if (isVendorPortal && !data.roles?.some((role) => role === 'vendor_owner' || role === 'vendor_staff')) {
       throw new Error('Bu səhifəyə yalnız satıcı kabineti hesabı ilə daxil olmaq olar');
     }
-    state.user = data;
     $('#loginView').hidden = true;
     $('#appView').hidden = false;
     $('#userName').textContent = `${data.firstName} ${data.lastName}`;
     $('#userRole').textContent = data.roles.map((role) => roleLabels[role] || role).join(', ');
     $('#avatar').textContent = `${data.firstName[0]}${data.lastName[0]}`.toUpperCase();
+    $('#notificationButton').hidden = !can('dashboard.read');
     await render();
-    await refreshNotificationCount();
+    if (can('dashboard.read')) await refreshNotificationCount();
   } catch (error) {
     state.user = null;
     $('#appView').hidden = true;

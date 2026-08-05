@@ -67,6 +67,13 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(home.body, /Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/);
     assert.doesNotMatch(home.body, /Bakı şəhəri, Azərbaycan/);
     assert.doesNotMatch(home.body, /37499833889|tel:55555555/);
+    for (const profile of [
+      /instagram\.com\/gundelikbaki\.az/,
+      /facebook\.com\/share\/1DH8hF28DT/,
+      /x\.com\/GundelikBaki/,
+      /tiktok\.com\/@gundelikbaki\.az/,
+      /linkedin\.com\/company\/gundelikbaki/
+    ]) assert.match(home.body, profile);
 
     const homeApi = await app.inject({ method: 'GET', url: '/api/v1/public/home' });
     assert.equal(homeApi.statusCode, 200);
@@ -88,6 +95,13 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(page.body, /tel:\+994502645400/);
     assert.match(page.body, /assets\/images\/categories\/logoSite\.png/);
     assert.match(page.body, /Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/);
+    for (const profile of [
+      /instagram\.com\/gundelikbaki\.az/,
+      /facebook\.com\/share\/1DH8hF28DT/,
+      /x\.com\/GundelikBaki/,
+      /tiktok\.com\/@gundelikbaki\.az/,
+      /linkedin\.com\/company\/gundelikbaki/
+    ]) assert.match(page.body, profile);
     assert.match(page.body, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:3000\/baki-club\/">/);
     assert.match(page.body, /class="page-category-list"/);
     assert.match(page.body, /href="\/baki-club\/xal-qazanma\/"/);
@@ -389,6 +403,7 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
   const ownerEmail = `audit-owner-${suffix}@example.test`;
   const vendorAccountEmail = `audit-vendor-account-${suffix}@example.test`;
   const managedUserEmail = `audit-managed-user-${suffix}@example.test`;
+  const moderatorEmail = `audit-moderator-${suffix}@example.test`;
   const adminPassword = 'AuditAdmin!2026';
   const customerPassword = 'AuditCustomer!2026';
   const updatedCustomerPassword = 'AuditCustomer!2027';
@@ -396,6 +411,7 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
   const vendorAccountPassword = 'VendorAccount!2026';
   const managedUserPassword = 'ManagedUser!2026';
   const managedUserNewPassword = 'ManagedUser!2027';
+  const moderatorPassword = 'AuditModerator!2026';
   const createdUserIds: string[] = [];
   let vendorId = '';
   let categoryId = '';
@@ -444,8 +460,58 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     );
     assert.ok(store.rows[0]);
     const storeRow = store.rows[0]!;
-    const moderatorMedia = await pool.query(`SELECT 1 FROM role_permissions rp JOIN roles r ON r.id=rp.role_id JOIN permissions p ON p.id=rp.permission_id WHERE r.code='moderator' AND p.code='media.read'`);
-    assert.equal(moderatorMedia.rowCount, 1);
+    const expectedModeratorPermissions = [
+      'catalog.create','catalog.delete','catalog.publish','catalog.read','catalog.update',
+      'inventory.manage','inventory.read',
+      'journal.create','journal.delete','journal.publish','journal.read','journal.update',
+      'media.read','media.upload',
+      'posts.create','posts.delete','posts.publish','posts.read','posts.update'
+    ];
+    const moderatorPermissions = await pool.query<{ code: string }>(`
+      SELECT p.code FROM role_permissions rp
+      JOIN roles r ON r.id=rp.role_id
+      JOIN permissions p ON p.id=rp.permission_id
+      WHERE r.code='moderator' ORDER BY p.code
+    `);
+    assert.deepEqual(moderatorPermissions.rows.map((row) => row.code), expectedModeratorPermissions);
+
+    const moderator = await pool.query<{ id: string }>(`
+      INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
+      VALUES($1,$2,'Audit','Moderator','active',now()) RETURNING id
+    `, [moderatorEmail, await hashPassword(moderatorPassword)]);
+    const moderatorId = moderator.rows[0]!.id;
+    createdUserIds.push(moderatorId);
+    await pool.query(`
+      INSERT INTO user_roles(user_id,role_id,store_id)
+      SELECT $1,id,$2 FROM roles WHERE code='moderator'
+    `, [moderatorId, storeRow.id]);
+    const moderatorLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: moderatorEmail, password: moderatorPassword }
+    });
+    assert.equal(moderatorLogin.statusCode, 200, moderatorLogin.body);
+    const moderatorJar = mergeCookies(moderatorLogin);
+    const moderatorMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(moderatorJar) });
+    assert.equal(moderatorMe.statusCode, 200, moderatorMe.body);
+    assert.deepEqual([...moderatorMe.json().data.permissions].sort(), expectedModeratorPermissions);
+
+    for (const url of [
+      '/api/v1/catalog/products', '/api/v1/catalog/categories', '/api/v1/catalog/brands',
+      '/api/v1/catalog/inventory', '/api/v1/content/posts',
+      `/api/v1/content/post-categories?storeId=${storeRow.id}`, '/api/v1/publishing/journal',
+      '/api/v1/media', `/api/v1/vendors/options?storeId=${storeRow.id}`
+    ]) {
+      const response = await app.inject({ method: 'GET', url, headers: authHeaders(moderatorJar) });
+      assert.equal(response.statusCode, 200, `${url}: ${response.body}`);
+    }
+    for (const url of [
+      '/api/v1/dashboard', '/api/v1/content/pages', '/api/v1/vendors', '/api/v1/orders',
+      '/api/v1/marketing/campaigns', '/api/v1/users', '/api/v1/settings', '/api/v1/editor/nav',
+      '/api/v1/publishing/classifieds', '/api/v1/loyalty/rewards'
+    ]) {
+      const response = await app.inject({ method: 'GET', url, headers: authHeaders(moderatorJar) });
+      assert.equal(response.statusCode, 403, `${url}: ${response.body}`);
+    }
+
     const passwordHash = await hashPassword(adminPassword);
     const admin = await pool.query<{ id: string }>(`
       INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
@@ -1029,6 +1095,10 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.match(adminScript.body, /data-user-edit/);
     assert.match(adminScript.body, /data-user-delete/);
     assert.match(adminScript.body, /vendorPortalViews/);
+    assert.match(adminScript.body, /moderatorViews/);
+    assert.match(adminScript.body, /isModeratorOnly/);
+    assert.match(adminScript.body, /\['posts', '≡', 'Məqalələr', 'posts\.read'\]/);
+    assert.match(adminScript.body, /\['journal', '▥', 'Jurnal buraxılışları', 'journal\.read'\]/);
     assert.doesNotMatch(adminScript.body, /attributesJson/);
     assert.match(adminScript.body, /mountSiteEditor/);
     const editorScript = await app.inject({ method: 'GET', url: '/admin/site-editor.js' });
