@@ -49,10 +49,20 @@ const userUpdate = z.object({
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', { preHandler: app.requirePermission('users.read') }, async (request) => {
-    const query = paginationSchema.parse(request.query);
+    const query = paginationSchema.extend({
+      accountType: z.enum(['general', 'vendor', 'all']).default('general')
+    }).parse(request.query);
     const actor = actorOf(request);
     const params: unknown[] = [];
     const conditions = ['u.deleted_at IS NULL'];
+    if (query.accountType !== 'all') {
+      const vendorRoleExists = `EXISTS (
+        SELECT 1 FROM user_roles vendor_ur
+        JOIN roles vendor_role ON vendor_role.id=vendor_ur.role_id
+        WHERE vendor_ur.user_id=u.id AND vendor_role.code IN ('vendor_owner','vendor_staff')
+      )`;
+      conditions.push(query.accountType === 'vendor' ? vendorRoleExists : `NOT ${vendorRoleExists}`);
+    }
     if (!actor.isSuperAdmin) {
       params.push(actor.storeIds);
       conditions.push(`ur.store_id = ANY($${params.length}::uuid[])`);
@@ -68,7 +78,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     params.push(query.limit, (query.page - 1) * query.limit);
     const result = await pool.query(`
       SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.status,
-        u.last_login_at, u.created_at,
+        u.last_login_at, u.created_at, u.failed_login_count, u.login_blocked_at, u.login_block_reason,
         array_remove(array_agg(DISTINCT r.code), NULL) AS roles,
         array_remove(array_agg(DISTINCT ur.store_id::text), NULL) AS store_ids,
         array_remove(array_agg(DISTINCT ur.vendor_id::text), NULL) AS vendor_ids,
@@ -89,6 +99,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const actor = actorOf(request);
     const result = await pool.query(`
       SELECT u.id,u.email,u.phone,u.first_name,u.last_name,u.status,u.last_login_at,u.created_at,
+        u.failed_login_count,u.login_blocked_at,u.login_block_reason,
         array_remove(array_agg(DISTINCT r.code),NULL) AS roles,
         array_remove(array_agg(DISTINCT ur.store_id::text),NULL) AS store_ids,
         array_remove(array_agg(DISTINCT ur.vendor_id::text),NULL) AS vendor_ids
@@ -138,12 +149,13 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     if (inviteToken) {
       inviteUrl = `${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/deveti-qebul-et/?token=${encodeURIComponent(inviteToken)}`;
       try {
-        await sendEmail({
+        const delivery = await sendEmail({
           to: input.email,
           subject: 'Gündəlik Bakı idarəetmə dəvəti',
-          html: authEmailTemplate('Komandaya dəvət edildiniz', `Salam ${input.firstName}, Gündəlik Bakı hesabınızı aktivləşdirmək üçün təhlükəsiz keçiddən istifadə edin.`, 'Dəvəti qəbul et', inviteUrl)
+          html: authEmailTemplate('Komandaya dəvət edildiniz', `Salam ${input.firstName}, Gündəlik Bakı hesabınızı aktivləşdirmək üçün təhlükəsiz keçiddən istifadə edin.`, 'Dəvəti qəbul et', inviteUrl),
+          text: `Salam ${input.firstName}, Gündəlik Bakı hesabınızı aktivləşdirmək üçün bu keçiddən istifadə edin: ${inviteUrl}`
         });
-        emailSent = true;
+        emailSent = delivery.accepted;
       } catch (error) {
         request.log.warn({ err: error, userId: user.id }, 'Invite email delivery failed');
       }
@@ -170,12 +182,13 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const inviteUrl = `${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/deveti-qebul-et/?token=${encodeURIComponent(raw)}`;
     let emailSent = false;
     try {
-      await sendEmail({
+      const delivery = await sendEmail({
         to: user.email,
         subject: 'Gündəlik Bakı idarəetmə dəvəti',
-        html: authEmailTemplate('Komandaya dəvət edildiniz', `Salam ${user.first_name}, hesabınızı aktivləşdirmək üçün yeni təhlükəsiz keçiddən istifadə edin.`, 'Dəvəti qəbul et', inviteUrl)
+        html: authEmailTemplate('Komandaya dəvət edildiniz', `Salam ${user.first_name}, hesabınızı aktivləşdirmək üçün yeni təhlükəsiz keçiddən istifadə edin.`, 'Dəvəti qəbul et', inviteUrl),
+        text: `Salam ${user.first_name}, Gündəlik Bakı hesabınızı aktivləşdirmək üçün bu yeni keçiddən istifadə edin: ${inviteUrl}`
       });
-      emailSent = true;
+      emailSent = delivery.accepted;
     } catch (error) {
       request.log.warn({ err: error, userId: id }, 'Invite email delivery failed');
     }
@@ -203,13 +216,67 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const updated = await withTransaction(async (client) => {
       const result = await client.query(`UPDATE users SET status=$2::user_status,
         failed_login_count=CASE WHEN $2::user_status='active'::user_status THEN 0 ELSE failed_login_count END,
-        locked_until=CASE WHEN $2::user_status='active'::user_status THEN NULL ELSE locked_until END
-        WHERE id=$1 RETURNING id,email,first_name,last_name,status`, [id, input.status]);
+        locked_until=CASE WHEN $2::user_status='active'::user_status THEN NULL ELSE locked_until END,
+        login_blocked_at=CASE WHEN $2::user_status='active'::user_status THEN NULL ELSE login_blocked_at END,
+        login_block_reason=CASE WHEN $2::user_status='active'::user_status THEN NULL ELSE login_block_reason END
+        WHERE id=$1 RETURNING id,email,first_name,last_name,status,failed_login_count,login_blocked_at`, [id, input.status]);
       if (input.status !== 'active') await client.query('UPDATE refresh_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
       await writeAudit(client, { actorUserId: actor.userId, action: 'user.status.update', entityType: 'user', entityId: id, beforeData: { status: current.rows[0].status }, afterData: { status: input.status }, requestId: request.id });
       return result.rows[0];
     });
     return { data: updated };
+  });
+
+  app.post('/:id/unlock', { preHandler: app.requirePermission('users.manage') }, async (request) => {
+    const id = z.uuid().parse((request.params as { id: string }).id);
+    const actor = actorOf(request);
+    const current = await pool.query<{
+      id: string;
+      email: string;
+      login_blocked_at: Date | null;
+      login_block_reason: string | null;
+      store_ids: string[] | null;
+      roles: string[] | null;
+    }>(`
+      SELECT u.id,u.email::text,u.login_blocked_at,u.login_block_reason,
+        array_remove(array_agg(DISTINCT ur.store_id::text),NULL) AS store_ids,
+        array_remove(array_agg(DISTINCT r.code),NULL) AS roles
+      FROM users u
+      LEFT JOIN user_roles ur ON ur.user_id=u.id
+      LEFT JOIN roles r ON r.id=ur.role_id
+      WHERE u.id=$1 AND u.deleted_at IS NULL
+      GROUP BY u.id
+    `, [id]);
+    const user = current.rows[0];
+    if (!user || !actor.isSuperAdmin && !(user.store_ids ?? []).some((storeId) => actor.storeIds.includes(storeId))) {
+      throw notFound('İstifadəçi');
+    }
+    if (user.roles?.includes('super_admin') && !actor.isSuperAdmin) {
+      throw forbidden('Super admin hesabının kilidini yalnız super admin aça bilər');
+    }
+    if (!user.login_blocked_at) {
+      throw badRequest('ACCOUNT_NOT_BLOCKED', 'Bu hesabın giriş kilidi aktiv deyil');
+    }
+
+    const unlocked = await withTransaction(async (client) => {
+      const result = await client.query(`
+        UPDATE users SET failed_login_count=0,locked_until=NULL,login_blocked_at=NULL,login_block_reason=NULL
+        WHERE id=$1
+        RETURNING id,email,first_name,last_name,status,failed_login_count,login_blocked_at
+      `, [id]);
+      await writeAudit(client, {
+        actorUserId: actor.userId,
+        storeId: user.store_ids?.[0] ?? null,
+        action: 'user.login.unlock',
+        entityType: 'user',
+        entityId: id,
+        beforeData: { loginBlockedAt: user.login_blocked_at, reason: user.login_block_reason },
+        afterData: { loginBlockedAt: null, failedLoginCount: 0 },
+        requestId: request.id
+      });
+      return result.rows[0];
+    });
+    return { data: unlocked };
   });
 
   app.patch('/:id', { preHandler: app.requirePermission('users.manage') }, async (request) => {
@@ -247,8 +314,10 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           password_hash=coalesce($7,password_hash),status=coalesce($8::user_status,status),
           email_verified_at=CASE WHEN $2::citext IS NOT NULL AND $2::citext<>email THEN NULL ELSE email_verified_at END,
           failed_login_count=CASE WHEN $7::text IS NOT NULL OR $8::user_status='active'::user_status THEN 0 ELSE failed_login_count END,
-          locked_until=CASE WHEN $7::text IS NOT NULL OR $8::user_status='active'::user_status THEN NULL ELSE locked_until END
-        WHERE id=$1 RETURNING id,email,phone,first_name,last_name,status,updated_at
+          locked_until=CASE WHEN $7::text IS NOT NULL OR $8::user_status='active'::user_status THEN NULL ELSE locked_until END,
+          login_blocked_at=CASE WHEN $7::text IS NOT NULL OR $8::user_status='active'::user_status THEN NULL ELSE login_blocked_at END,
+          login_block_reason=CASE WHEN $7::text IS NOT NULL OR $8::user_status='active'::user_status THEN NULL ELSE login_block_reason END
+        WHERE id=$1 RETURNING id,email,phone,first_name,last_name,status,updated_at,failed_login_count,login_blocked_at
       `, [id, input.email ?? null, Object.hasOwn(input, 'phone'), input.phone || null, input.firstName ?? null, input.lastName ?? null, passwordHash, input.status ?? null]);
       if (input.roleCode) {
         await client.query('DELETE FROM user_roles WHERE user_id=$1', [id]);

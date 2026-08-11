@@ -499,10 +499,12 @@
 .db-auth-form{display:grid;gap:16px}
 .db-auth-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .db-auth-form>label,.db-auth-form-grid label{display:grid;gap:7px;color:#3f444d;font-size:12px;font-weight:700}
-.db-auth-form input:not([type="checkbox"]){width:100%;height:48px;padding:11px 13px;color:#191d23;background:#fff;border:1px solid #d2d6de;border-radius:6px;outline:0;font:500 13px/1.2 Poppins,Arial,sans-serif}
-.db-auth-form input:not([type="checkbox"]):focus{border-color:#2351df;box-shadow:0 0 0 4px rgba(35,81,223,.11)}
+.db-auth-form input:not([type="checkbox"]),.db-auth-form textarea{width:100%;height:48px;padding:11px 13px;color:#191d23;background:#fff;border:1px solid #d2d6de;border-radius:6px;outline:0;font:500 13px/1.2 Poppins,Arial,sans-serif}
+.db-auth-form textarea{height:auto;min-height:108px;resize:vertical;line-height:1.55}
+.db-auth-form input:not([type="checkbox"]):focus,.db-auth-form textarea:focus{border-color:#2351df;box-shadow:0 0 0 4px rgba(35,81,223,.11)}
 .db-auth-options,.db-auth-consent{display:flex!important;align-items:flex-start;justify-content:space-between;gap:15px;color:#606670!important;font-size:11px!important;font-weight:500!important}
 .db-auth-options label,.db-auth-consent{display:flex!important;align-items:center;gap:7px}
+.db-auth-consent{width:100%;margin:0!important;padding:0!important;justify-content:flex-start!important;text-align:left!important}.db-auth-consent>span{min-width:0;flex:1;text-align:left}
 .db-auth-options input,.db-auth-consent input{accent-color:#2351df}
 .db-auth-options a,.db-auth-switch a,.db-auth-status a{color:#1e4adc;font-weight:700;text-decoration:none}
 .db-auth-form>button{width:100%;min-height:51px;margin-top:3px;color:#fff;background:#174ddd;border:0;border-radius:6px;font:800 12px/1 Poppins,Arial,sans-serif;letter-spacing:.03em;cursor:pointer;transition:background .2s ease,transform .2s ease}
@@ -511,6 +513,8 @@
 .db-auth-status{min-height:19px;margin:0;color:#174ddd;font-size:11px;font-weight:600;line-height:1.5}
 .db-auth-status.is-error{color:#c71331}.db-auth-status.is-success{color:#147643}
 .db-auth-switch{margin:22px 0 0;padding-top:20px;color:#686e78;border-top:1px solid #e5e7eb;font-size:12px;text-align:center}
+.db-auth-switch-secondary{margin-top:11px;padding-top:0;border-top:0}
+.db-auth-promo-vendor{background:linear-gradient(145deg,#0b377e,#085dea)}
 .db-auth-token-copy{padding:13px;color:#1e4adc;background:#edf3ff;border-radius:6px;font-size:12px;font-weight:700}
 
 /* Loyalty and notifications */

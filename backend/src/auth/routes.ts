@@ -6,8 +6,15 @@ import { env } from '../config/env.js';
 import { AppError } from '../core/errors.js';
 import { hashPassword, verifyPassword } from '../core/password.js';
 import { privacyHash, randomToken, tokenDigest } from '../core/security.js';
-import { authEmailTemplate, sendEmail } from '../core/email.js';
+import {
+  authEmailTemplate,
+  customerWelcomeEmailTemplate,
+  sendEmail,
+  vendorWelcomeEmailTemplate
+} from '../core/email.js';
 import { azerbaijanPhoneSchema } from '../core/phone.js';
+import { slugify } from '../core/slug.js';
+import { writeAudit } from '../core/audit.js';
 import { pool, withTransaction } from '../db/pool.js';
 import { clearAuthCookies, cookieNames, setAuthCookies } from './cookies.js';
 import { loadActorContext } from './context.js';
@@ -23,6 +30,18 @@ const registerSchema = z.object({
   firstName: z.string().trim().min(2).max(100),
   lastName: z.string().trim().min(2).max(100),
   password: z.string().min(12).max(200)
+});
+
+const vendorRegisterSchema = z.object({
+  displayName: z.string().trim().min(2).max(160),
+  legalName: z.string().trim().min(2).max(200),
+  taxId: z.string().trim().min(5).max(80),
+  email: z.email().max(254).transform((value) => value.toLowerCase()),
+  phone: azerbaijanPhoneSchema,
+  firstName: z.string().trim().min(2).max(100),
+  lastName: z.string().trim().min(2).max(100),
+  password: z.string().min(12).max(200),
+  description: z.string().trim().max(5000).default('')
 });
 
 const forgotPasswordSchema = z.object({
@@ -42,6 +61,15 @@ interface UserRow {
   password_hash: string;
   status: string;
   locked_until: Date | null;
+  failed_login_count: number;
+  login_blocked_at: Date | null;
+}
+
+interface VendorAccessRow {
+  has_vendor_role: boolean | null;
+  has_non_vendor_role: boolean | null;
+  has_active_vendor: boolean | null;
+  has_pending_vendor: boolean | null;
 }
 
 type PendingSession = {
@@ -103,6 +131,77 @@ async function createSession(
   applySessionCookies(reply, session);
 }
 
+async function verifyLoginCredentials(input: z.infer<typeof loginSchema>): Promise<UserRow> {
+  const result = await pool.query<UserRow>(`
+    SELECT id, email, password_hash, status, locked_until, failed_login_count, login_blocked_at
+    FROM users WHERE email = $1 AND deleted_at IS NULL
+  `, [input.email]);
+  const user = result.rows[0];
+
+  if (!user || user.status !== 'active') {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır');
+  }
+  if (user.login_blocked_at) {
+    throw new AppError(423, 'ACCOUNT_LOGIN_BLOCKED', 'Hesabınız 10 uğursuz giriş cəhdindən sonra bloklanıb. Kilidin açılması üçün administratorla əlaqə saxlayın');
+  }
+  // Preserve protection for a legacy temporary lock until migration 022 clears it.
+  if (user.locked_until && user.locked_until > new Date()) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır');
+  }
+
+  const valid = await verifyPassword(input.password, user.password_hash);
+  if (!valid) {
+    const failed = await withTransaction(async (client) => {
+      const updated = await client.query<{ failed_login_count: number; login_blocked_at: Date | null }>(`
+      UPDATE users SET
+        failed_login_count = failed_login_count + 1,
+        locked_until = NULL,
+        login_blocked_at = CASE WHEN failed_login_count + 1 >= 10 THEN coalesce(login_blocked_at,now()) ELSE login_blocked_at END,
+        login_block_reason = CASE WHEN failed_login_count + 1 >= 10 THEN 'too_many_failed_logins' ELSE login_block_reason END
+      WHERE id = $1 AND login_blocked_at IS NULL
+      RETURNING failed_login_count,login_blocked_at
+    `, [user.id]);
+      if (updated.rows[0]?.login_blocked_at) {
+        await client.query('UPDATE refresh_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [user.id]);
+      }
+      return updated.rows[0];
+    });
+    if (failed?.login_blocked_at) {
+      throw new AppError(423, 'ACCOUNT_LOGIN_BLOCKED', 'Hesabınız 10 uğursuz giriş cəhdindən sonra bloklanıb. Kilidin açılması üçün administratorla əlaqə saxlayın');
+    }
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır');
+  }
+
+  return user;
+}
+
+async function vendorAccessFor(userId: string): Promise<VendorAccessRow> {
+  const result = await pool.query<VendorAccessRow>(`
+    SELECT
+      bool_or(r.code IN ('vendor_owner','vendor_staff')) AS has_vendor_role,
+      bool_or(r.code NOT IN ('vendor_owner','vendor_staff')) AS has_non_vendor_role,
+      bool_or(r.code IN ('vendor_owner','vendor_staff') AND v.status='active' AND v.deleted_at IS NULL) AS has_active_vendor,
+      bool_or(r.code IN ('vendor_owner','vendor_staff') AND v.status='pending' AND v.deleted_at IS NULL) AS has_pending_vendor
+    FROM user_roles ur
+    JOIN roles r ON r.id=ur.role_id
+    LEFT JOIN vendors v ON v.id=ur.vendor_id
+    WHERE ur.user_id=$1
+  `, [userId]);
+  return result.rows[0] ?? {
+    has_vendor_role: false,
+    has_non_vendor_role: false,
+    has_active_vendor: false,
+    has_pending_vendor: false
+  };
+}
+
+async function markSuccessfulLogin(userId: string): Promise<void> {
+  await pool.query(`
+    UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = now()
+    WHERE id = $1 AND login_blocked_at IS NULL
+  `, [userId]);
+}
+
 async function issueActionToken(
   userId: string,
   type: 'password_reset' | 'invite',
@@ -143,18 +242,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       "SELECT id,first_name FROM users WHERE email=$1 AND status='active' AND deleted_at IS NULL",
       [input.email]
     );
-    let previewUrl: string | undefined;
     if (result.rows[0]) {
       const token = await issueActionToken(result.rows[0].id, 'password_reset');
       const resetUrl = `${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/sifre-yenile/?token=${encodeURIComponent(token.raw)}`;
-      if (env.NODE_ENV !== 'production') previewUrl = resetUrl;
-      await sendEmail({
-        to: input.email,
-        subject: 'Gündəlik Bakı — şifrənizi yeniləyin',
-        html: authEmailTemplate('Şifrənizi yeniləyin', `Salam ${result.rows[0].first_name}, aşağıdakı təhlükəsiz keçid 1 saat ərzində etibarlıdır.`, 'Şifrəni yenilə', resetUrl)
-      });
+      try {
+        await sendEmail({
+          to: input.email,
+          subject: 'Gündəlik Bakı — şifrənizi yeniləyin',
+          html: authEmailTemplate('Şifrənizi yeniləyin', `Salam ${result.rows[0].first_name}, aşağıdakı təhlükəsiz keçid 1 saat ərzində etibarlıdır.`, 'Şifrəni yenilə', resetUrl),
+          text: `Salam ${result.rows[0].first_name}, şifrənizi yeniləmək üçün bu keçiddən istifadə edin. Keçid 1 saat ərzində etibarlıdır: ${resetUrl}`
+        });
+      } catch (error) {
+        // Keep the public response identical for existing and unknown accounts.
+        // Delivery failures remain visible in structured server logs.
+        request.log.error({ err: error, userId: result.rows[0].id }, 'Password reset email delivery failed');
+      }
     }
-    return { data: { accepted: true, ...(previewUrl ? { previewUrl } : {}) } };
+    return { data: { accepted: true } };
   });
 
   app.post('/reset-password', {
@@ -163,12 +267,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const input = resetPasswordSchema.parse(request.body);
     const passwordHash = await hashPassword(input.password);
     const userId = await withTransaction(async (client) => {
-      const token = await client.query<{ id: string; user_id: string }>(`
-        SELECT id,user_id FROM user_action_tokens
-        WHERE token_hash=$1 AND token_type='password_reset' AND used_at IS NULL AND expires_at>now()
-        FOR UPDATE
+      const token = await client.query<{ id: string; user_id: string; login_blocked_at: Date | null }>(`
+        SELECT t.id,t.user_id,u.login_blocked_at FROM user_action_tokens t
+        JOIN users u ON u.id=t.user_id
+        WHERE t.token_hash=$1 AND t.token_type='password_reset' AND t.used_at IS NULL AND t.expires_at>now()
+          AND u.status='active' AND u.deleted_at IS NULL
+        FOR UPDATE OF t,u
       `, [tokenDigest(input.token)]);
       if (!token.rows[0]) throw new AppError(404, 'TOKEN_INVALID', 'Şifrə yeniləmə keçidi etibarsızdır və ya vaxtı bitib');
+      if (token.rows[0].login_blocked_at) {
+        throw new AppError(423, 'ACCOUNT_LOGIN_BLOCKED', 'Hesabınız bloklanıb. Kilidin açılması üçün administratorla əlaqə saxlayın');
+      }
       await client.query("UPDATE users SET password_hash=$2,failed_login_count=0,locked_until=NULL WHERE id=$1 AND status='active'", [token.rows[0].user_id, passwordHash]);
       await client.query('UPDATE user_action_tokens SET used_at=now() WHERE id=$1', [token.rows[0].id]);
       await client.query('UPDATE refresh_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [token.rows[0].user_id]);
@@ -248,38 +357,169 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     applySessionCookies(reply, session);
     const actor = await loadActorContext(userId);
-    return reply.code(201).send({ data: actor && { ...actor, permissions: [...actor.permissions] } });
+    let welcomeEmailSent = false;
+    try {
+      const delivery = await sendEmail({
+        to: input.email,
+        subject: 'Gündəlik Bakı hesabınıza xoş gəlmisiniz',
+        html: customerWelcomeEmailTemplate(input.firstName, `${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/hesabim/`),
+        text: `Salam ${input.firstName}, Gündəlik Bakı hesabınız uğurla yaradıldı. Hesabınıza keçid: ${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/hesabim/`
+      });
+      welcomeEmailSent = delivery.accepted;
+    } catch (error) {
+      request.log.error({ err: error, userId }, 'Customer welcome email delivery failed');
+    }
+    return reply.code(201).send({ data: actor && { ...actor, permissions: [...actor.permissions], welcomeEmailSent } });
+  });
+
+  app.post('/vendor-register', {
+    config: { rateLimit: { max: 3, timeWindow: '1 hour' } }
+  }, async (request, reply) => {
+    const input = vendorRegisterSchema.parse(request.body);
+    const passwordHash = await hashPassword(input.password);
+    const session = prepareSession(app, '00000000-0000-0000-0000-000000000000');
+
+    try {
+      const result = await withTransaction(async (client) => {
+        const store = await client.query<{ id: string }>(`
+          SELECT id FROM stores WHERE code=$1 AND status='active' FOR SHARE
+        `, [env.DEFAULT_STORE_CODE]);
+        if (!store.rows[0]) throw new AppError(503, 'STORE_UNAVAILABLE', 'Satıcı qeydiyyatı müvəqqəti əlçatan deyil');
+        const storeId = store.rows[0].id;
+
+        const baseSlug = slugify(input.displayName) || 'satici';
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${storeId}:${baseSlug}`]);
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${storeId}:tax:${input.taxId}`]);
+        const duplicateTaxId = await client.query(
+          'SELECT id FROM vendors WHERE store_id=$1 AND tax_id=$2 AND deleted_at IS NULL',
+          [storeId, input.taxId]
+        );
+        if (duplicateTaxId.rows[0]) throw new AppError(409, 'VENDOR_EXISTS', 'Bu VÖEN ilə satıcı müraciəti artıq mövcuddur');
+        const duplicateSlug = await client.query(
+          'SELECT 1 FROM vendors WHERE store_id=$1 AND slug=$2 AND deleted_at IS NULL',
+          [storeId, baseSlug]
+        );
+        const vendorSlug = duplicateSlug.rows[0] ? `${baseSlug}-${randomUUID().slice(0, 8)}` : baseSlug;
+
+        const vendor = await client.query<{ id: string; status: string }>(`
+          INSERT INTO vendors(
+            store_id,display_name,legal_name,slug,tax_id,email,phone,description,
+            commission_rate,status,settings
+          ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,0,'pending',jsonb_build_object(
+            'registrationSource','self_service','submittedAt',now()
+          )) RETURNING id,status
+        `, [storeId, input.displayName, input.legalName, vendorSlug, input.taxId, input.email, input.phone, input.description]);
+        const vendorId = vendor.rows[0]!.id;
+
+        const user = await client.query<{ id: string }>(`
+          INSERT INTO users(email,phone,password_hash,first_name,last_name,status)
+          VALUES($1,$2,$3,$4,$5,'active') RETURNING id
+        `, [input.email, input.phone, passwordHash, input.firstName, input.lastName]);
+        const userId = user.rows[0]!.id;
+
+        const assigned = await client.query(`
+          INSERT INTO user_roles(user_id,role_id,store_id,vendor_id)
+          SELECT $1,id,$2,$3 FROM roles WHERE code='vendor_owner' RETURNING id
+        `, [userId, storeId, vendorId]);
+        if (!assigned.rows[0]) throw new AppError(503, 'ROLE_UNAVAILABLE', 'Satıcı rolu sistemdə tapılmadı');
+
+        session.userId = userId;
+        session.accessToken = app.jwt.sign({ sub: userId, sessionId: session.id }, { expiresIn: env.ACCESS_TOKEN_TTL });
+        await persistSession(client, session, request);
+
+        await client.query(`
+          INSERT INTO user_notifications(user_id,notification_type,title,message,action_url,metadata)
+          SELECT DISTINCT ur.user_id,'vendor.registration','Yeni satıcı qeydiyyatı',
+            $2 || ' partnyorluq üçün qeydiyyatdan keçdi. Məlumatları yoxlayaraq statusu təsdiqləyin.',
+            '/admin/#vendors',jsonb_build_object('vendorId',$3::text,'source','self_service')
+          FROM user_roles ur
+          JOIN users u ON u.id=ur.user_id AND u.status='active' AND u.deleted_at IS NULL
+          JOIN role_permissions rp ON rp.role_id=ur.role_id
+          JOIN permissions p ON p.id=rp.permission_id AND p.code='vendors.approve'
+          WHERE ur.store_id IS NULL OR ur.store_id=$1
+        `, [storeId, input.displayName, vendorId]);
+
+        await writeAudit(client, {
+          storeId,
+          vendorId,
+          action: 'vendor.self_register',
+          entityType: 'vendor',
+          entityId: vendorId,
+          afterData: {
+            displayName: input.displayName,
+            legalName: input.legalName,
+            taxId: input.taxId,
+            email: input.email,
+            phone: input.phone,
+            ownerUserId: userId,
+            status: 'pending',
+            registrationSource: 'self_service'
+          },
+          requestId: request.id,
+          ipHash: privacyHash(request.ip, env.COOKIE_SECRET)
+        });
+
+        return { userId, vendorId, status: vendor.rows[0]!.status };
+      });
+      applySessionCookies(reply, session);
+      const actor = await loadActorContext(result.userId);
+      let welcomeEmailSent = false;
+      try {
+        const delivery = await sendEmail({
+          to: input.email,
+          subject: 'Gündəlik Bakı — satıcı kabinetiniz yaradıldı',
+          html: vendorWelcomeEmailTemplate(input.firstName, input.displayName, `${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/satici-paneli/`),
+          text: `Salam ${input.firstName}, ${input.displayName} üçün satıcı kabinetiniz yaradıldı. Məhsullar administrator təsdiqindən sonra saytda görünəcək. Kabinet: ${env.PUBLIC_ORIGIN.replace(/\/$/, '')}/satici-paneli/`
+        });
+        welcomeEmailSent = delivery.accepted;
+      } catch (error) {
+        request.log.error({ err: error, userId: result.userId, vendorId: result.vendorId }, 'Vendor welcome email delivery failed');
+      }
+      return reply.code(201).send({
+        data: {
+          registered: true,
+          vendorId: result.vendorId,
+          status: result.status,
+          welcomeEmailSent,
+          ...(actor ? { ...actor, permissions: [...actor.permissions] } : {})
+        }
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new AppError(409, 'ACCOUNT_EXISTS', 'Bu e-poçt və ya telefonla hesab artıq mövcuddur');
+      }
+      throw error;
+    }
   });
 
   app.post('/login', {
-    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } }
+    config: { rateLimit: { max: 20, timeWindow: '15 minutes' } }
   }, async (request, reply) => {
     const input = loginSchema.parse(request.body);
-    const result = await pool.query<UserRow>(`
-      SELECT id, email, password_hash, status, locked_until
-      FROM users WHERE email = $1 AND deleted_at IS NULL
-    `, [input.email]);
-    const user = result.rows[0];
-
-    if (!user || user.status !== 'active' || (user.locked_until && user.locked_until > new Date())) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır');
+    const user = await verifyLoginCredentials(input);
+    const vendorAccess = await vendorAccessFor(user.id);
+    if (vendorAccess.has_vendor_role && !vendorAccess.has_active_vendor && !vendorAccess.has_pending_vendor && !vendorAccess.has_non_vendor_role) {
+      throw new AppError(403, 'VENDOR_INACTIVE', 'Satıcı hesabınız aktiv deyil');
     }
+    await markSuccessfulLogin(user.id);
+    await createSession(app, reply, request, user.id);
+    const actor = await loadActorContext(user.id);
+    return reply.send({ data: actor && { ...actor, permissions: [...actor.permissions] } });
+  });
 
-    const valid = await verifyPassword(input.password, user.password_hash);
-    if (!valid) {
-      await pool.query(`
-        UPDATE users SET
-          failed_login_count = failed_login_count + 1,
-          locked_until = CASE WHEN failed_login_count + 1 >= 5 THEN now() + interval '15 minutes' ELSE locked_until END
-        WHERE id = $1
-      `, [user.id]);
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Email və ya şifrə yanlışdır');
+  app.post('/vendor-login', {
+    config: { rateLimit: { max: 20, timeWindow: '15 minutes' } }
+  }, async (request, reply) => {
+    const input = loginSchema.parse(request.body);
+    const user = await verifyLoginCredentials(input);
+    const vendorAccess = await vendorAccessFor(user.id);
+    if (!vendorAccess.has_vendor_role) {
+      throw new AppError(403, 'VENDOR_ACCOUNT_REQUIRED', 'Bu məlumatlarla satıcı hesabı tapılmadı');
     }
-
-    await pool.query(`
-      UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = now()
-      WHERE id = $1
-    `, [user.id]);
+    if (!vendorAccess.has_active_vendor && !vendorAccess.has_pending_vendor) {
+      throw new AppError(403, 'VENDOR_INACTIVE', 'Satıcı hesabınız aktiv deyil');
+    }
+    await markSuccessfulLogin(user.id);
     await createSession(app, reply, request, user.id);
     const actor = await loadActorContext(user.id);
     return reply.send({ data: actor && { ...actor, permissions: [...actor.permissions] } });
@@ -296,7 +536,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }>(`
         SELECT rs.id,rs.user_id,rs.family_id,rs.expires_at,rs.rotated_at,rs.revoked_at
         FROM refresh_sessions rs JOIN users u ON u.id=rs.user_id
-        WHERE rs.token_hash=$1 AND u.status='active' AND u.deleted_at IS NULL
+        WHERE rs.token_hash=$1 AND u.status='active' AND u.login_blocked_at IS NULL AND u.deleted_at IS NULL
         FOR UPDATE OF rs
       `, [tokenDigest(rawToken)]);
       const current = result.rows[0];

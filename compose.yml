@@ -29,8 +29,13 @@ services:
       DATABASE_URL: postgresql://dailybaku:${POSTGRES_PASSWORD}@postgres:5432/dailybaku
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tələb olunur}
       COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET tələb olunur}
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@dailybaku.az}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@gundelikbaki.az}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD tələb olunur}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
+      RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY tələb olunur}
+      EMAIL_FROM: ${EMAIL_FROM:-Gündəlik Bakı <noreply@gundelikbaki.az>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@gundelikbaki.az}
+      EMAIL_TIMEOUT_MS: ${EMAIL_TIMEOUT_MS:-10000}
       TRUST_PROXY: "true"
       UPLOAD_DIR: /app/backend/uploads
     volumes:

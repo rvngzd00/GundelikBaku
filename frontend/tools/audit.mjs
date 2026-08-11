@@ -9,6 +9,11 @@ const html = readFileSync(entry, 'utf8');
 const themeController = readFileSync(join(root, 'assets/wp-content/themes/bigxon/js/controller.js'), 'utf8');
 const cms = readFileSync(join(root, 'assets/js/cms.js'), 'utf8');
 const auth = readFileSync(join(root, 'assets/js/auth.js'), 'utf8');
+const commerce = readFileSync(join(root, 'assets/js/commerce.js'), 'utf8');
+const i18n = readFileSync(join(root, 'assets/js/i18n.js'), 'utf8');
+const siteCss = readFileSync(join(root, 'assets/css/site.css'), 'utf8');
+const accountCss = readFileSync(join(root, 'assets/css/account.css'), 'utf8');
+const mobilePanels = readFileSync(join(root, 'assets/js/mobile-panels.js'), 'utf8');
 const errors = [];
 const warnings = [];
 const checked = new Set();
@@ -97,12 +102,27 @@ const required = [
   ['Gündəlik Bakı metadata and schema branding', /property="og:site_name" content="Gündəlik Bakı"/.test(html) && /"@type":"WebSite","name":"Gündəlik Bakı"/.test(html) && !/Daily\s+Baku/i.test(html.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', ''))],
   ['Gündəlik Bakı logo', (html.match(/assets\/images\/categories\/logoSite\.png/gi) || []).length >= 6 && !/assets\/brand\/(?:daily-baku-logo\.svg|gundelik-baki-logo(?:-white)?\.png)/i.test(html)],
   ['brand favicon', /assets\/brand\/favicon-32\.png/i.test(html)],
-  ['language selectors removed', !/elementor-widget-et_language_switcher|class="current-lang"/i.test(html)],
+  ['legacy language selectors removed', !/elementor-widget-et_language_switcher|class="current-lang"/i.test(html)],
+  ['responsive custom AZ and EN language pickers', (html.match(/data-language-picker/g) || []).length === 2 && (html.match(/data-language-trigger/g) || []).length === 2 && (html.match(/data-language-option="az"/g) || []).length === 2 && (html.match(/data-language-option="en"/g) || []).length === 2 && !/data-language-select|db-language-switcher-label/.test(html)],
+  ['language picker is centered with adjacent header controls', /\.db-language-switcher\s*\{[^}]*align-items:\s*center;[^}]*align-self:\s*center;/s.test(siteCss)],
+  ['mobile language picker lives in the hamburger panel header', html.indexOf('class="db-language-switcher db-language-switcher-mobile"') > html.indexOf('class="mobile-container ') && html.indexOf('class="db-language-switcher db-language-switcher-mobile"') < html.indexOf('class="db-mobile-store-pane ')],
+  ['language picker switches cleanly between desktop and hamburger layouts', /@media \(max-width: 1023px\)[\s\S]*?\.db-language-switcher-desktop\s*\{\s*display:\s*none;/s.test(siteCss) && siteCss.includes('.et-mobile-container-top > .db-language-switcher-mobile')],
+  ['localization runtime loads before interactive homepage scripts', html.indexOf('./assets/js/i18n.js') > -1 && html.indexOf('./assets/js/i18n.js') < html.indexOf('./assets/js/commerce.js')],
+  ['localization runtime persists and observes language state', /gundelikBakiLanguage/.test(i18n) && /SUPPORTED_LANGUAGES = new Set\(\['az', 'en'\]\)/.test(i18n) && /dailybaku:languagechange/.test(i18n) && /MutationObserver/.test(i18n)],
+  ['dynamic homepage content uses the localization layer', /products = products\.map\(localizeProduct\)/.test(cms) && /posts = posts\.map\(localizePost\)/.test(cms) && /categories = categories\.map\(localizeCategory\)/.test(cms) && /dailybaku:languagechange/.test(cms)],
+  ['commerce keeps canonical product data across language changes', /canonicalizeProduct/.test(i18n) && /canonicalizeProduct\(cleaned\)/.test(commerce) && /dailybaku:languagechange/.test(commerce)],
   ['footer Sitemap link removed', !/<a href="\/sitemap\.xml"[^>]*>/i.test(html)],
   ['footer payment logos disabled', /<!-- Payment method logos are intentionally disabled\.[\s\S]*?elementor-element-6d02874[\s\S]*?-->/i.test(html)],
   ['footer company identity', /Gündəlik Bakı Poçtu-Daily Baku Mail/.test(html) && /"Gündəlik Bakı" Panorama Reklam MMC nin satış platformasıdır/.test(html) && /VÖEN 2007614681/.test(html)],
   ['header login uses customer auth fields', /<form[^>]+data-auth-form="login"[^>]*>[\s\S]*?name="email"[\s\S]*?name="password"[\s\S]*?<\/form>/i.test(html)],
   ['vendor accounts enter the dedicated seller portal', /vendor_owner/.test(auth) && /vendor_staff/.test(auth) && /destination = '\/satici-paneli\/'/.test(auth)],
+  ['management accounts use role-aware menus with logout', /ADMIN_PORTAL_ROLES/.test(auth) && /VENDOR_PORTAL_ROLES/.test(auth) && /renderPanelAccount/.test(auth) && /accountMenuMarkup/.test(auth) && /data-account-logout/.test(auth) && /DailyBakuPanelPath/.test(auth) && /panelLinks/.test(mobilePanels) && !/window\.location\.assign\(panelPath\)/.test(mobilePanels)],
+  ['customer header account menu uses the redesigned accessible layout', /db-header-account-menu/.test(auth) && /navigationLabel = 'Hesab keçidləri'/.test(auth) && /db-header-account-logout/.test(auth) && /\.et__login\.db-customer-account \.login-box/.test(siteCss)],
+  ['seller login is linked from desktop and mobile account entry points', /href="\/satici-girisi\/" class="db-header-vendor-login"/.test(html) && /db-mobile-panel-vendor[^>]*href="\/satici-girisi\/"|href="\/satici-girisi\/"[^>]*db-mobile-panel-vendor/.test(mobilePanels)],
+  ['seller registration and login use dedicated auth APIs', /type === 'vendor-login'[\s\S]*authApi\('\/vendor-login'/.test(auth) && /type === 'vendor-register'[\s\S]*authApi\('\/vendor-register'/.test(auth)],
+  ['customer and seller registration complete automatic sign-in', /type === 'register'[\s\S]*?authApi\('\/register'[\s\S]*?completeAuthentication\('\/hesabim\/'\)/.test(auth) && /type === 'vendor-register'[\s\S]*?authApi\('\/vendor-register'[\s\S]*?completeAuthentication\('\/satici-paneli\/'\)/.test(auth)],
+  ['all public password inputs receive accessible visibility controls', /initializePasswordFields\(\)/.test(auth) && /Şifrəni göstər/.test(auth) && /MutationObserver/.test(auth) && /\.db-password-toggle/.test(siteCss)],
+  ['seller registration consent remains left aligned', /\.db-auth-consent\{[^}]*justify-content:flex-start!important;[^}]*text-align:left!important/s.test(accountCss)],
   ['header login theme validation supports email inputs', /input\[type="email"\], input\[type="text"\]/.test(themeController)],
   ['Slider Revolution keyboard listener preserves editable fields', /__dailyBakuPatched/.test(html) && /hasKeyboardEvent/.test(html) && /active\.matches\('input, textarea, select/.test(html) && /defer data-wp-strategy="defer" id="tp-tools-js"/.test(html)],
   ['public contact phone', (html.match(/\+994 50 264 54 00/g) || []).length >= 3 && !/tel:(?:55555555|\+994120000000)/.test(html) && !/37499833889/.test(html)],

@@ -18,6 +18,8 @@
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   })[character]);
+  const tr = (value) => globalThis.DailyBakuI18n?.t(value) || value;
+  const localizeProduct = (product) => globalThis.DailyBakuI18n?.localizeProduct(product) || product;
   const money = new Intl.NumberFormat('az-AZ', {
     style: 'currency',
     currency: 'AZN',
@@ -35,20 +37,23 @@
     }
   };
 
-  const cleanProduct = (product = {}) => ({
-    ...(product.listingId ? { listingId: String(product.listingId) } : {}),
-    ...(product.variantId ? { variantId: String(product.variantId) } : {}),
-    slug: String(product.slug || ''),
-    title: String(product.title || product.slug || ''),
-    price: Number(product.price || 0),
-    ...(Number(product.compareAt) > 0 ? { compareAt: Number(product.compareAt) } : {}),
-    image: String(product.image || '/assets/wp-content/uploads/other-cat.webp'),
-    ...(product.sku ? { sku: String(product.sku) } : {}),
-    ...(product.brand ? { brand: String(product.brand) } : {}),
-    ...(product.vendor ? { vendor: String(product.vendor) } : {}),
-    ...(product.description ? { description: String(product.description) } : {}),
-    ...(product.shortDescription ? { shortDescription: String(product.shortDescription) } : {})
-  });
+  const cleanProduct = (product = {}) => {
+    const cleaned = {
+      ...(product.listingId ? { listingId: String(product.listingId) } : {}),
+      ...(product.variantId ? { variantId: String(product.variantId) } : {}),
+      slug: String(product.slug || ''),
+      title: String(product.title || product.slug || ''),
+      price: Number(product.price || 0),
+      ...(Number(product.compareAt) > 0 ? { compareAt: Number(product.compareAt) } : {}),
+      image: String(product.image || '/assets/wp-content/uploads/other-cat.webp'),
+      ...(product.sku ? { sku: String(product.sku) } : {}),
+      ...(product.brand ? { brand: String(product.brand) } : {}),
+      ...(product.vendor ? { vendor: String(product.vendor) } : {}),
+      ...(product.description ? { description: String(product.description) } : {}),
+      ...(product.shortDescription ? { shortDescription: String(product.shortDescription) } : {})
+    };
+    return globalThis.DailyBakuI18n?.canonicalizeProduct(cleaned) || cleaned;
+  };
 
   function readCart() {
     return parseArray(CART_KEY)
@@ -134,18 +139,19 @@
     let product;
     try { product = cleanProduct(JSON.parse(button.dataset.addCart || '{}')); } catch { return; }
     if (!product.slug) return;
+    product = localizeProduct(product);
     button.classList.toggle('is-in-cart', active);
-    button.setAttribute('aria-label', active ? `${product.title} — səbətə bax` : `${product.title} səbətə əlavə et`);
+    button.setAttribute('aria-label', active ? `${product.title} — ${tr('SƏBƏTƏ BAX')}` : `${product.title} — ${tr('Səbətə at')}`);
     button.setAttribute('aria-pressed', String(active));
     if (isIconOnlyCart(button)) return;
 
     const label = cartLabelTarget(button);
     if (label) {
       if (!button.dataset.cartOriginalLabel) button.dataset.cartOriginalLabel = label.textContent.trim();
-      label.textContent = active ? 'SƏBƏTƏ BAX' : button.dataset.cartOriginalLabel;
+      label.textContent = active ? tr('SƏBƏTƏ BAX') : tr(button.dataset.cartOriginalLabel);
     } else {
       if (!button.dataset.cartOriginalLabel) button.dataset.cartOriginalLabel = button.textContent.trim();
-      button.textContent = active ? 'SƏBƏTƏ BAX' : button.dataset.cartOriginalLabel;
+      button.textContent = active ? tr('SƏBƏTƏ BAX') : tr(button.dataset.cartOriginalLabel);
     }
   }
 
@@ -161,11 +167,11 @@
       const active = wishlistMap.has(slug);
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
-      button.setAttribute('aria-label', active ? 'Seçilmişlərdən çıxar' : 'Seçilmişlərə əlavə et');
+      button.setAttribute('aria-label', tr(active ? 'Seçilmişlərdən çıxar' : 'Seçilmişlərə əlavə et'));
       const symbol = button.querySelector(':scope > span:not(.db-action-icon):not(.db-action-tooltip)');
       if (symbol) symbol.textContent = '♡';
       const tooltip = button.querySelector('.db-action-tooltip');
-      if (tooltip) tooltip.textContent = active ? 'Seçilmişlərdən çıxar' : 'Seçilmişlərə əlavə et';
+      if (tooltip) tooltip.textContent = tr(active ? 'Seçilmişlərdən çıxar' : 'Seçilmişlərə əlavə et');
       const saved = wishlistMap.get(slug);
       if (saved && !saved.listingId) {
         const enriched = parseButtonProduct(button);
@@ -192,11 +198,11 @@
     const wishlistCount = wishlistMap.size;
     document.querySelectorAll('.cart-contents,[data-cart-count]').forEach((counter) => {
       counter.textContent = String(cartCount);
-      counter.setAttribute('aria-label', `Səbətdə ${cartCount} məhsul`);
+      counter.setAttribute('aria-label', tr(`Səbətdə ${cartCount} məhsul`));
     });
     document.querySelectorAll('.wishlist-counter,[data-wishlist-count]').forEach((counter) => {
       counter.textContent = String(wishlistCount);
-      counter.setAttribute('aria-label', `Seçilmişlərdə ${wishlistCount} məhsul`);
+      counter.setAttribute('aria-label', tr(`Seçilmişlərdə ${wishlistCount} məhsul`));
     });
   }
 
@@ -209,13 +215,14 @@
       toast.setAttribute('aria-live', 'polite');
       document.body.append(toast);
     }
-    toast.textContent = message;
+    toast.textContent = tr(message);
     toast.classList.add('show');
     clearTimeout(showToast.timer);
     showToast.timer = setTimeout(() => toast.classList.remove('show'), 2200);
   }
 
   function drawerProductCard(item) {
+    item = localizeProduct(item);
     return `<article class="db-mini-cart-item">
       <a class="db-mini-cart-item-image" href="/mehsul/${encodeURIComponent(item.slug)}/">
         <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" width="100" height="100" loading="lazy">
@@ -236,6 +243,7 @@
   }
 
   function recommendationCard(product) {
+    product = localizeProduct(product);
     const payload = escapeHtml(JSON.stringify(cleanProduct(product)));
     return `<article class="db-mini-cart-recommendation">
       <a href="/mehsul/${encodeURIComponent(product.slug)}/">
@@ -694,6 +702,11 @@
       syncUI();
       renderCartDrawer();
     }
+  });
+
+  document.addEventListener('dailybaku:languagechange', () => {
+    syncUI();
+    renderCartDrawer();
   });
 
   const observer = new MutationObserver((mutations) => {

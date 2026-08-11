@@ -14,9 +14,22 @@ test('admin və statik frontend faylları ümumi API rate limitinə düşmür', 
   const app = await buildApp();
 
   try {
+    const adminRedirect = await app.inject({ method: 'GET', url: '/admin' });
+    assert.equal(adminRedirect.statusCode, 308);
+    assert.equal(adminRedirect.headers.location, '/admin/');
+
     const admin = await app.inject({ method: 'GET', url: '/admin/' });
     assert.equal(admin.statusCode, 200);
     assert.match(admin.headers['content-type'] ?? '', /^text\/html/);
+    const adminIndexBypass = await app.inject({ method: 'GET', url: '/admin/index.html' });
+    assert.equal(adminIndexBypass.statusCode, 308);
+    assert.equal(adminIndexBypass.headers.location, '/admin/');
+    const adminScript = await app.inject({ method: 'GET', url: '/admin/admin.js' });
+    assert.equal(adminScript.statusCode, 200);
+    assert.match(adminScript.body, /\['seller-users', '♙', 'Satıcılar', 'users\.read'\]/);
+    assert.match(adminScript.body, /accountType: 'vendor'/);
+    assert.match(adminScript.body, /adminPortalRoles/);
+    assert.match(adminScript.body, /location\.replace\('\/satici-paneli\/'\)/);
 
     for (let index = 0; index < 320; index += 1) {
       const asset = await app.inject({ method: 'GET', url: '/assets/css/kirki-styles.css' });
@@ -125,6 +138,15 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
 
     const unknownChild = await app.inject({ method: 'GET', url: '/baki-club/movcud-deyil/' });
     assert.equal(unknownChild.statusCode, 404);
+    assert.match(unknownChild.headers['content-type'] ?? '', /^text\/html/);
+    assert.match(unknownChild.body, /<title>Səhifə tapılmadı — Gündəlik Bakı<\/title>/);
+    assert.match(unknownChild.body, /name="robots" content="noindex,follow"/);
+    assert.match(unknownChild.body, /class="db-not-found-visual"/);
+    assert.match(unknownChild.body, /Ana səhifəyə qayıt/);
+
+    const missingApi = await app.inject({ method: 'GET', url: '/api/v1/movcud-deyil' });
+    assert.equal(missingApi.statusCode, 404);
+    assert.equal(missingApi.json().error.code, 'NOT_FOUND');
 
     const discounts = await app.inject({ method: 'GET', url: '/endirimler/' });
     assert.equal(discounts.statusCode, 200);
@@ -332,13 +354,17 @@ test('şifrə bərpası tokeni birdəfəlik işləyir və yeni sessiya yaradır'
   const { buildApp } = await import('./app.js');
   const { pool } = await import('./db/pool.js');
   const { hashPassword } = await import('./core/password.js');
+  const { clearDevelopmentEmailOutbox, getDevelopmentEmailOutbox } = await import('./core/email.js');
+  clearDevelopmentEmailOutbox();
   const app = await buildApp();
   const suffix=randomUUID().slice(0,8);const email=`password-audit-${suffix}@example.test`;const oldPassword='OldPassword!2026';const newPassword='NewPassword!2026';let userId='';
   try {
     const created=await pool.query<{id:string}>(`INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at) VALUES($1,$2,'Şifrə','Auditi','active',now()) RETURNING id`,[email,await hashPassword(oldPassword)]);userId=created.rows[0]!.id;
     await pool.query(`INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE code='customer'`,[userId]);
-    const forgot=await app.inject({method:'POST',url:'/api/v1/auth/forgot-password',payload:{email}});assert.equal(forgot.statusCode,200);assert.equal(forgot.json().data.accepted,true);assert.ok(forgot.json().data.previewUrl);
-    const token=new URL(forgot.json().data.previewUrl).searchParams.get('token');assert.ok(token);
+    const forgot=await app.inject({method:'POST',url:'/api/v1/auth/forgot-password',payload:{email}});assert.equal(forgot.statusCode,200);assert.deepEqual(forgot.json().data,{accepted:true});
+    const resetMessage=getDevelopmentEmailOutbox().find((message)=>message.to===email&&/şifrənizi yeniləyin/i.test(message.subject)&&/HESAB TƏHLÜKƏSİZLİYİ/.test(message.html));assert.ok(resetMessage);
+    const resetUrl=resetMessage.text?.match(/https?:\/\/\S+/)?.[0];assert.ok(resetUrl);
+    const token=new URL(resetUrl).searchParams.get('token');assert.ok(token);
     const valid=await app.inject({method:'GET',url:`/api/v1/auth/action-token/${encodeURIComponent(token!)}`});assert.equal(valid.statusCode,200);assert.equal(valid.json().data.type,'password_reset');
     const reset=await app.inject({method:'POST',url:'/api/v1/auth/reset-password',payload:{token,password:newPassword}});assert.equal(reset.statusCode,200);assert.ok(reset.headers['set-cookie']);
     const reused=await app.inject({method:'POST',url:'/api/v1/auth/reset-password',payload:{token,password:'AnotherPassword!2026'}});assert.equal(reused.statusCode,404);assert.equal(reused.json().error.code,'TOKEN_INVALID');
@@ -346,6 +372,111 @@ test('şifrə bərpası tokeni birdəfəlik işləyir və yeni sessiya yaradır'
     const newLogin=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email,password:newPassword}});assert.equal(newLogin.statusCode,200);
   } finally {
     if(userId)await pool.query('DELETE FROM users WHERE id=$1',[userId]);
+    await app.close();
+  }
+});
+
+test('10 yanlış şifrə cəhdi hesabı daimi bloklayır və kilidi yalnız admin açır', async () => {
+  const { buildApp } = await import('./app.js');
+  const { pool } = await import('./db/pool.js');
+  const { hashPassword } = await import('./core/password.js');
+  const { env } = await import('./config/env.js');
+  const { clearDevelopmentEmailOutbox, getDevelopmentEmailOutbox } = await import('./core/email.js');
+  clearDevelopmentEmailOutbox();
+  const app = await buildApp();
+  const suffix = randomUUID().slice(0, 8);
+  const userEmail = `login-lock-${suffix}@example.test`;
+  const adminEmail = `login-unlock-admin-${suffix}@example.test`;
+  const userPassword = 'LoginLockUser!2026';
+  const adminPassword = 'LoginUnlockAdmin!2026';
+  const userIds: string[] = [];
+
+  const cookieJar = (response: { headers: Record<string, string | string[] | number | undefined> }) => {
+    const jar: Record<string, string> = {};
+    const raw = response.headers['set-cookie'];
+    for (const item of Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : []) {
+      const pair = item.split(';', 1)[0]!;
+      const separator = pair.indexOf('=');
+      if (separator > 0) jar[pair.slice(0, separator)] = pair.slice(separator + 1);
+    }
+    return jar;
+  };
+  const authHeaders = (jar: Record<string, string>) => {
+    const headers: Record<string, string> = { cookie: Object.entries(jar).map(([key, value]) => `${key}=${value}`).join('; ') };
+    const csrf = jar['db_csrf'] || jar['__Host-db_csrf'];
+    if (csrf) headers['x-csrf-token'] = csrf;
+    return headers;
+  };
+
+  try {
+    const store = await pool.query<{ id: string }>('SELECT id FROM stores WHERE code=$1', [env.DEFAULT_STORE_CODE]);
+    assert.ok(store.rows[0]);
+    const createdUser = await pool.query<{ id: string }>(`
+      INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
+      VALUES($1,$2,'Giriş','Kilidi','active',now()) RETURNING id
+    `, [userEmail, await hashPassword(userPassword)]);
+    const userId = createdUser.rows[0]!.id;
+    userIds.push(userId);
+    await pool.query(`INSERT INTO user_roles(user_id,role_id,store_id) SELECT $1,id,$2 FROM roles WHERE code='customer'`, [userId, store.rows[0]!.id]);
+
+    const createdAdmin = await pool.query<{ id: string }>(`
+      INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
+      VALUES($1,$2,'Kilid','Admini','active',now()) RETURNING id
+    `, [adminEmail, await hashPassword(adminPassword)]);
+    const adminId = createdAdmin.rows[0]!.id;
+    userIds.push(adminId);
+    await pool.query(`INSERT INTO user_roles(user_id,role_id,store_id) SELECT $1,id,$2 FROM roles WHERE code='admin'`, [adminId, store.rows[0]!.id]);
+
+    const activeSession = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: userEmail, password: userPassword } });
+    assert.equal(activeSession.statusCode, 200, activeSession.body);
+    const activeJar = cookieJar(activeSession);
+
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      const endpoint = attempt <= 5 ? '/api/v1/auth/login' : '/api/v1/auth/vendor-login';
+      const failed = await app.inject({ method: 'POST', url: endpoint, payload: { email: userEmail, password: 'TamamiləYanlış!2026' } });
+      assert.equal(failed.statusCode, attempt === 10 ? 423 : 401, `attempt ${attempt}: ${failed.body}`);
+      if (attempt === 10) assert.equal(failed.json().error.code, 'ACCOUNT_LOGIN_BLOCKED');
+    }
+
+    const blockedRow = await pool.query<{ failed_login_count: number; login_blocked_at: Date | null }>('SELECT failed_login_count,login_blocked_at FROM users WHERE id=$1', [userId]);
+    assert.equal(blockedRow.rows[0]!.failed_login_count, 10);
+    assert.ok(blockedRow.rows[0]!.login_blocked_at);
+    const revokedSession = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(activeJar) });
+    assert.equal(revokedSession.statusCode, 401);
+    const blockedLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: userEmail, password: userPassword } });
+    assert.equal(blockedLogin.statusCode, 423);
+    assert.equal(blockedLogin.json().error.code, 'ACCOUNT_LOGIN_BLOCKED');
+
+    const forgot = await app.inject({ method: 'POST', url: '/api/v1/auth/forgot-password', payload: { email: userEmail } });
+    assert.equal(forgot.statusCode, 200);
+    assert.deepEqual(forgot.json().data, { accepted: true });
+    const resetMessage = getDevelopmentEmailOutbox().find((message) => message.to === userEmail && /şifrənizi yeniləyin/i.test(message.subject));
+    const resetUrl = resetMessage?.text?.match(/https?:\/\/\S+/)?.[0];
+    assert.ok(resetUrl);
+    const resetToken = new URL(resetUrl).searchParams.get('token');
+    assert.ok(resetToken);
+    const blockedReset = await app.inject({ method: 'POST', url: '/api/v1/auth/reset-password', payload: { token: resetToken, password: 'ResetCannotUnlock!2026' } });
+    assert.equal(blockedReset.statusCode, 423);
+    assert.equal(blockedReset.json().error.code, 'ACCOUNT_LOGIN_BLOCKED');
+
+    const adminLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: adminEmail, password: adminPassword } });
+    assert.equal(adminLogin.statusCode, 200, adminLogin.body);
+    const adminJar = cookieJar(adminLogin);
+    const detail = await app.inject({ method: 'GET', url: `/api/v1/users/${userId}`, headers: authHeaders(adminJar) });
+    assert.equal(detail.statusCode, 200, detail.body);
+    assert.ok(detail.json().data.login_blocked_at);
+    assert.equal(detail.json().data.failed_login_count, 10);
+
+    const unlocked = await app.inject({ method: 'POST', url: `/api/v1/users/${userId}/unlock`, headers: authHeaders(adminJar) });
+    assert.equal(unlocked.statusCode, 200, unlocked.body);
+    assert.equal(unlocked.json().data.login_blocked_at, null);
+    assert.equal(unlocked.json().data.failed_login_count, 0);
+    const restoredLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: userEmail, password: userPassword } });
+    assert.equal(restoredLogin.statusCode, 200, restoredLogin.body);
+    const audit = await pool.query(`SELECT id FROM audit_logs WHERE action='user.login.unlock' AND entity_id=$1`, [userId]);
+    assert.ok(audit.rows[0]);
+  } finally {
+    if (userIds.length) await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])', [userIds]);
     await app.close();
   }
 });
@@ -391,11 +522,230 @@ test('mega menu ağacı ayrılmış kuponlar və hədiyyələr daxil olmaqla tam
   assert.ok(new Set(categoryImages).size >= 41);
 });
 
+test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını ilə işləyir', async () => {
+  const { buildApp } = await import('./app.js');
+  const { pool } = await import('./db/pool.js');
+  const { hashPassword } = await import('./core/password.js');
+  const { env } = await import('./config/env.js');
+  const { clearDevelopmentEmailOutbox, getDevelopmentEmailOutbox } = await import('./core/email.js');
+  clearDevelopmentEmailOutbox();
+  const app = await buildApp();
+  const suffix = randomUUID().slice(0, 8);
+  const adminEmail = `self-vendor-admin-${suffix}@example.test`;
+  const vendorEmail = `self-vendor-${suffix}@example.test`;
+  const adminPassword = 'SelfVendorAdmin!2026';
+  const vendorPassword = 'SelfVendorOwner!2026';
+  let adminUserId = '';
+  let vendorUserId = '';
+  let vendorId = '';
+  let productId = '';
+
+  type CookieJar = Record<string, string>;
+  type InjectableResponse = { headers: Record<string, string | string[] | number | undefined> };
+  const mergeCookies = (response: InjectableResponse): CookieJar => {
+    const jar: CookieJar = {};
+    const raw = response.headers['set-cookie'];
+    for (const item of Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : []) {
+      const pair = item.split(';', 1)[0]!;
+      const separator = pair.indexOf('=');
+      if (separator > 0) jar[pair.slice(0, separator)] = pair.slice(separator + 1);
+    }
+    return jar;
+  };
+  const authHeaders = (jar: CookieJar): Record<string, string> => {
+    const headers: Record<string, string> = {
+      cookie: Object.entries(jar).map(([name, value]) => `${name}=${value}`).join('; ')
+    };
+    const csrf = jar['db_csrf'] || jar['__Host-db_csrf'];
+    if (csrf) headers['x-csrf-token'] = csrf;
+    return headers;
+  };
+
+  try {
+    const store = await pool.query<{ id: string }>('SELECT id FROM stores WHERE code=$1', [env.DEFAULT_STORE_CODE]);
+    assert.ok(store.rows[0]);
+    const storeId = store.rows[0]!.id;
+    const adminHash = await hashPassword(adminPassword);
+    const admin = await pool.query<{ id: string }>(`
+      INSERT INTO users(email,password_hash,first_name,last_name,status,email_verified_at)
+      VALUES($1,$2,'Self','Vendor Admin','active',now()) RETURNING id
+    `, [adminEmail, adminHash]);
+    adminUserId = admin.rows[0]!.id;
+    await pool.query(`
+      INSERT INTO user_roles(user_id,role_id,store_id)
+      SELECT $1,id,$2 FROM roles WHERE code='admin'
+    `, [adminUserId, storeId]);
+
+    const registrationPage = await app.inject({ method: 'GET', url: '/qeydiyyat/' });
+    assert.equal(registrationPage.statusCode, 200);
+    assert.match(registrationPage.body, /href="\/satici-qeydiyyati\/">Partnyorluq üçün qeydiyyatdan keçin/);
+    const loginPage = await app.inject({ method: 'GET', url: '/giris/' });
+    assert.equal(loginPage.statusCode, 200);
+    assert.match(loginPage.body, /href="\/satici-girisi\/">Satıcı olaraq daxil ol/);
+    const vendorRegistrationPage = await app.inject({ method: 'GET', url: '/satici-qeydiyyati/' });
+    assert.equal(vendorRegistrationPage.statusCode, 200);
+    assert.match(vendorRegistrationPage.body, /data-auth-form="vendor-register"/);
+    assert.match(vendorRegistrationPage.body, /name="displayName"/);
+    const vendorLoginPage = await app.inject({ method: 'GET', url: '/satici-girisi/' });
+    assert.equal(vendorLoginPage.statusCode, 200);
+    assert.match(vendorLoginPage.body, /data-auth-form="vendor-login"/);
+
+    const vendorRegistrationPayload = {
+      displayName: `Self Service Market ${suffix}`,
+      legalName: `Self Service Market ${suffix} MMC`,
+      taxId: `20${suffix.replace(/[^0-9]/g, '').padEnd(8, '7').slice(0, 8)}`,
+      email: vendorEmail,
+      phone: `+994 55 7${suffix.replace(/[^0-9]/g, '').padEnd(6, '3').slice(0, 2)} ${suffix.replace(/[^0-9]/g, '').padEnd(4, '4').slice(0, 2)} ${suffix.replace(/[^0-9]/g, '').padEnd(2, '5').slice(0, 2)}`,
+      firstName: 'Onlayn',
+      lastName: 'Satıcı',
+      password: vendorPassword,
+      description: 'Özünü qeydiyyat production audit müraciəti.'
+    };
+    const registration = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/vendor-register',
+      payload: vendorRegistrationPayload
+    });
+    assert.equal(registration.statusCode, 201, registration.body);
+    assert.equal(registration.json().data.status, 'pending');
+    assert.deepEqual(registration.json().data.roles, ['vendor_owner']);
+    assert.ok(getDevelopmentEmailOutbox().some((message) => message.to === vendorEmail && /satıcı kabinetiniz yaradıldı/i.test(message.subject)));
+    vendorId = registration.json().data.vendorId;
+    const registrationJar = mergeCookies(registration);
+    assert.ok(registrationJar['db_access'] || registrationJar['__Host-db_access']);
+    const registrationMe = await app.inject({
+      method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(registrationJar)
+    });
+    assert.equal(registrationMe.statusCode, 200, registrationMe.body);
+    assert.deepEqual(registrationMe.json().data.roles, ['vendor_owner']);
+    assert.deepEqual(registrationMe.json().data.vendorIds, [vendorId]);
+
+    const duplicateRegistration = await app.inject({
+      method: 'POST', url: '/api/v1/auth/vendor-register', payload: vendorRegistrationPayload
+    });
+    assert.equal(duplicateRegistration.statusCode, 409, duplicateRegistration.body);
+    assert.equal(duplicateRegistration.json().error.code, 'VENDOR_EXISTS');
+
+    const owner = await pool.query<{ id: string }>('SELECT id FROM users WHERE email=$1', [vendorEmail]);
+    vendorUserId = owner.rows[0]!.id;
+    const pendingLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/vendor-login', payload: { email: vendorEmail, password: vendorPassword }
+    });
+    assert.equal(pendingLogin.statusCode, 200, pendingLogin.body);
+    assert.deepEqual(pendingLogin.json().data.roles, ['vendor_owner']);
+    assert.deepEqual(pendingLogin.json().data.vendorIds, [vendorId]);
+    const genericPendingLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: vendorEmail, password: vendorPassword }
+    });
+    assert.equal(genericPendingLogin.statusCode, 200, genericPendingLogin.body);
+    assert.deepEqual(genericPendingLogin.json().data.roles, ['vendor_owner']);
+
+    const productSlug = `pending-satici-mehsulu-${suffix}`;
+    const createdProduct = await app.inject({
+      method: 'POST',
+      url: '/api/v1/catalog/products',
+      headers: authHeaders(registrationJar),
+      payload: {
+        storeId,
+        vendorId,
+        name: `Pending satıcı məhsulu ${suffix}`,
+        title: `Pending satıcı məhsulu ${suffix}`,
+        slug: productSlug,
+        shortDescription: 'Satıcı təsdiqi üzrə public görünürlük testi.',
+        description: 'Pending satıcı kabinetdən məhsul əlavə edə bilməli, məhsul isə satıcı təsdiqinədək mağazada görünməməlidir.',
+        price: 29.9,
+        currency: 'AZN',
+        categoryIds: [],
+        attributes: { Ölçü: 'Standart' },
+        mediaIds: [],
+        seoTitle: `Pending satıcı məhsulu ${suffix}`,
+        seoDescription: 'Satıcı hesabının təsdiq statusuna bağlı public məhsul görünürlüyü üçün inteqrasiya testi.'
+      }
+    });
+    assert.equal(createdProduct.statusCode, 201, createdProduct.body);
+    productId = createdProduct.json().data.id;
+
+    const adminNotification = await pool.query(`
+      SELECT id FROM user_notifications
+      WHERE user_id=$1 AND notification_type='vendor.registration' AND metadata->>'vendorId'=$2
+    `, [adminUserId, vendorId]);
+    assert.ok(adminNotification.rows[0]);
+
+    const adminLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/login', payload: { email: adminEmail, password: adminPassword }
+    });
+    assert.equal(adminLogin.statusCode, 200, adminLogin.body);
+    const adminJar = mergeCookies(adminLogin);
+
+    const generalUsers = await app.inject({
+      method: 'GET', url: '/api/v1/users?limit=100', headers: authHeaders(adminJar)
+    });
+    assert.equal(generalUsers.statusCode, 200, generalUsers.body);
+    assert.equal(generalUsers.json().data.some((item: { id: string }) => item.id === vendorUserId), false);
+    const vendorUsers = await app.inject({
+      method: 'GET', url: '/api/v1/users?accountType=vendor&limit=100', headers: authHeaders(adminJar)
+    });
+    assert.equal(vendorUsers.statusCode, 200, vendorUsers.body);
+    assert.equal(vendorUsers.json().data.some((item: { id: string }) => item.id === vendorUserId), true);
+
+    const publishProduct = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/catalog/products/${productId}/status`,
+      headers: authHeaders(adminJar),
+      payload: { status: 'published', note: 'Public görünürlük sərhədi testi' }
+    });
+    assert.equal(publishProduct.statusCode, 200, publishProduct.body);
+
+    const hiddenPublicProduct = await app.inject({ method: 'GET', url: `/api/v1/public/products/${productSlug}` });
+    assert.equal(hiddenPublicProduct.statusCode, 404, hiddenPublicProduct.body);
+    const hiddenProductPage = await app.inject({ method: 'GET', url: `/mehsul/${productSlug}/` });
+    assert.equal(hiddenProductPage.statusCode, 404, hiddenProductPage.body);
+
+    const pendingVendors = await app.inject({
+      method: 'GET', url: '/api/v1/vendors?status=pending&limit=100', headers: authHeaders(adminJar)
+    });
+    assert.equal(pendingVendors.statusCode, 200, pendingVendors.body);
+    const pendingVendor = pendingVendors.json().data.find((item: { id: string }) => item.id === vendorId);
+    assert.equal(pendingVendor.owner_email, vendorEmail);
+    assert.equal(pendingVendor.settings.registrationSource, 'self_service');
+
+    const approval = await app.inject({
+      method: 'PATCH', url: `/api/v1/vendors/${vendorId}`, headers: authHeaders(adminJar), payload: { status: 'active' }
+    });
+    assert.equal(approval.statusCode, 200, approval.body);
+    assert.equal(approval.json().data.status, 'active');
+
+    const visiblePublicProduct = await app.inject({ method: 'GET', url: `/api/v1/public/products/${productSlug}` });
+    assert.equal(visiblePublicProduct.statusCode, 200, visiblePublicProduct.body);
+    const visibleProductPage = await app.inject({ method: 'GET', url: `/mehsul/${productSlug}/` });
+    assert.equal(visibleProductPage.statusCode, 200, visibleProductPage.body);
+
+    const vendorLogin = await app.inject({
+      method: 'POST', url: '/api/v1/auth/vendor-login', payload: { email: vendorEmail, password: vendorPassword }
+    });
+    assert.equal(vendorLogin.statusCode, 200, vendorLogin.body);
+    assert.deepEqual(vendorLogin.json().data.roles, ['vendor_owner']);
+    assert.deepEqual(vendorLogin.json().data.vendorIds, [vendorId]);
+    const approvalNotification = await pool.query(`
+      SELECT id FROM user_notifications
+      WHERE user_id=$1 AND notification_type='vendor.status' AND metadata->>'status'='active'
+    `, [vendorUserId]);
+    assert.ok(approvalNotification.rows[0]);
+  } finally {
+    if (vendorId) await pool.query('DELETE FROM audit_logs WHERE vendor_id=$1 OR entity_id=$1::text', [vendorId]);
+    if (productId) await pool.query('DELETE FROM products WHERE id=$1', [productId]);
+    if (adminUserId || vendorUserId) await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[adminUserId, vendorUserId].filter(Boolean)]);
+    if (vendorId) await pool.query('DELETE FROM vendors WHERE id=$1', [vendorId]);
+    await app.close();
+  }
+});
+
 test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işləyir', async () => {
   const { buildApp } = await import('./app.js');
   const { pool } = await import('./db/pool.js');
   const { hashPassword } = await import('./core/password.js');
   const { env } = await import('./config/env.js');
+  const { getDevelopmentEmailOutbox } = await import('./core/email.js');
   const app = await buildApp();
   const suffix = randomUUID().slice(0, 8);
   const adminEmail = `audit-admin-${suffix}@example.test`;
@@ -493,6 +843,9 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     const moderatorMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(moderatorJar) });
     assert.equal(moderatorMe.statusCode, 200, moderatorMe.body);
     assert.deepEqual([...moderatorMe.json().data.permissions].sort(), expectedModeratorPermissions);
+    const moderatorAdminPanel = await app.inject({ method: 'GET', url: '/admin/', headers: authHeaders(moderatorJar) });
+    assert.equal(moderatorAdminPanel.statusCode, 200);
+    assert.match(moderatorAdminPanel.body, /id="appView"/);
 
     for (const url of [
       '/api/v1/catalog/products', '/api/v1/catalog/categories', '/api/v1/catalog/brands',
@@ -540,6 +893,11 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.ok(adminMe.json().data.permissions.includes('editor.read'));
     assert.ok(adminMe.json().data.permissions.includes('editor.manage'));
     assert.ok(adminMe.json().data.permissions.includes('editor.publish'));
+    const adminPanel = await app.inject({ method: 'GET', url: '/admin/', headers: authHeaders(adminJar) });
+    assert.equal(adminPanel.statusCode, 200);
+    const adminCannotUseVendorPortal = await app.inject({ method: 'GET', url: '/satici-paneli/', headers: authHeaders(adminJar) });
+    assert.equal(adminCannotUseVendorPortal.statusCode, 303);
+    assert.equal(adminCannotUseVendorPortal.headers.location, '/admin/');
 
     const editorOptions = await app.inject({ method: 'GET', url: '/api/v1/editor/options', headers: authHeaders(adminJar) });
     assert.equal(editorOptions.statusCode, 200, editorOptions.body);
@@ -602,12 +960,19 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.equal(registration.statusCode, 201);
     assert.deepEqual(registration.json().data.roles, ['customer']);
     assert.deepEqual(registration.json().data.permissions, []);
+    assert.ok(getDevelopmentEmailOutbox().some((message) => message.to === customerEmail && /xoş gəlmisiniz/i.test(message.subject)));
     const customerId = registration.json().data.userId as string;
     createdUserIds.push(customerId);
     const originalCustomerJar = mergeCookies(registration);
 
     const customerMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(originalCustomerJar) });
     assert.equal(customerMe.statusCode, 200);
+    const customerAdminPanel = await app.inject({ method: 'GET', url: '/admin/', headers: authHeaders(originalCustomerJar) });
+    assert.equal(customerAdminPanel.statusCode, 303);
+    assert.equal(customerAdminPanel.headers.location, '/hesabim/');
+    const customerVendorPanel = await app.inject({ method: 'GET', url: '/satici-paneli/', headers: authHeaders(originalCustomerJar) });
+    assert.equal(customerVendorPanel.statusCode, 303);
+    assert.equal(customerVendorPanel.headers.location, '/hesabim/');
     const profileUpdate = await app.inject({
       method: 'PATCH', url: '/api/v1/customer/profile', headers: authHeaders(originalCustomerJar),
       payload: { firstName: 'Yenilənmiş', lastName: 'Müştəri', displayName: 'Yenilənmiş Müştəri', email: customerEmail, phone: '+994501234567' }
@@ -666,9 +1031,12 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     const vendorAccountJar = mergeCookies(vendorAccountLogin);
     const vendorCatalog = await app.inject({ method: 'GET', url: '/api/v1/catalog/products', headers: authHeaders(vendorAccountJar) });
     assert.equal(vendorCatalog.statusCode, 200);
-    const vendorPortal = await app.inject({ method: 'GET', url: '/satici-paneli/' });
+    const vendorAdminPanel = await app.inject({ method: 'GET', url: '/admin/', headers: authHeaders(vendorAccountJar) });
+    assert.equal(vendorAdminPanel.statusCode, 303);
+    assert.equal(vendorAdminPanel.headers.location, '/satici-paneli/');
+    const vendorPortal = await app.inject({ method: 'GET', url: '/satici-paneli/', headers: authHeaders(vendorAccountJar) });
     assert.equal(vendorPortal.statusCode, 200);
-    assert.match(vendorPortal.body, /id="loginForm"/);
+    assert.match(vendorPortal.body, /id="appView"/);
 
     const approvedVendor = await app.inject({
       method: 'PATCH', url: `/api/v1/vendors/${vendorId}`, headers: authHeaders(adminJar), payload: { status: 'active' }

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dailybaku.az/sitemap.xml
+Sitemap: https://gundelikbaki.az/sitemap.xml

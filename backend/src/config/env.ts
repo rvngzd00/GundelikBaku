@@ -26,11 +26,13 @@ const schema = z.object({
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_UPLOAD_BYTES: z.coerce.number().int().min(1024).max(50 * 1024 * 1024).default(10 * 1024 * 1024),
   DEFAULT_STORE_CODE: z.string().regex(/^[a-z0-9-]+$/).default('daily-baku'),
-  BOOTSTRAP_ADMIN_EMAIL: z.email().default('admin@dailybaku.az'),
+  BOOTSTRAP_ADMIN_EMAIL: z.email().default('admin@gundelikbaki.az'),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).default('change-this-immediately'),
   EMAIL_PROVIDER: z.enum(['disabled', 'resend']).default('disabled'),
   RESEND_API_KEY: z.string().trim().optional(),
-  EMAIL_FROM: z.string().trim().default('Gündəlik Bakı <noreply@dailybaku.az>')
+  EMAIL_FROM: z.string().trim().default('Gündəlik Bakı <noreply@gundelikbaki.az>'),
+  EMAIL_REPLY_TO: z.email().optional(),
+  EMAIL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30_000).default(10_000)
 });
 
 const parsed = schema.safeParse(process.env);

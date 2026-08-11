@@ -34,9 +34,11 @@ import { loyaltyRoutes } from './routes/loyalty.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { publishingRoutes } from './routes/publishing.js';
 import { publicSiteEditorRoutes, siteEditorRoutes } from './routes/site-editor.js';
-import { webRoutes } from './web/routes.js';
+import { notFoundPage, webRoutes } from './web/routes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const adminPanelRoles = new Set(['super_admin', 'admin', 'editor', 'seo', 'moderator']);
+const vendorPanelRoles = new Set(['vendor_owner', 'vendor_staff']);
 
 export async function buildApp(): Promise<FastifyInstance> {
   await mkdir(resolve(env.UPLOAD_DIR), { recursive: true });
@@ -113,7 +115,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
 
     const publicMutation = request.url.startsWith('/api/v1/auth/login')
+      || request.url.startsWith('/api/v1/auth/vendor-login')
       || request.url.startsWith('/api/v1/auth/register')
+      || request.url.startsWith('/api/v1/auth/vendor-register')
       || request.url.startsWith('/api/v1/auth/refresh')
       || request.url.startsWith('/api/v1/auth/forgot-password')
       || request.url.startsWith('/api/v1/auth/reset-password')
@@ -190,12 +194,45 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   app.get('/sitemap.xml', async (_request, reply) => reply.redirect('/api/v1/public/sitemap.xml'));
 
+  const panelHtml = await readFile(join(here, '../admin/index.html'), 'utf8');
+  const actorForPanelRequest = async (request: Parameters<typeof app.authenticate>[0], reply: Parameters<typeof app.authenticate>[1]) => {
+    if (!request.cookies[cookieNames.access]) return null;
+    try {
+      await app.authenticate(request, reply);
+      return request.actor;
+    } catch {
+      // An expired or otherwise invalid browser session must see the login view,
+      // never a partially rendered management interface.
+      return null;
+    }
+  };
+
   app.get('/satici-paneli', async (_request, reply) => reply.redirect('/satici-paneli/'));
-  app.get('/satici-paneli/', async (_request, reply) => {
-    const html = await readFile(join(here, '../admin/index.html'), 'utf8');
-    return reply.type('text/html; charset=utf-8').send(html);
+  app.get('/satici-paneli/', async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store').header('Vary', 'Cookie');
+    const actor = await actorForPanelRequest(request, reply);
+    if (actor && !actor.roles.some((role) => vendorPanelRoles.has(role))) {
+      const destination = actor.roles.some((role) => adminPanelRoles.has(role)) ? '/admin/' : '/hesabim/';
+      return reply.redirect(destination, 303);
+    }
+    return reply.type('text/html; charset=utf-8').send(panelHtml);
   });
 
+  app.get('/admin', async (_request, reply) => reply.redirect('/admin/', 308));
+  app.get('/admin/index.html', async (_request, reply) => reply.redirect('/admin/', 308));
+  app.get('/admin/', async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store').header('Vary', 'Cookie');
+    const actor = await actorForPanelRequest(request, reply);
+    if (actor) {
+      if (actor.roles.some((role) => vendorPanelRoles.has(role))) {
+        return reply.redirect('/satici-paneli/', 303);
+      }
+      if (!actor.roles.some((role) => adminPanelRoles.has(role))) {
+        return reply.redirect('/hesabim/', 303);
+      }
+    }
+    return reply.type('text/html; charset=utf-8').send(panelHtml);
+  });
   await app.register(fastifyStatic, {
     root: join(here, '../admin'),
     prefix: '/admin/',
@@ -213,6 +250,21 @@ export async function buildApp(): Promise<FastifyInstance> {
     prefix: '/',
     wildcard: false,
     index: ['index.html']
+  });
+
+  app.setNotFoundHandler((request, reply) => {
+    if (request.url.startsWith('/api/')) {
+      return reply.code(404).send({
+        error: { code: 'NOT_FOUND', message: 'API əməliyyatı tapılmadı' },
+        requestId: request.id
+      });
+    }
+    const pathname = new URL(request.url, env.PUBLIC_ORIGIN).pathname;
+    return reply
+      .code(404)
+      .type('text/html; charset=utf-8')
+      .header('Cache-Control', 'no-store')
+      .send(notFoundPage(pathname));
   });
 
   return app;

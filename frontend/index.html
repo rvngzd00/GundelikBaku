@@ -6916,6 +6916,7 @@
 	<link rel="stylesheet" href="./assets/css/commerce.css">
 	<link rel="stylesheet" href="./assets/css/search.css">
 	<link rel="stylesheet" href="./assets/css/mobile-panels.css">
+	<script src="./assets/js/i18n.js" defer></script>
 	<script src="./assets/js/commerce.js" defer></script>
 	<script src="./assets/js/auth.js" defer></script>
 	<script src="./assets/js/mobile-panels.js" defer></script>
@@ -7380,6 +7381,18 @@
 									<div class="avatar-placeholder"></div>
 									<div class="info"><span>Salam, qonaq</span><span>Daha yaxşı təcrübə üçün daxil olun</span>
 									</div><a title="Daxil ol" href="/giris/" class="account" data-auth-link></a>
+								</div>
+								<div class="db-language-switcher db-language-switcher-mobile" data-language-picker>
+									<button class="db-language-trigger" type="button" data-language-trigger aria-label="Saytın dili"
+										aria-haspopup="listbox" aria-expanded="false" aria-controls="db-language-menu-mobile">
+										<svg class="db-language-globe" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3C9.5 5.5 8.2 8.5 8.2 12S9.5 18.5 12 21"></path></svg>
+										<span data-language-current>AZ</span>
+										<svg class="db-language-chevron" aria-hidden="true" viewBox="0 0 12 8"><path d="m1 1 5 5 5-5"></path></svg>
+									</button>
+									<div class="db-language-menu" id="db-language-menu-mobile" role="listbox" aria-label="Saytın dili" hidden>
+										<button type="button" role="option" data-language-option="az" aria-selected="true"><span>AZ</span></button>
+										<button type="button" role="option" data-language-option="en" aria-selected="false"><span>EN</span></button>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -8628,6 +8641,18 @@
 								</div>
 							</div>
 						</div>
+						<div class="db-language-switcher db-language-switcher-desktop" data-language-picker>
+							<button class="db-language-trigger" type="button" data-language-trigger aria-label="Saytın dili"
+								aria-haspopup="listbox" aria-expanded="false" aria-controls="db-language-menu-desktop">
+								<svg class="db-language-globe" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3C9.5 5.5 8.2 8.5 8.2 12S9.5 18.5 12 21"></path></svg>
+								<span data-language-current>AZ</span>
+								<svg class="db-language-chevron" aria-hidden="true" viewBox="0 0 12 8"><path d="m1 1 5 5 5-5"></path></svg>
+							</button>
+							<div class="db-language-menu" id="db-language-menu-desktop" role="listbox" aria-label="Saytın dili" hidden>
+								<button type="button" role="option" data-language-option="az" aria-selected="true"><span>AZ</span></button>
+								<button type="button" role="option" data-language-option="en" aria-selected="false"><span>EN</span></button>
+							</div>
+						</div>
 						<div class="elementor-element elementor-element-10f5538 elementor-widget elementor-widget-et_login"
 							data-id="10f5538" data-element_type="widget" data-e-type="widget"
 							data-widget_type="et_login.default">
@@ -8662,7 +8687,9 @@
 												</form>
 												<div class="form-links">
 											<a href="/sifre-berpasi/" class="forgot">
-														Şifrəni unutmusunuz? </a>
+															Şifrəni unutmusunuz? </a>
+											<a href="/satici-girisi/" class="db-header-vendor-login">
+															Satıcı olaraq daxil ol </a>
 											<a href="/qeydiyyat/" class="signup">
 														Qeydiyyat </a>
 												</div>

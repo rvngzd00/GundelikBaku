@@ -35,16 +35,17 @@ export async function vendorRoutes(app: FastifyInstance): Promise<void> {
     if (![...actor.permissions].some((permission) => ['vendors.read', 'catalog.read', 'posts.read'].includes(permission))) {
       throw forbidden('Satıcı seçimi üçün icazəniz yoxdur');
     }
-    const query = z.object({ storeId: z.uuid().optional() }).parse(request.query);
+    const query = z.object({ storeId: z.uuid().optional(), includePending: z.coerce.boolean().default(false) }).parse(request.query);
     const storeId = query.storeId ?? actor.storeIds[0];
     if (!storeId) throw badRequest('STORE_REQUIRED', 'Mağaza seçilməlidir');
     assertStoreScope(actor, storeId);
+    const includePending = query.includePending && (actor.permissions.has('vendors.manage') || actor.permissions.has('users.manage'));
     const result = await pool.query(`
       SELECT id,store_id,display_name
       FROM vendors
-      WHERE store_id=$1 AND status='active' AND deleted_at IS NULL
+      WHERE store_id=$1 AND (status='active' OR ($2 AND status='pending')) AND deleted_at IS NULL
       ORDER BY display_name
-    `, [storeId]);
+    `, [storeId, includePending]);
     return { data: result.rows };
   });
 
@@ -67,8 +68,20 @@ export async function vendorRoutes(app: FastifyInstance): Promise<void> {
     }
     params.push(query.limit, (query.page - 1) * query.limit);
     const result = await pool.query(`
-      SELECT v.*, count(*) OVER()::int AS total_count
-      FROM vendors v WHERE ${conditions.join(' AND ')}
+      SELECT v.*,owner.id AS owner_user_id,owner.first_name AS owner_first_name,
+        owner.last_name AS owner_last_name,owner.email::text AS owner_email,
+        owner.phone AS owner_phone,owner.last_login_at AS owner_last_login_at,
+        count(*) OVER()::int AS total_count
+      FROM vendors v
+      LEFT JOIN LATERAL (
+        SELECT u.id,u.first_name,u.last_name,u.email,u.phone,u.last_login_at
+        FROM user_roles ur
+        JOIN roles r ON r.id=ur.role_id AND r.code='vendor_owner'
+        JOIN users u ON u.id=ur.user_id AND u.deleted_at IS NULL
+        WHERE ur.vendor_id=v.id
+        ORDER BY ur.created_at ASC LIMIT 1
+      ) owner ON true
+      WHERE ${conditions.join(' AND ')}
       ORDER BY v.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}
     `, params);
     const total = Number(result.rows[0]?.total_count ?? 0);
@@ -106,14 +119,20 @@ export async function vendorRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ data: result });
   });
 
-  app.patch('/:id', { preHandler: app.requirePermission('vendors.manage') }, async (request) => {
+  app.patch('/:id', { preHandler: app.authenticate }, async (request) => {
     const id = z.uuid().parse((request.params as { id: string }).id);
     const input = vendorUpdate.parse(request.body);
     const actor = actorOf(request);
+    const canManage = actor.permissions.has('vendors.manage');
+    const canApprove = actor.permissions.has('vendors.approve');
+    if (!canManage && !canApprove) throw forbidden('Satıcı məlumatlarını dəyişmək üçün icazəniz yoxdur');
+    if (Object.keys(input).some((key) => key !== 'status') && !canManage) {
+      throw forbidden('Satıcı məlumatlarını redaktə etmək üçün idarəetmə icazəsi tələb olunur');
+    }
     const current = await pool.query('SELECT * FROM vendors WHERE id = $1 AND deleted_at IS NULL', [id]);
     if (!current.rows[0]) throw notFound('Satıcı');
     assertStoreScope(actor, current.rows[0].store_id);
-    if (input.status && !actor.permissions.has('vendors.approve')) {
+    if (input.status && !canApprove) {
       throw forbidden('Satıcı statusunu dəyişmək üçün təsdiq icazəsi tələb olunur');
     }
 
@@ -127,7 +146,28 @@ export async function vendorRoutes(app: FastifyInstance): Promise<void> {
           approved_at = CASE WHEN $10::vendor_status = 'active'::vendor_status AND approved_at IS NULL THEN now() ELSE approved_at END
         WHERE id = $1 RETURNING *
       `, [id, input.displayName ?? null, input.legalName ?? null, input.slug ? slugify(input.slug) : null, input.taxId ?? null, input.email ?? null, input.phone ?? null, input.description ?? null, input.commissionRate ?? null, input.status ?? null]);
-      await writeAudit(client, { actorUserId: actor.userId, storeId: current.rows[0].store_id, action: 'vendor.update', entityType: 'vendor', entityId: id, beforeData: current.rows[0], afterData: updated.rows[0], requestId: request.id });
+      if (input.status && input.status !== current.rows[0].status) {
+        const notification = input.status === 'active'
+          ? {
+              title: 'Satıcı hesabınız təsdiqləndi',
+              message: 'Partnyorluq müraciətiniz təsdiqləndi. Moderasiyadan keçmiş məhsullarınız artıq mağazada görünə bilər.',
+              actionUrl: '/satici-paneli/'
+            }
+          : {
+              title: 'Satıcı hesabınızın statusu yeniləndi',
+              message: `Satıcı hesabınızın yeni statusu: ${input.status}. Ətraflı məlumat üçün Gündəlik Bakı ilə əlaqə saxlayın.`,
+              actionUrl: '/satici-girisi/'
+            };
+        await client.query(`
+          INSERT INTO user_notifications(user_id,notification_type,title,message,action_url,metadata)
+          SELECT DISTINCT ur.user_id,'vendor.status',$2,$3,$4,
+            jsonb_build_object('vendorId',$1::text,'status',$5::text)
+          FROM user_roles ur
+          JOIN roles r ON r.id=ur.role_id AND r.code IN ('vendor_owner','vendor_staff')
+          WHERE ur.vendor_id=$1::uuid
+        `, [id, notification.title, notification.message, notification.actionUrl, input.status]);
+      }
+      await writeAudit(client, { actorUserId: actor.userId, storeId: current.rows[0].store_id, vendorId: id, action: 'vendor.update', entityType: 'vendor', entityId: id, beforeData: current.rows[0], afterData: updated.rows[0], requestId: request.id });
       return updated.rows[0];
     });
     return { data: result };

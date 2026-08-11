@@ -3,6 +3,9 @@ const api = '/api/v1/public';
 const money = new Intl.NumberFormat('az-AZ', { style: 'currency', currency: 'AZN' });
 const compactMoney = new Intl.NumberFormat('az-AZ', { maximumFractionDigits: 0 });
 const cmsBrandLogos = new Map();
+const localizeProduct = (product) => globalThis.DailyBakuI18n?.localizeProduct(product) || product;
+const localizePost = (post) => globalThis.DailyBakuI18n?.localizePost(post) || post;
+const localizeCategory = (category) => globalThis.DailyBakuI18n?.localizeCategory(category) || category;
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 })[character]);
@@ -29,6 +32,7 @@ function orderedSelection(items, ids = []) {
 }
 
 function renderCatalogData(categories = [], brands = [], editorConfig = null) {
+  categories = categories.map(localizeCategory);
   cmsBrandLogos.clear();
   brands.forEach((brand) => {
     if (brand?.name && brand?.logo_url) cmsBrandLogos.set(String(brand.name).toLocaleLowerCase('az-AZ'), safeImageUrl(brand.logo_url));
@@ -400,6 +404,7 @@ function newsMarkup(posts) {
 
 function renderNews(posts, editorConfig = null) {
   if (!Array.isArray(posts)) return;
+  posts = posts.map(localizePost);
   posts = orderedSelection(posts, editorConfig?.news?.postIds || []);
   const container = document.querySelector('#bf72957, [data-id="bf72957"], [data-cms-news]');
   if (!container) return;
@@ -411,6 +416,7 @@ function renderNews(posts, editorConfig = null) {
 
 function renderProducts(products, editorConfig = null) {
   if (!Array.isArray(products)) return;
+  products = products.map(localizeProduct);
   const complete = completeProductSet(products);
   document.querySelectorAll('.et__products_ajax, [data-cms-products]').forEach((container, containerIndex) => {
     const isFeatured = container.hasAttribute('data-featured-products') || container.dataset.id === '4dee5e4';
@@ -1289,6 +1295,16 @@ document.addEventListener('dailybaku:editor', (event) => {
   renderProducts(home.products || [], config);
   renderNews(home.posts || [], config);
   renderCatalogData(home.categories || [], home.brands || [], config);
+});
+
+document.addEventListener('dailybaku:languagechange', () => {
+  const home = window.dailyBaku?.home;
+  if (!home) return;
+  const config = window.dailyBakuEditor?.index || home.editor?.index;
+  renderProducts(home.products || [], config);
+  renderNews(home.posts || [], config);
+  renderCatalogData(home.categories || [], home.brands || [], config);
+  scheduleTopPicksTabsEnhancement();
 });
 
 document.addEventListener('submit', (event) => {

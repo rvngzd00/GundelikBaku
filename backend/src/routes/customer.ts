@@ -116,7 +116,7 @@ const commerceProductFields = `
 const commerceProductFrom = `
   FROM product_listings pl
   JOIN products p ON p.id=pl.product_id
-  JOIN vendors v ON v.id=p.vendor_id
+  JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
   LEFT JOIN brands b ON b.id=p.brand_id
   LEFT JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary
   LEFT JOIN media_assets ma ON ma.id=pm.media_asset_id
@@ -246,6 +246,8 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
         const product = await client.query<{ price: string }>(`
           SELECT pl.price FROM product_listings pl
           JOIN product_variants pv ON pv.product_id=pl.product_id
+          JOIN products p ON p.id=pl.product_id AND p.deleted_at IS NULL
+          JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
           WHERE pl.id=$1 AND pv.id=$2 AND pl.store_id=$3
             AND pl.status='published' AND pv.status='active'
         `, [item.listingId, item.variantId, store.id]);
@@ -261,6 +263,8 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
         await client.query(`
           INSERT INTO wishlist_items(wishlist_id,listing_id)
           SELECT $1,pl.id FROM product_listings pl
+          JOIN products p ON p.id=pl.product_id AND p.deleted_at IS NULL
+          JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
           WHERE pl.store_id=$2 AND pl.status='published' AND pl.id=ANY($3::uuid[])
           ON CONFLICT DO NOTHING
         `, [wishlistId, store.id, listingIds]);
@@ -318,7 +322,7 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
       if (!current.rows[0] || !await verifyPassword(input.currentPassword, current.rows[0].password_hash)) {
         throw badRequest('CURRENT_PASSWORD_INVALID', 'Cari şifrə yanlışdır');
       }
-      await client.query('UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1', [
+      await client.query('UPDATE users SET password_hash=$2,failed_login_count=0,locked_until=NULL,updated_at=now() WHERE id=$1', [
         identity.userId,
         await hashPassword(input.newPassword)
       ]);
@@ -387,8 +391,10 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
     const input = reviewSchema.parse(request.body);
     const [store, identity] = await Promise.all([getStore(), resolveCustomerIdentity(request, reply)]);
     const product = await pool.query<{ product_id: string }>(`
-      SELECT product_id FROM product_listings
-      WHERE store_id=$1 AND slug=$2 AND status='published'
+      SELECT pl.product_id FROM product_listings pl
+      JOIN products p ON p.id=pl.product_id AND p.deleted_at IS NULL
+      JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
+      WHERE pl.store_id=$1 AND pl.slug=$2 AND pl.status='published'
     `, [store.id, slug]);
     if (!product.rows[0]) throw notFound('Məhsul');
 

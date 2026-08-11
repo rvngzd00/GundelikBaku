@@ -20,14 +20,16 @@ export async function loadActorContext(userId: string): Promise<ActorContext | n
     SELECT u.id, u.email, u.first_name, u.last_name,
       array_remove(array_agg(DISTINCT r.code), NULL) AS roles,
       array_remove(array_agg(DISTINCT p.code), NULL) AS permissions,
-      array_remove(array_agg(DISTINCT ur.store_id::text), NULL) AS store_ids,
-      array_remove(array_agg(DISTINCT ur.vendor_id::text), NULL) AS vendor_ids
+      array_remove(array_agg(DISTINCT CASE WHEN r.id IS NOT NULL THEN ur.store_id::text END), NULL) AS store_ids,
+      array_remove(array_agg(DISTINCT CASE WHEN r.id IS NOT NULL THEN ur.vendor_id::text END), NULL) AS vendor_ids
     FROM users u
     LEFT JOIN user_roles ur ON ur.user_id = u.id
+    LEFT JOIN vendors v ON v.id=ur.vendor_id
     LEFT JOIN roles r ON r.id = ur.role_id
+      AND (ur.vendor_id IS NULL OR (v.status IN ('pending','active') AND v.deleted_at IS NULL))
     LEFT JOIN role_permissions rp ON rp.role_id = r.id
     LEFT JOIN permissions p ON p.id = rp.permission_id
-    WHERE u.id = $1 AND u.status = 'active' AND u.deleted_at IS NULL
+    WHERE u.id = $1 AND u.status = 'active' AND u.login_blocked_at IS NULL AND u.deleted_at IS NULL
     GROUP BY u.id
   `, [userId]);
 

@@ -148,6 +148,7 @@
   .db-mobile-panel-primary{color:#fff;background:#2349df}
   .db-mobile-panel-secondary{color:#2349df;background:#eef3ff;border:1px solid #cad7ff}
   .db-mobile-panel-guest .db-mobile-panel-forgot{min-height:auto;margin-top:20px;color:#2349df;background:transparent;font-weight:600}
+  .db-mobile-panel-guest .db-mobile-panel-vendor{min-height:40px;margin-top:10px;color:#174ddd;background:#fff;border:1px solid #cad7ff;font-size:10px}
 
   .db-mobile-category-grid {
     display:grid;

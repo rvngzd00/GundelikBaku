@@ -86,7 +86,7 @@ async function assertReferences(storeId: string, scope: EditorScope, content: Si
     const value = content as typeof editorDefaults.index;
     const products = [...new Set([...value.featured.productIds, ...value.popular.productIds, ...value.topPicks.productIds])];
     const categories = [...new Set([...value.categories.categoryIds, ...value.topPicks.categoryIds])];
-    if (products.length) references.push({ kind: 'məhsul', ids: products, sql: "SELECT DISTINCT p.id FROM products p JOIN product_listings pl ON pl.product_id=p.id WHERE pl.store_id=$1 AND pl.status='published' AND p.id=ANY($2::uuid[]) AND p.deleted_at IS NULL" });
+    if (products.length) references.push({ kind: 'məhsul', ids: products, sql: "SELECT DISTINCT p.id FROM products p JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL JOIN product_listings pl ON pl.product_id=p.id WHERE pl.store_id=$1 AND pl.status='published' AND p.id=ANY($2::uuid[]) AND p.deleted_at IS NULL" });
     if (categories.length) references.push({ kind: 'kateqoriya', ids: categories, sql: "SELECT id FROM categories WHERE store_id=$1 AND status='active' AND id=ANY($2::uuid[])" });
     if (value.news.postIds.length) references.push({ kind: 'xəbər', ids: value.news.postIds, sql: "SELECT id FROM posts WHERE store_id=$1 AND status='published' AND id=ANY($2::uuid[]) AND deleted_at IS NULL" });
     if (value.brands.brandIds.length) references.push({ kind: 'brend', ids: value.brands.brandIds, sql: "SELECT id FROM brands WHERE store_id=$1 AND status='active' AND id=ANY($2::uuid[])" });
@@ -105,7 +105,7 @@ export async function siteEditorRoutes(app: FastifyInstance): Promise<void> {
     const storeId = await selectedStoreId(request, query.storeId);
     const [media, products, categories, posts, brands] = await Promise.all([
       pool.query(`SELECT id,public_url,alt_text,title,mime_type,created_at FROM media_assets WHERE store_id=$1 AND mime_type LIKE 'image/%' ORDER BY created_at DESC LIMIT 500`, [storeId]),
-      pool.query(`SELECT p.id,pl.title,pl.slug,p.sku,pl.status,ma.public_url AS image_url,ma.alt_text FROM products p JOIN product_listings pl ON pl.product_id=p.id AND pl.store_id=$1 AND pl.status='published' LEFT JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary LEFT JOIN media_assets ma ON ma.id=pm.media_asset_id WHERE p.deleted_at IS NULL ORDER BY pl.title LIMIT 500`, [storeId]),
+      pool.query(`SELECT p.id,pl.title,pl.slug,p.sku,pl.status,ma.public_url AS image_url,ma.alt_text FROM products p JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL JOIN product_listings pl ON pl.product_id=p.id AND pl.store_id=$1 AND pl.status='published' LEFT JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary LEFT JOIN media_assets ma ON ma.id=pm.media_asset_id WHERE p.deleted_at IS NULL ORDER BY pl.title LIMIT 500`, [storeId]),
       pool.query(`SELECT id,name,slug,parent_id,status,position FROM categories WHERE store_id=$1 AND status='active' ORDER BY position,name LIMIT 300`, [storeId]),
       pool.query(`SELECT id,title,slug,status,post_type,published_at FROM posts WHERE store_id=$1 AND status='published' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 300`, [storeId]),
       pool.query(`SELECT id,name,slug,status FROM brands WHERE store_id=$1 AND status='active' ORDER BY name LIMIT 300`, [storeId])

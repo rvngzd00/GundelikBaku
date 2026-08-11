@@ -11,7 +11,8 @@ const productSelect = `SELECT pl.id,pl.title,pl.slug,pl.short_description,pl.des
   p.product_type,v.display_name AS vendor_name,b.name AS brand_name,ma.public_url AS image_url,ma.alt_text,
   (SELECT pv.id FROM product_variants pv WHERE pv.product_id=p.id AND pv.status='active' ORDER BY pv.created_at LIMIT 1) AS variant_id,
   coalesce((SELECT sum(i.quantity-i.reserved) FROM product_variants pv JOIN inventory i ON i.variant_id=pv.id WHERE pv.product_id=p.id),0)::int AS stock
-  FROM product_listings pl JOIN products p ON p.id=pl.product_id JOIN vendors v ON v.id=p.vendor_id
+  FROM product_listings pl JOIN products p ON p.id=pl.product_id
+  JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
   LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary
   LEFT JOIN media_assets ma ON ma.id=pm.media_asset_id`;
 const searchLetterMap: Record<string, string> = { 'ə': 'e', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'ç': 'c' };
@@ -31,6 +32,29 @@ function sendHtml(reply: FastifyReply, html: string, status = 200, cacheControl?
 
 function pageHero(kicker: string, title: string, description: string): string {
   return `<section class="page-hero"><div class="page-container"><p>${escapeHtml(kicker)}</p><h1>${escapeHtml(title)}</h1><div>${escapeHtml(description)}</div></div></section>`;
+}
+
+export function notFoundPage(pathname: string): string {
+  return layout({
+    title: 'Səhifə tapılmadı — Gündəlik Bakı',
+    description: 'Axtardığınız səhifə mövcud deyil və ya ünvanı dəyişib.',
+    path: pathname,
+    robots: 'noindex,follow',
+    content: `<section class="db-not-found"><div class="page-container db-not-found-layout">
+      <div class="db-not-found-visual" aria-hidden="true"><span>4</span><i><b></b></i><span>4</span></div>
+      <div class="db-not-found-content">
+        <p class="db-not-found-kicker">SƏHİFƏ TAPILMADI</p>
+        <h1>Görünür, bu fürsət başqa ünvana köçüb.</h1>
+        <p>Axtardığınız səhifə silinmiş, adı dəyişmiş və ya keçid yanlış yazılmış ola bilər. Axtarışdan istifadə edin və ya əsas bölmələrdən birinə keçin.</p>
+        <form class="db-not-found-search" action="/magaza/" method="get" role="search">
+          <label class="sr-only" for="not-found-search">Məhsul axtarışı</label>
+          <input id="not-found-search" name="axtaris" type="search" placeholder="Məhsul və ya brend axtarın" autocomplete="off">
+          <button type="submit">Axtar</button>
+        </form>
+        <div class="db-not-found-actions"><a class="page-primary" href="/">Ana səhifəyə qayıt</a><a href="/magaza/">Mağazaya bax</a></div>
+      </div>
+    </div><div class="page-container"><nav class="db-not-found-links" aria-label="Faydalı keçidlər"><a href="/endirimler/"><strong>Endirimlər</strong><span>Aktual fürsətlərə baxın</span></a><a href="/jurnal/"><strong>Jurnal</strong><span>Şəhərin yeniliklərini oxuyun</span></a><a href="/elaqe/"><strong>Dəstək</strong><span>Bizimlə əlaqə saxlayın</span></a></nav></div></section>`
+  });
 }
 
 function renderContentBlocks(content: unknown): string {
@@ -159,17 +183,17 @@ const staticPages: Record<string, { active?: string; title: string; description:
   'baki-club': { active: 'baki-club', title: 'Bakı Club — Oxu, skan et, qazan', description: 'Gündəlik Bakı platformasında alış-veriş, QR skanları və kampaniyalar vasitəsilə xal və hədiyyələr qazanın.', kicker: 'LOYALLIQ PROQRAMI', body: `<div class="page-feature-grid"><article id="xal-qazan"><b>01</b><h2>Xal qazan</h2><p>Alış-veriş, kampaniya və QR skanlarından avtomatik xal toplayın.</p></article><article id="hediyyeler"><b>02</b><h2>Hədiyyələri seç</h2><p>Topladığınız xalları eksklüziv məhsul və endirimlərlə dəyişin.</p></article><article id="giveaway"><b>03</b><h2>Giveaway-lərə qoşul</h2><p>Club üzvləri üçün keçirilən xüsusi çəkilişlərdə iştirak edin.</p></article><article id="qr-cuzdan"><b>04</b><h2>QR cüzdan</h2><p>Kupon və bonuslarınızı bir mərkəzdən izləyin.</p></article></div>` },
   biznes: { active: 'biznes', title: 'Biznesinizi Gündəlik Bakı ilə böyüdün', description: 'Reklam, sponsorluq, məhsul vitrini və ölçülə bilən kampaniyalar üçün vahid biznes platforması.', kicker: 'BİZNES ÜÇÜN', body: `<div class="page-feature-grid"><article id="reklam"><b>01</b><h2>Reklam ver</h2><p>Hədəf auditoriyaya uyğun banner və yerli kampaniyalar yaradın.</p></article><article id="sponsorluq"><b>02</b><h2>Sponsorluq</h2><p>Jurnal, tədbir və xüsusi layihələrdə brendinizlə iştirak edin.</p></article><article id="brend-vitrini"><b>03</b><h2>Brend vitrini</h2><p>Məhsullarınızı SEO-dostu kataloqda və kampaniyalarda nümayiş etdirin.</p></article><article id="analitika"><b>04</b><h2>Analitika paneli</h2><p>Baxış, klik, QR skanı, sifariş və dönüşümləri izləyin.</p></article></div><section class="page-cta"><h2>Əməkdaşlığa başlayaq</h2><p>Komandamız biznesiniz üçün uyğun rəqəmsal həlli hazırlasın.</p><a class="page-primary" href="/elaqe/">Bizimlə əlaqə</a></section>` },
   haqqimizda: { title: 'Gündəlik Bakı haqqında', description: 'Gündəlik Bakı şəhərin alış-veriş, endirim, jurnal və biznes ekosistemidir.', kicker: 'BİZ KİMİK', body: `<section class="page-prose"><h2>Şəhərin fürsətlərini bir platformada birləşdiririk</h2><p>Gündəlik Bakı istifadəçiləri etibarlı bizneslər, məhsullar, kampaniyalar və faydalı şəhər kontenti ilə əlaqələndirir.</p><h2>Missiyamız</h2><p>Yerli bizneslərin rəqəmsal görünürlüğünü artırmaq, istifadəçilərə isə daha rahat və sərfəli seçim imkanı yaratmaqdır.</p></section>` },
-  elaqe: { title: 'Gündəlik Bakı ilə əlaqə', description: 'Satış, reklam, texniki dəstək və tərəfdaşlıq üçün Gündəlik Bakı komandası ilə əlaqə saxlayın.', kicker: 'ƏLAQƏ', body: `<div class="page-contact-grid"><article><h2>Biznes və reklam</h2><a href="mailto:business@dailybaku.az">business@dailybaku.az</a><a href="tel:+994502645400">+994 50 264 54 00</a></article><article><h2>Müştəri dəstəyi</h2><a href="mailto:support@dailybaku.az">support@dailybaku.az</a><p>B.e.–Cümə, 09:00–18:00</p></article><article><h2>Ünvan</h2><p>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</p></article></div>` },
+  elaqe: { title: 'Gündəlik Bakı ilə əlaqə', description: 'Satış, reklam, texniki dəstək və tərəfdaşlıq üçün Gündəlik Bakı komandası ilə əlaqə saxlayın.', kicker: 'ƏLAQƏ', body: `<div class="page-contact-grid"><article><h2>Biznes və reklam</h2><a href="mailto:business@gundelikbaki.az">business@gundelikbaki.az</a><a href="tel:+994502645400">+994 50 264 54 00</a></article><article><h2>Müştəri dəstəyi</h2><a href="mailto:support@gundelikbaki.az">support@gundelikbaki.az</a><p>B.e.–Cümə, 09:00–18:00</p></article><article><h2>Ünvan</h2><p>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</p></article></div>` },
   faq: { title: 'Tez-tez verilən suallar', description: 'Gündəlik Bakı alış-veriş, sifariş, kampaniya və Bakı Club haqqında tez-tez verilən suallar.', kicker: 'DƏSTƏK', body: `<section class="page-faq"><details open><summary>Sifarişi necə verə bilərəm?</summary><p>Məhsulu səbətə əlavə edin, səbət səhifəsində sifariş məlumatlarını tamamlayın.</p></details><details><summary>Satıcılarla necə əməkdaşlıq edə bilərəm?</summary><p>Biznes üçün bölməsindən əlaqə saxlayaraq satıcı hesabı əldə edə bilərsiniz.</p></details><details><summary>Bakı Club xalları necə qazanılır?</summary><p>Uyğun alış-veriş və QR kampaniyalarından sonra xallar hesabınıza əlavə olunur.</p></details></section>` },
   catdirilma: { title: 'Çatdırılma siyasəti', description: 'Gündəlik Bakı platformasında sifarişlərin çatdırılma şərtləri və müddətləri.', kicker: 'MÜŞTƏRİ DƏSTƏYİ', body: `<section class="page-prose"><h2>Çatdırılma müddəti</h2><p>Bakı daxilində stokda olan məhsullar adətən 1–3 iş günü ərzində çatdırılır. Dəqiq müddət satıcı və məhsul səhifəsində göstərilir.</p><h2>Çatdırılma haqqı</h2><p>99 AZN-dən yuxarı uyğun sifarişlər üçün standart çatdırılma pulsuzdur.</p></section>` },
-  'geri-qaytarma': { title: 'Geri qaytarma siyasəti', description: 'Gündəlik Bakı üzərindən alınmış məhsulların dəyişdirilməsi və geri qaytarılması qaydaları.', kicker: 'MÜŞTƏRİ DƏSTƏYİ', body: `<section class="page-prose"><h2>Qaytarma şərtləri</h2><p>Məhsul istifadə edilməyibsə və komplektasiyası qorunubsa, qanunvericiliyə və satıcının şərtlərinə uyğun qaytarıla bilər.</p><h2>Müraciət</h2><p>Sifariş nömrəsini qeyd etməklə support@dailybaku.az ünvanına müraciət edin.</p></section>` },
-  mexfilik: { title: 'Məxfilik siyasəti', description: 'Gündəlik Bakı istifadəçi və sifariş məlumatlarının qorunması haqqında məxfilik siyasəti.', kicker: 'HÜQUQİ', body: `<section class="page-prose"><h2>Məlumatların qorunması</h2><p>Şəxsi məlumatlar yalnız xidmətin göstərilməsi, təhlükəsizlik və qanuni öhdəliklər üçün işlənir.</p><h2>Əlaqə</h2><p>Məxfilik sorğuları üçün privacy@dailybaku.az ünvanına müraciət edə bilərsiniz.</p></section>` },
+  'geri-qaytarma': { title: 'Geri qaytarma siyasəti', description: 'Gündəlik Bakı üzərindən alınmış məhsulların dəyişdirilməsi və geri qaytarılması qaydaları.', kicker: 'MÜŞTƏRİ DƏSTƏYİ', body: `<section class="page-prose"><h2>Qaytarma şərtləri</h2><p>Məhsul istifadə edilməyibsə və komplektasiyası qorunubsa, qanunvericiliyə və satıcının şərtlərinə uyğun qaytarıla bilər.</p><h2>Müraciət</h2><p>Sifariş nömrəsini qeyd etməklə support@gundelikbaki.az ünvanına müraciət edin.</p></section>` },
+  mexfilik: { title: 'Məxfilik siyasəti', description: 'Gündəlik Bakı istifadəçi və sifariş məlumatlarının qorunması haqqında məxfilik siyasəti.', kicker: 'HÜQUQİ', body: `<section class="page-prose"><h2>Məlumatların qorunması</h2><p>Şəxsi məlumatlar yalnız xidmətin göstərilməsi, təhlükəsizlik və qanuni öhdəliklər üçün işlənir.</p><h2>Əlaqə</h2><p>Məxfilik sorğuları üçün privacy@gundelikbaki.az ünvanına müraciət edə bilərsiniz.</p></section>` },
   'istifade-sertleri': { title: 'İstifadə şərtləri', description: 'Gündəlik Bakı platformasının istifadə qaydaları, istifadəçi və satıcı öhdəlikləri.', kicker: 'HÜQUQİ', body: `<section class="page-prose"><h2>Platformadan istifadə</h2><p>İstifadəçi təqdim etdiyi məlumatların düzgünlüyünə, satıcı isə məhsul və sifariş məlumatlarının aktuallığına cavabdehdir.</p><h2>Məzmun hüquqları</h2><p>Gündəlik Bakı brendi və platforma məzmunu müəllif hüquqları ilə qorunur.</p></section>` }
 };
 
 export async function webRoutes(app: FastifyInstance): Promise<void> {
   const accountPaths = ['/hesabim', '/hesabim/secilmisler', '/hesabim/sifarisler', '/hesabim/tarixce', '/hesabim/baki-club', '/hesabim/bildirisler', '/hesabim/unvanlar', '/hesabim/hesab-melumatlari'];
-  const authPaths = ['/giris', '/qeydiyyat', '/sifre-berpasi', '/sifre-yenile', '/deveti-qebul-et'];
+  const authPaths = ['/giris', '/qeydiyyat', '/satici-girisi', '/satici-qeydiyyati', '/sifre-berpasi', '/sifre-yenile', '/deveti-qebul-et'];
   const slashed = [...navigationSections.map((section) => section.href.slice(0, -1)), '/sebet', ...accountPaths, ...authPaths, '/haqqimizda', '/elaqe', '/faq', '/catdirilma', '/geri-qaytarma', '/mexfilik', '/istifade-sertleri'];
   for (const path of slashed) app.get(path, async (_request, reply) => reply.redirect(`${path}/`, 308));
 
@@ -227,7 +251,13 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
     if (query.mense) { params.push(query.mense); where.push(`EXISTS (SELECT 1 FROM jsonb_each_text(p.attributes) attribute WHERE translate(lower(attribute.key),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC') IN ('mense','mense olkesi','country of origin') AND trim(both '-' FROM regexp_replace(translate(lower(attribute.value),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC'),'[^a-z0-9]+','-','g'))=$${params.length})`); }
     const [products, categories] = await Promise.all([
       pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id ${joins} WHERE ${where.join(' AND ')} ORDER BY ${orderBy}`, params),
-      pool.query(`SELECT c.name,c.slug,count(pc.product_id)::int AS product_count FROM categories c JOIN stores s ON s.id=c.store_id LEFT JOIN product_categories pc ON pc.category_id=c.id WHERE s.code=$1 AND c.status='active' GROUP BY c.id ORDER BY c.position,c.name`, [env.DEFAULT_STORE_CODE])
+      pool.query(`SELECT c.name,c.slug,count(DISTINCT pl.product_id)::int AS product_count
+        FROM categories c JOIN stores s ON s.id=c.store_id
+        LEFT JOIN product_categories pc ON pc.category_id=c.id
+        LEFT JOIN products p ON p.id=pc.product_id AND p.deleted_at IS NULL
+        LEFT JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
+        LEFT JOIN product_listings pl ON pl.product_id=p.id AND v.id IS NOT NULL AND pl.store_id=c.store_id AND pl.status='published'
+        WHERE s.code=$1 AND c.status='active' GROUP BY c.id ORDER BY c.position,c.name`, [env.DEFAULT_STORE_CODE])
     ]);
     const heading = query.axtaris ? `“${query.axtaris}” üçün nəticələr` : 'Bütün məhsullar';
     const section = requiredNavigationSection('magaza');
@@ -337,14 +367,17 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
     return sendHtml(reply,layout({title:'Elanlar | Gündəlik Bakı',description:'Bakı üzrə məhsul, xidmət, əmlak və avtomobil elanları.',path:'/elanlar/',active:'elanlar',schema:categorySchemas(section),content}));
   });
 
-  const authPage = (path: string, title: string, subtitle: string, form: string) => {
+  const authPage = (path: string, title: string, subtitle: string, form: string, audience: 'customer' | 'vendor' = 'customer') => {
+    const promo = audience === 'vendor'
+      ? `<aside class="db-auth-promo db-auth-promo-vendor"><span>GÜNDƏLİK BAKI PARTNYORLUĞU</span><h1>Biznesinizi rəqəmsal vitrində böyüdün.</h1><p>Məhsullarınızı, stokunuzu və sifarişlərinizi vahid satıcı kabinetindən rahat idarə edin.</p><ul><li>Məhsul və stok idarəetməsi</li><li>Sifarişlərin real vaxt izlənməsi</li><li>Admin təsdiqli etibarlı tərəfdaş profili</li></ul></aside>`
+      : `<aside class="db-auth-promo"><span>GÜNDƏLİK BAKI HESABI</span><h1>Alış-verişiniz hər cihazda sizinlə qalsın.</h1><p>Səbət, seçilmişlər, sifarişlər və Bakı Club xalları təhlükəsiz hesabınızda sinxronlaşdırılır.</p><ul><li>Sifarişləri bir yerdən izləyin</li><li>Seçilmiş məhsulları itirməyin</li><li>Xal və hədiyyələr qazanın</li></ul></aside>`;
     app.get(path, async (_request, reply) => sendHtml(reply, layout({
       title: `${title} | Gündəlik Bakı`,
       description: subtitle,
       path,
       robots: 'noindex,follow',
       content: `<section class="db-auth-page"><div class="page-container">${breadcrumb([[title]])}<div class="db-auth-layout">
-        <aside class="db-auth-promo"><span>GÜNDƏLİK BAKI HESABI</span><h1>Alış-verişiniz hər cihazda sizinlə qalsın.</h1><p>Səbət, seçilmişlər, sifarişlər və Bakı Club xalları təhlükəsiz hesabınızda sinxronlaşdırılır.</p><ul><li>Sifarişləri bir yerdən izləyin</li><li>Seçilmiş məhsulları itirməyin</li><li>Xal və hədiyyələr qazanın</li></ul></aside>
+        ${promo}
         <div class="db-auth-card"><div class="db-auth-card-head"><p>TƏHLÜKƏSİZ HESAB</p><h2>${escapeHtml(title)}</h2><span>${escapeHtml(subtitle)}</span></div>${form}</div>
       </div></div></section>`
     }), 200, 'private, no-store'));
@@ -356,7 +389,7 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
       <label>Şifrə<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
       <div class="db-auth-options"><label><input name="remember" type="checkbox" checked> Məni xatırla</label><a href="/sifre-berpasi/">Şifrəni unutmusunuz?</a></div>
       <button type="submit">DAXİL OL</button><p class="db-auth-status" role="status" aria-live="polite"></p>
-    </form><p class="db-auth-switch">Hesabınız yoxdur? <a href="/qeydiyyat/">Qeydiyyatdan keçin</a></p>`);
+    </form><p class="db-auth-switch">Hesabınız yoxdur? <a href="/qeydiyyat/">Qeydiyyatdan keçin</a></p><p class="db-auth-switch db-auth-switch-secondary"><a href="/satici-girisi/">Satıcı olaraq daxil ol</a></p>`);
 
   authPage('/qeydiyyat/', 'Qeydiyyat', 'Bir dəqiqə ərzində şəxsi hesabınızı yaradın.', `
     <form class="db-auth-form" data-auth-form="register" novalidate>
@@ -367,7 +400,29 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
       <label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label>
       <label class="db-auth-consent"><input name="terms" type="checkbox" required><span><a href="/istifade-sertleri/">İstifadə şərtləri</a> və <a href="/mexfilik/">məxfilik siyasəti</a> ilə razıyam.</span></label>
       <button type="submit">HESAB YARAT</button><p class="db-auth-status" role="status" aria-live="polite"></p>
-    </form><p class="db-auth-switch">Artıq hesabınız var? <a href="/giris/">Daxil olun</a></p>`);
+    </form><p class="db-auth-switch">Artıq hesabınız var? <a href="/giris/">Daxil olun</a></p><p class="db-auth-switch db-auth-switch-secondary">Biznesinizi platformaya qoşmaq istəyirsiniz? <a href="/satici-qeydiyyati/">Partnyorluq üçün qeydiyyatdan keçin</a></p>`);
+
+  authPage('/satici-girisi/', 'Satıcı olaraq daxil ol', 'Satıcı hesabınızla kabinetə daxil olun.', `
+    <form class="db-auth-form" data-auth-form="vendor-login" novalidate>
+      <label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label>
+      <label>Şifrə<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <div class="db-auth-options"><span></span><a href="/sifre-berpasi/">Şifrəni unutmusunuz?</a></div>
+      <button type="submit">SATICI KABİNETİNƏ DAXİL OL</button><p class="db-auth-status" role="status" aria-live="polite"></p>
+    </form><p class="db-auth-switch">Satıcı hesabınız yoxdur? <a href="/satici-qeydiyyati/">Partnyorluq üçün qeydiyyatdan keçin</a></p><p class="db-auth-switch db-auth-switch-secondary"><a href="/giris/">Müştəri olaraq daxil ol</a></p>`, 'vendor');
+
+  authPage('/satici-qeydiyyati/', 'Partnyorluq qeydiyyatı', 'Məlumatlarınızı göndərin, admin təsdiqindən sonra satıcı kabinetiniz aktivləşdirilsin.', `
+    <form class="db-auth-form" data-auth-form="vendor-register" novalidate>
+      <div class="db-auth-form-grid"><label>Ad<input name="firstName" autocomplete="given-name" minlength="2" required></label><label>Soyad<input name="lastName" autocomplete="family-name" minlength="2" required></label></div>
+      <label>Biznesin görünən adı<input name="displayName" autocomplete="organization" minlength="2" required></label>
+      <label>Hüquqi ad<input name="legalName" autocomplete="organization" minlength="2" required></label>
+      <div class="db-auth-form-grid"><label>VÖEN<input name="taxId" inputmode="numeric" minlength="5" maxlength="80" required></label><label>Telefon<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="+994 12 345 67 89" maxlength="17" pattern="\\+994 [0-9]{2} [0-9]{3} [0-9]{2} [0-9]{2}" data-az-phone required></label></div>
+      <label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label>
+      <label>Biznes haqqında qısa məlumat <small>(istəyə bağlı)</small><textarea name="description" rows="4" maxlength="5000"></textarea></label>
+      <label>Şifrə<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>Ən az 12 simvol istifadə edin.</small></label>
+      <label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+      <label class="db-auth-consent"><input name="terms" type="checkbox" required><span><a href="/istifade-sertleri/">İstifadə şərtləri</a> və <a href="/mexfilik/">məxfilik siyasəti</a> ilə razıyam.</span></label>
+      <button type="submit">PARTNYORLUQ MÜRACİƏTİNİ GÖNDƏR</button><p class="db-auth-status" role="status" aria-live="polite"></p>
+    </form><p class="db-auth-switch">Artıq satıcı hesabınız var? <a href="/satici-girisi/">Satıcı olaraq daxil olun</a></p><p class="db-auth-switch db-auth-switch-secondary"><a href="/qeydiyyat/">Müştəri hesabı yaradın</a></p>`, 'vendor');
 
   authPage('/sifre-berpasi/', 'Şifrəni bərpa et', 'E-poçtunuza bir dəfə istifadə edilən təhlükəsiz keçid göndərəcəyik.', `
     <form class="db-auth-form" data-auth-form="forgot-password" novalidate><label>E-poçt ünvanı<input name="email" type="email" autocomplete="email" required></label><button type="submit">BƏRPA KEÇİDİ GÖNDƏR</button><p class="db-auth-status" role="status" aria-live="polite"></p></form><p class="db-auth-switch"><a href="/giris/">Daxil ol səhifəsinə qayıt</a></p>`);

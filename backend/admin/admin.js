@@ -4,9 +4,48 @@ const state = { user: null, view: 'dashboard', search: {}, page: {} };
 const isVendorPortal = location.pathname.startsWith('/satici-paneli');
 const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media']);
 const moderatorViews = new Set(['products', 'reviews', 'categories', 'brands', 'inventory', 'posts', 'post-categories', 'journal']);
+const adminPortalRoles = new Set(['super_admin', 'admin', 'editor', 'seo', 'moderator']);
+const vendorPortalRoles = new Set(['vendor_owner', 'vendor_staff']);
 let productImages = [];
 let draggedProductImage = null;
+let notificationTimer = null;
 const $ = (selector) => document.querySelector(selector);
+const passwordEyeIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.75"/><path class="password-eye-slash" d="m4 4 16 16"/></svg>`;
+
+function initializeAdminPasswordField(input) {
+  if (!(input instanceof HTMLInputElement) || input.dataset.passwordToggleReady) return;
+  input.dataset.passwordToggleReady = 'true';
+  const wrapper = document.createElement('span');
+  wrapper.className = 'password-field';
+  input.before(wrapper);
+  wrapper.append(input);
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'password-toggle';
+  toggle.innerHTML = passwordEyeIcon;
+  const synchronize = () => {
+    const visible = input.type === 'text';
+    toggle.classList.toggle('is-visible', visible);
+    toggle.setAttribute('aria-pressed', String(visible));
+    toggle.setAttribute('aria-label', visible ? 'Şifrəni gizlət' : 'Şifrəni göstər');
+    toggle.title = visible ? 'Şifrəni gizlət' : 'Şifrəni göstər';
+  };
+  toggle.addEventListener('click', () => {
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    synchronize();
+    input.focus({ preventScroll: true });
+    if (selectionStart !== null && selectionEnd !== null) input.setSelectionRange(selectionStart, selectionEnd);
+  });
+  wrapper.append(toggle);
+  synchronize();
+}
+
+function initializeAdminPasswordFields(root = document) {
+  if (root instanceof HTMLInputElement && root.matches('input[type="password"]')) initializeAdminPasswordField(root);
+  root.querySelectorAll?.('input[type="password"]').forEach(initializeAdminPasswordField);
+}
 
 const menus = [
   ['Əsas', [['dashboard', '◫', 'İcmal', 'dashboard.read']]],
@@ -17,8 +56,7 @@ const menus = [
     ['categories', '▦', 'Kateqoriyalar', 'catalog.read'],
     ['brands', '◆', 'Brendlər', 'catalog.read'],
     ['inventory', '▥', 'Anbar', 'inventory.read'],
-    ['classifieds', '▰', 'Elanlar', 'classifieds.read'],
-    ['vendors', '◇', 'Satıcılar', 'vendors.read']
+    ['classifieds', '▰', 'Elanlar', 'classifieds.read']
   ]],
   ['Kontent', [
     ['editor', '✦', 'Sayt editoru', 'editor.read'],
@@ -37,6 +75,8 @@ const menus = [
     ['redemptions', '✓', 'Hədiyyə sifarişləri', 'loyalty.read']
   ]],
   ['Sistem', [
+    ['vendors', '◇', 'Satıcı biznesləri', 'vendors.read'],
+    ['seller-users', '♙', 'Satıcılar', 'users.read'],
     ['users', '♙', 'İstifadəçilər', 'users.read'],
     ['settings', '⚙', 'Parametrlər', 'settings.read']
   ]]
@@ -51,7 +91,8 @@ const labels = {
   brands: ['Brendlər', 'Məhsul istehsalçıları'],
   inventory: ['Anbar', 'Stok idarəetməsi'],
   classifieds: ['Elanlar', 'Elanların moderasiyası və idarəetməsi'],
-  vendors: ['Satıcılar', 'Tərəfdaş hesabları'],
+  vendors: ['Satıcı biznesləri', 'Tərəfdaş profilləri, müraciətlər və təsdiq statusları'],
+  'seller-users': ['Satıcılar', 'Yalnız satıcı panelinə giriş hesabları'],
   posts: ['Məqalələr', 'Redaksiya kontenti'],
   'post-categories': ['Məqalə kateqoriyaları', 'Jurnal mövzuları və SEO'],
   pages: ['Səhifələr', 'Sayt səhifələri'],
@@ -63,7 +104,7 @@ const labels = {
   qr: ['QR mərkəzi', 'Dinamik QR və analitika'],
   rewards: ['Club hədiyyələri', 'Xalla əldə edilən məhsullar'],
   redemptions: ['Hədiyyə sifarişləri', 'Təhvil və icra statusları'],
-  users: ['İstifadəçilər', 'Rol və giriş idarəetməsi'],
+  users: ['İstifadəçilər', 'Satıcı hesablarından ayrı rol və giriş idarəetməsi'],
   settings: ['Parametrlər', 'Platforma konfiqurasiyası'],
   editor: ['Sayt editoru', 'Nav, ana səhifə və footer idarəetməsi']
 };
@@ -84,7 +125,7 @@ const roleLabels = {
 };
 
 const createPermissions = {
-  vendors: 'vendors.manage', products: 'catalog.create', categories: 'catalog.create', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
+  vendors: 'vendors.manage', 'seller-users': 'users.manage', products: 'catalog.create', categories: 'catalog.create', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
   posts: 'posts.create', 'post-categories': 'posts.create', pages: 'cms.create', seo: 'seo.manage',
   campaigns: 'campaigns.manage', coupons: 'coupons.manage', qr: 'qr.manage', rewards: 'loyalty.manage',
   journal: 'journal.create', classifieds: 'classifieds.moderate'
@@ -207,6 +248,9 @@ async function dashboard() {
 }
 
 function userStatus(row) {
+  if (row.login_blocked_at) {
+    return `<span class="account-lock-status"><span class="badge login-blocked">Giriş bloklanıb</span><small>10 uğursuz cəhd</small></span>`;
+  }
   if (!can('users.manage') || (row.roles || []).includes('super_admin')) return badge(row.status);
   const options = ['invited', 'active', 'suspended', 'disabled'].map((status) => (
     `<option value="${status}" ${row.status === status ? 'selected' : ''}>${statusLabels[status]}</option>`
@@ -214,10 +258,22 @@ function userStatus(row) {
   return `<select class="table-status" data-user-status="${esc(row.id)}" data-current="${esc(row.status)}" aria-label="İstifadəçi statusu">${options}</select>`;
 }
 
+function userActions(row, view) {
+  if (!can('users.manage')) return '—';
+  const unlock = row.login_blocked_at
+    ? `<button class="table-action account-unlock" data-user-unlock="${esc(row.id)}">Kilidi aç</button> `
+    : '';
+  const edit = `<button class="table-action" data-user-edit="${esc(row.id)}" data-user-view="${esc(view)}">Redaktə et</button>`;
+  const invite = row.status === 'invited' ? ` <button class="table-action" data-resend-invite="${esc(row.id)}">Dəvəti göndər</button>` : '';
+  const remove = row.id !== state.user.userId ? ` <button class="table-action danger" data-user-delete="${esc(row.id)}">Sil</button>` : '';
+  return `${unlock}${edit}${invite}${remove}`;
+}
+
 function vendorStatus(row) {
   if (!can('vendors.approve')) return badge(row.status);
+  const vendorStatusLabels = { pending: 'Təsdiqlənməyib', active: 'Təsdiqlənmiş', suspended: 'Dayandırılıb', rejected: 'Rədd edilib' };
   const options = ['pending', 'active', 'suspended', 'rejected'].map((status) => (
-    `<option value="${status}" ${row.status === status ? 'selected' : ''}>${statusLabels[status]}</option>`
+    `<option value="${status}" ${row.status === status ? 'selected' : ''}>${vendorStatusLabels[status]}</option>`
   )).join('');
   return `<select class="table-status" data-vendor-status="${esc(row.id)}" data-current="${esc(row.status)}" aria-label="Satıcı statusu">${options}</select>`;
 }
@@ -296,15 +352,32 @@ const configs = {
     { label: 'Tarix', render: (row) => date(row.created_at) }, { label: '', render: (row) => can('classifieds.moderate')?`<button class="table-action" data-classified-edit="${esc(row.id)}">Redaktə et</button> <button class="table-action danger" data-classified-delete="${esc(row.id)}">Arxivlə</button>`:'—' }
   ] },
   vendors: { path: '/vendors', columns: [
-    { label: 'Satıcı', key: 'display_name' }, { label: 'Hüquqi ad', key: 'legal_name' },
-    { label: 'E-poçt', key: 'email' }, { label: 'Komissiya', render: (row) => `${esc(row.commission_rate)}%` },
-    { label: 'Status', render: vendorStatus }, { label: 'Tarix', render: (row) => date(row.created_at) }, { label: '', render: (row) => can('vendors.manage')?`<button class="table-action" data-vendor-edit="${esc(row.id)}">Redaktə et</button>`:'—' }
+    { label: 'Satıcı', render: (row) => `<strong>${esc(row.display_name)}</strong><small class="cell-note">${esc(row.legal_name)}</small>${row.tax_id ? `<small class="cell-note">VÖEN: ${esc(row.tax_id)}</small>` : ''}` },
+    { label: 'Hesab sahibi', render: (row) => `${esc([row.owner_first_name,row.owner_last_name].filter(Boolean).join(' ') || '—')}<small class="cell-note">${esc(row.owner_email || '—')}</small>` },
+    { label: 'Əlaqə', render: (row) => `${esc(row.email)}<small class="cell-note">${esc(row.phone || '—')}</small>` },
+    { label: 'Mənbə', render: (row) => row.settings?.registrationSource === 'self_service' ? '<span class="badge review">Onlayn müraciət</span>' : '<span class="badge active">Admin</span>' },
+    { label: 'Status', render: vendorStatus }, { label: 'Tarix', render: (row) => date(row.created_at) },
+    { label: '', render: (row) => {
+      const approve = row.status === 'pending' && can('vendors.approve')
+        ? `<button class="table-action vendor-approve" data-vendor-approve="${esc(row.id)}">Təsdiqlə</button> `
+        : '';
+      const details = can('vendors.manage')
+        ? `<button class="table-action" data-vendor-edit="${esc(row.id)}">Məlumatlar</button>`
+        : '';
+      return approve || details ? `${approve}${details}` : '—';
+    } }
   ] },
-  users: { path: '/users', columns: [
+  'seller-users': { path: '/users', query: { accountType: 'vendor' }, columns: [
+    { label: 'Ad', render: (row) => `${esc(row.first_name)} ${esc(row.last_name)}` }, { label: 'E-poçt', key: 'email' },
+    { label: 'Satıcı rolu', render: (row) => (row.roles || []).map((role) => `<span class="badge active">${esc(roleLabels[role] || role)}</span>`).join(' ') },
+    { label: 'Status', render: userStatus }, { label: 'Son giriş', render: (row) => date(row.last_login_at) },
+    { label: '', render: (row) => userActions(row, 'seller-users') }
+  ] },
+  users: { path: '/users', query: { accountType: 'general' }, columns: [
     { label: 'Ad', render: (row) => `${esc(row.first_name)} ${esc(row.last_name)}` }, { label: 'E-poçt', key: 'email' },
     { label: 'Rollar', render: (row) => (row.roles || []).map((role) => `<span class="badge active">${esc(roleLabels[role] || role)}</span>`).join(' ') },
     { label: 'Status', render: userStatus }, { label: 'Son giriş', render: (row) => date(row.last_login_at) },
-    { label: '', render: (row) => can('users.manage') ? `<button class="table-action" data-user-edit="${esc(row.id)}">Redaktə et</button>${row.status === 'invited' ? ` <button class="table-action" data-resend-invite="${esc(row.id)}">Dəvəti göndər</button>` : ''}${row.id !== state.user.userId ? ` <button class="table-action danger" data-user-delete="${esc(row.id)}">Sil</button>` : ''}` : '—' }
+    { label: '', render: (row) => userActions(row, 'users') }
   ] },
   posts: { path: '/content/posts', columns: [
     { label: 'Başlıq', key: 'title' }, { label: 'Slug', key: 'slug' }, { label: 'Status', render: (row) => contentStatus(row, 'posts') },
@@ -358,6 +431,7 @@ async function listing(view) {
   const search = state.search[view] || '';
   const page = state.page[view] || 1;
   const query = new URLSearchParams({ page: String(page), limit: '20' });
+  for (const [key, value] of Object.entries(config.query || {})) query.set(key, value);
   if (search) query.set('search', search);
   const result = await api(`${config.path}?${query}`);
   const create = createPermissions[view] && can(createPermissions[view])
@@ -386,22 +460,24 @@ function field(name, label, type = 'text', required = true, options = [], attrib
   return `<label>${label}<input name="${name}" type="${type}" ${required ? 'required' : ''} ${attributes}></label>`;
 }
 
-function vendorFields(editing = false) {
+function vendorFields(editing = false, vendor = null) {
   const common = field('displayName', 'Görünən ad') + field('legalName', 'Hüquqi ad')
+    + field('taxId', 'VÖEN', 'text', false)
     + field('email', 'Əlaqə e-poçtu', 'email') + field('phone', 'Telefon', 'tel', false, [], 'inputmode="numeric" placeholder="+994 12 345 67 89"')
     + field('commissionRate', 'Komissiya faizi', 'number', true, [], 'min="0" max="100" step="0.01" value="0"')
     + field('description', 'Təsvir', 'textarea', false);
-  if (editing) return common;
+  if (editing) return common + `<fieldset class="wide choice-field account-credentials vendor-account-details"><legend>Satıcı kabineti və müraciət məlumatları</legend><div class="detail-grid"><div><span>Hesab sahibi</span><strong>${esc([vendor?.owner_first_name,vendor?.owner_last_name].filter(Boolean).join(' ') || '—')}</strong></div><div><span>Giriş e-poçtu</span><strong>${esc(vendor?.owner_email || '—')}</strong></div><div><span>Hesab telefonu</span><strong>${esc(vendor?.owner_phone || '—')}</strong></div><div><span>Qeydiyyat mənbəyi</span><strong>${vendor?.settings?.registrationSource === 'self_service' ? 'Onlayn partnyorluq müraciəti' : 'Admin tərəfindən yaradılıb'}</strong></div><div><span>Qeydiyyat tarixi</span><strong>${esc(date(vendor?.created_at))}</strong></div><div><span>Son giriş</span><strong>${esc(date(vendor?.owner_last_login_at))}</strong></div></div></fieldset>`;
   return common + `<fieldset class="wide choice-field account-credentials"><legend>Satıcı kabineti hesabı</legend><p class="muted">Bu məlumatlarla satıcı <strong>/satici-paneli/</strong> ünvanından daxil olacaq.</p><div class="credential-grid">${field('ownerFirstName', 'Hesab sahibinin adı')}${field('ownerLastName', 'Hesab sahibinin soyadı')}${field('accountEmail', 'Giriş e-poçtu', 'email')}${field('accountPassword', 'Giriş şifrəsi', 'password', true, [], 'minlength="12" maxlength="200" autocomplete="new-password"')}</div></fieldset>`;
 }
 
-function userFields(vendors, editing = false) {
+function userFields(vendors, editing = false, sellerOnly = false) {
   const roleLocked = editing && !state.user?.roles?.includes('super_admin');
-  const roles = [
-    ...(editing && state.user?.roles?.includes('super_admin') ? [['super_admin', 'Super admin']] : []),
-    ['admin', 'Admin'], ['editor', 'Redaktor'], ['seo', 'SEO'], ['moderator', 'Moderator'],
-    ['vendor_owner', 'Satıcı sahibi'], ['vendor_staff', 'Satıcı işçisi'], ['customer', 'Müştəri']
-  ];
+  const roles = sellerOnly
+    ? [['vendor_owner', 'Satıcı sahibi'], ['vendor_staff', 'Satıcı işçisi']]
+    : [
+        ...(editing && state.user?.roles?.includes('super_admin') ? [['super_admin', 'Super admin']] : []),
+        ['admin', 'Admin'], ['editor', 'Redaktor'], ['seo', 'SEO'], ['moderator', 'Moderator'], ['customer', 'Müştəri']
+      ];
   return field('firstName', 'Ad') + field('lastName', 'Soyad') + field('email', 'E-poçt', 'email')
     + field('phone', 'Telefon', 'tel', false, [], 'inputmode="numeric" placeholder="+994 12 345 67 89"')
     + field(editing ? 'newPassword' : 'temporaryPassword', editing ? 'Yeni şifrə (dəyişmirsə boş saxlayın)' : 'Müvəqqəti şifrə', 'password', !editing, [], 'minlength="12" maxlength="200" autocomplete="new-password"')
@@ -412,7 +488,7 @@ function userFields(vendors, editing = false) {
 
 function synchronizeUserVendorField() {
   const form = $('#createForm');
-  if (form.dataset.view !== 'users') return;
+  if (!['users', 'seller-users'].includes(form.dataset.view)) return;
   const role = form.elements.roleCode;
   const vendor = form.elements.vendorId;
   if (!role || !vendor) return;
@@ -425,7 +501,7 @@ function synchronizeUserVendorField() {
 
 async function vendorOptions(storeId = state.user.storeIds[0]) {
   if (state.user.vendorIds.length) return state.user.vendorIds.map((id) => [id, 'Mənim satıcı hesabım']);
-  const result = await api(`/vendors/options?storeId=${encodeURIComponent(storeId)}`);
+  const result = await api(`/vendors/options?storeId=${encodeURIComponent(storeId)}&includePending=true`);
   return result.data.filter((vendor) => !storeId || vendor.store_id === storeId).map((vendor) => [vendor.id, vendor.display_name]);
 }
 
@@ -722,14 +798,15 @@ async function openPostCategoryEdit(id) {
 }
 
 async function openVendorEdit(id) {
-  const {data}=await api('/vendors?limit=100');const row=data.find((item)=>item.id===id);if(!row)throw new Error('Satıcı tapılmadı');showDialog('Satıcını redaktə et','vendors',vendorFields(true),row.store_id||state.user.storeIds[0]);$('#createForm').dataset.recordId=id;
-  setDialogValues({displayName:row.display_name,legalName:row.legal_name,email:row.email,phone:row.phone||'',commissionRate:row.commission_rate,description:row.description});
+  const {data}=await api('/vendors?limit=100');const row=data.find((item)=>item.id===id);if(!row)throw new Error('Satıcı tapılmadı');showDialog('Satıcı məlumatları','vendors',vendorFields(true,row),row.store_id||state.user.storeIds[0]);$('#createForm').dataset.recordId=id;
+  setDialogValues({displayName:row.display_name,legalName:row.legal_name,taxId:row.tax_id||'',email:row.email,phone:row.phone||'',commissionRate:row.commission_rate,description:row.description});
 }
 
-async function openUserEdit(id) {
+async function openUserEdit(id, view = 'users') {
   const [{data},vendors]=await Promise.all([api(`/users/${id}`),vendorOptions()]);
   const storeId=data.store_ids?.[0]||state.user.storeIds[0];
-  showDialog('İstifadəçini redaktə et','users',userFields(vendors,true),storeId);
+  const sellerOnly = view === 'seller-users';
+  showDialog(sellerOnly ? 'Satıcı hesabını redaktə et' : 'İstifadəçini redaktə et',view,userFields(vendors,true,sellerOnly),storeId);
   $('#createForm').dataset.recordId=id;
   setDialogValues({firstName:data.first_name,lastName:data.last_name,email:data.email,phone:data.phone||'',status:data.status,roleCode:data.roles?.[0]||'customer',vendorId:data.vendor_ids?.[0]||''});
   const role=$('#createForm').elements.roleCode;
@@ -793,8 +870,8 @@ async function openCreate(view) {
   } else if (view === 'brands') {
     const options=await catalogOptions(storeId);const images=options.media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
     fields = field('name', 'Brend adı') + field('slug', 'Slug', 'text', false) + field('logoAssetId','Brend loqosu','select',false,[['','Loqosuz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('websiteUrl', 'Rəsmi sayt', 'url', false) + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
-  } else if (view === 'users') {
-    fields = userFields(vendors);
+  } else if (view === 'users' || view === 'seller-users') {
+    fields = userFields(vendors, false, view === 'seller-users');
   } else if (view === 'pages' || view === 'posts') {
     const common=field('title', 'Başlıq') + field('slug', 'Slug', 'text', false) + field('excerpt', 'Xülasə', 'textarea') + field('body', 'Əsas mətn', 'textarea') + field('seoTitle', 'SEO başlığı') + field('seoDescription', 'Meta təsvir') + field('canonicalUrl','Canonical URL','url',false) + field('robotsDirective','Robot təlimatı','select',true,[['index,follow','index,follow'],['noindex,follow','noindex,follow'],['noindex,nofollow','noindex,nofollow']]) + field('scheduledAt','Planlı dərc','datetime-local',false);
     if(view==='pages')fields=common;
@@ -822,7 +899,7 @@ async function openCreate(view) {
     throw new Error('Bu bölmədə yaradılma əməliyyatı ayrıca aparılır');
   }
   showDialog(`${labels[view][0]} — yeni qeyd`, view, fields, storeId);
-  if(view==='users')synchronizeUserVendorField();
+  if(view==='users'||view==='seller-users')synchronizeUserVendorField();
 }
 
 function openInventoryAdjust(button) {
@@ -861,7 +938,7 @@ $('#createForm').addEventListener('submit', async (event) => {
       if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'brands') {
       path=form.dataset.recordId?`/catalog/brands/${form.dataset.recordId}`:'/catalog/brands';body.logoAssetId=String(formData.get('logoAssetId')||'')||null;body.websiteUrl=String(formData.get('websiteUrl')||'');if(!form.dataset.recordId)delete body.status;if(form.dataset.recordId)delete body.storeId;
-    } else if (view === 'users') {
+    } else if (view === 'users' || view === 'seller-users') {
       path = form.dataset.recordId?`/users/${form.dataset.recordId}`:'/users';
       body.phone=String(formData.get('phone')||'')||null;
       body.vendorId=String(formData.get('vendorId')||'')||null;
@@ -936,14 +1013,27 @@ async function render() {
 }
 
 async function boot() {
+  if (notificationTimer) clearInterval(notificationTimer);
+  notificationTimer = null;
   try {
     const { data } = await api('/auth/me', {}, false);
     state.user = data;
+    const hasVendorRole = data.roles?.some((role) => vendorPortalRoles.has(role));
+    const hasAdminRole = data.roles?.some((role) => adminPortalRoles.has(role));
+    if (!isVendorPortal && hasVendorRole) {
+      location.replace('/satici-paneli/');
+      return;
+    }
+    if (!isVendorPortal && !hasAdminRole) {
+      location.replace('/hesabim/');
+      return;
+    }
+    if (isVendorPortal && !hasVendorRole) {
+      location.replace(hasAdminRole ? '/admin/' : '/hesabim/');
+      return;
+    }
     const hasPanelAccess = menus.some(([, items]) => items.some(menuItemIsVisible));
     if (!hasPanelAccess) throw new Error('Bu hesabın idarəetmə panelinə giriş icazəsi yoxdur');
-    if (isVendorPortal && !data.roles?.some((role) => role === 'vendor_owner' || role === 'vendor_staff')) {
-      throw new Error('Bu səhifəyə yalnız satıcı kabineti hesabı ilə daxil olmaq olar');
-    }
     $('#loginView').hidden = true;
     $('#appView').hidden = false;
     $('#userName').textContent = `${data.firstName} ${data.lastName}`;
@@ -951,7 +1041,10 @@ async function boot() {
     $('#avatar').textContent = `${data.firstName[0]}${data.lastName[0]}`.toUpperCase();
     $('#notificationButton').hidden = !can('dashboard.read');
     await render();
-    if (can('dashboard.read')) await refreshNotificationCount();
+    if (can('dashboard.read')) {
+      await refreshNotificationCount();
+      notificationTimer = setInterval(() => refreshNotificationCount().catch(() => undefined), 30_000);
+    }
   } catch (error) {
     state.user = null;
     $('#appView').hidden = true;
@@ -975,7 +1068,7 @@ $('#loginForm').addEventListener('submit', async (event) => {
   $('#loginError').textContent = '';
   const form = new FormData(event.currentTarget);
   try {
-    await api('/auth/login', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }, false);
+    await api(isVendorPortal ? '/auth/vendor-login' : '/auth/login', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }, false);
     await boot();
   } catch (error) {
     $('#loginError').textContent = error.message;
@@ -1128,8 +1221,12 @@ document.addEventListener('click', (event) => {
   if(postCategoryDelete&&confirm('Bu məqalə kateqoriyası həmişəlik silinsin?'))api(`/content/post-categories/${postCategoryDelete.dataset.postCategoryDelete}`,{method:'DELETE'}).then(()=>{toast('Məqalə kateqoriyası silindi');return render();}).catch((error)=>toast(error.message,true));
   const vendorEdit=event.target.closest('[data-vendor-edit]');
   if(vendorEdit)openVendorEdit(vendorEdit.dataset.vendorEdit).catch((error)=>toast(error.message,true));
+  const vendorApprove=event.target.closest('[data-vendor-approve]');
+  if(vendorApprove){vendorApprove.disabled=true;api(`/vendors/${vendorApprove.dataset.vendorApprove}`,{method:'PATCH',body:JSON.stringify({status:'active'})}).then(()=>{toast('Satıcı hesabı təsdiqləndi');return Promise.all([render(),refreshNotificationCount()]);}).catch((error)=>{vendorApprove.disabled=false;toast(error.message,true);});}
   const userEdit=event.target.closest('[data-user-edit]');
-  if(userEdit)openUserEdit(userEdit.dataset.userEdit).catch((error)=>toast(error.message,true));
+  if(userEdit)openUserEdit(userEdit.dataset.userEdit,userEdit.dataset.userView||'users').catch((error)=>toast(error.message,true));
+  const userUnlock=event.target.closest('[data-user-unlock]');
+  if(userUnlock&&confirm('Bu hesabın giriş kilidi açılsın? Uğursuz giriş sayğacı sıfırlanacaq.')){userUnlock.disabled=true;api(`/users/${userUnlock.dataset.userUnlock}/unlock`,{method:'POST'}).then(()=>{toast('Hesabın giriş kilidi açıldı');return render();}).catch((error)=>{userUnlock.disabled=false;toast(error.message,true);});}
   const userDelete=event.target.closest('[data-user-delete]');
   if(userDelete&&confirm('Bu istifadəçi silinsin? Hesabın bütün aktiv sessiyaları bağlanacaq.'))api(`/users/${userDelete.dataset.userDelete}`,{method:'DELETE'}).then(()=>{toast('İstifadəçi silindi');return render();}).catch((error)=>toast(error.message,true));
   const categoryDelete=event.target.closest('[data-category-delete]');
@@ -1197,4 +1294,8 @@ $('#createDialog').addEventListener('close',()=>{
   $('#createDialog').classList.remove('product-dialog');
 });
 configurePortalChrome();
+initializeAdminPasswordFields();
+new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+  if (node instanceof Element) initializeAdminPasswordFields(node);
+}))).observe(document.body, { childList: true, subtree: true });
 boot();

@@ -194,8 +194,8 @@ async function seed(): Promise<void> {
   await withTransaction(async (client) => {
     const storeResult = await client.query<{ id: string }>(`
       INSERT INTO stores (code, name, primary_domain, settings)
-      VALUES ($1, 'Gündəlik Bakı', 'dailybaku.az', $2)
-      ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name,settings=EXCLUDED.settings || stores.settings
+      VALUES ($1, 'Gündəlik Bakı', 'gundelikbaki.az', $2)
+      ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name,primary_domain=EXCLUDED.primary_domain,settings=EXCLUDED.settings || stores.settings
       RETURNING id
     `, [env.DEFAULT_STORE_CODE, JSON.stringify({
       demo: true,
@@ -907,7 +907,7 @@ async function seed(): Promise<void> {
         ON CONFLICT (store_id, slug) DO UPDATE SET title=EXCLUDED.title, description=EXCLUDED.description,
           price=EXCLUDED.price, status='published', expires_at=EXCLUDED.expires_at, deleted_at=NULL
         RETURNING id
-      `, [storeId, userResult.rows[0]!.id, vendorId, category, title, slug, description, price, JSON.stringify({ phone: '+994 50 264 54 00', email: 'elan@dailybaku.az' }), JSON.stringify({ city: 'Bakı' })]);
+      `, [storeId, userResult.rows[0]!.id, vendorId, category, title, slug, description, price, JSON.stringify({ phone: '+994 50 264 54 00', email: 'elan@gundelikbaki.az' }), JSON.stringify({ city: 'Bakı' })]);
       const productMedia = await client.query<{ id: string }>('SELECT media_asset_id AS id FROM product_media WHERE product_id=$1 AND is_primary=true LIMIT 1', [seededProducts[listingIndex]!.productId]);
       if (productMedia.rows[0]) {
         await client.query('INSERT INTO classified_media(listing_id,media_asset_id,position) VALUES($1,$2,0) ON CONFLICT DO NOTHING', [listing.rows[0]!.id, productMedia.rows[0].id]);

@@ -70,11 +70,16 @@
       <a class="db-mobile-panel-primary" href="/giris/">DAXİL OL</a>
       <a class="db-mobile-panel-secondary" href="/qeydiyyat/">YENİ HESAB YARAT</a>
       <a class="db-mobile-panel-forgot" href="/sifre-berpasi/">Şifrəni unutmusunuz?</a>
+      <a class="db-mobile-panel-vendor" href="/satici-girisi/">SATICI OLARAQ DAXİL OL</a>
     </div>`;
+    const panelPath = String(window.DailyBakuPanelPath || '');
+    const panelLinks = panelPath
+      ? [[panelPath === '/satici-paneli/' ? 'Satıcı kabineti' : 'İdarəetmə paneli', panelPath, 'dashboard']]
+      : accountLinks;
     return `<div class="db-mobile-panel-account">
       <h2 class="sr-only" id="db-mobile-panel-title">Mənim hesabım</h2>
       <nav aria-labelledby="db-mobile-panel-title">
-        ${accountLinks.map(([label, href, iconName]) => `<a href="${href}">${icon(iconName)}<span>${label}</span></a>`).join('')}
+        ${panelLinks.map(([label, href, iconName]) => `<a href="${href}">${icon(iconName)}<span>${label}</span></a>`).join('')}
         <button type="button" data-mobile-account-logout>${icon('logout')}<span>Çıxış</span></button>
       </nav>
     </div>`;
