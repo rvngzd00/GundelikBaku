@@ -40,6 +40,28 @@ const here = dirname(fileURLToPath(import.meta.url));
 const adminPanelRoles = new Set(['super_admin', 'admin', 'editor', 'seo', 'moderator']);
 const vendorPanelRoles = new Set(['vendor_owner', 'vendor_staff']);
 
+function allowedRequestOrigins(): ReadonlySet<string> {
+  const primary = new URL(env.PUBLIC_ORIGIN).origin;
+  const origins = new Set([primary]);
+
+  for (const value of env.ALLOWED_ORIGINS.split(',')) {
+    const candidate = value.trim();
+    if (!candidate) continue;
+    try {
+      origins.add(new URL(candidate).origin);
+    } catch {
+      throw new Error(`ALLOWED_ORIGINS contains an invalid URL: ${candidate}`);
+    }
+  }
+
+  // The public storefront can be reached with or without www while Caddy
+  // redirects www to the canonical hostname. Keep both valid during redirect
+  // propagation so authenticated mutations do not fail for real visitors.
+  if (primary === 'https://gundelikbaki.az') origins.add('https://www.gundelikbaki.az');
+  if (primary === 'https://www.gundelikbaki.az') origins.add('https://gundelikbaki.az');
+  return origins;
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   await mkdir(resolve(env.UPLOAD_DIR), { recursive: true });
   const logger = {
@@ -58,8 +80,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     logger
   }) as FastifyInstance;
 
+  const allowedOrigins = allowedRequestOrigins();
   await app.register(cookie, { secret: env.COOKIE_SECRET, hook: 'onRequest' });
-  await app.register(cors, { origin: env.PUBLIC_ORIGIN, credentials: true });
+  await app.register(cors, {
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+    credentials: true
+  });
   await app.register(helmet, {
     global: true,
     contentSecurityPolicy: {
@@ -110,7 +136,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return;
 
     const origin = request.headers.origin;
-    if (origin && origin !== env.PUBLIC_ORIGIN) {
+    if (origin && !allowedOrigins.has(origin)) {
       throw new AppError(403, 'ORIGIN_REJECTED', 'Sorğunun origin-i qəbul edilmir');
     }
 

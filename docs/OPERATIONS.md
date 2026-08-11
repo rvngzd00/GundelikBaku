@@ -3,7 +3,7 @@
 ## Buraxılış
 
 1. `.env.example` əsasında serverdə `.env` yaradın. JWT, cookie, PostgreSQL və bootstrap admin şifrələri bir-birindən fərqli, minimum 32 bayt təsadüfi dəyərlər olmalıdır.
-2. `PUBLIC_ORIGIN=https://gundelikbaki.az` və `DOMAIN=gundelikbaki.az` təyin edin.
+2. `PUBLIC_ORIGIN=https://gundelikbaki.az`, `ALLOWED_ORIGINS=https://gundelikbaki.az,https://www.gundelikbaki.az` və `DOMAIN=gundelikbaki.az` təyin edin. `www` hostu avtomatik olaraq canonical domenə yönləndirilir.
 3. `docker compose up -d --build` başladın. Konteyner hər startda checksum-lı, dəyişdirilməz migrasiyaları tətbiq edir və sistem rollarını idempotent seed edir.
 4. `/api/v1/ready`, `/documentation`, `/admin/`, əsas səhifə və sitemap-ı yoxlayın.
 5. İlk girişdən dərhal sonra bootstrap şifrəsini dəyişin və seed şifrəsini secret manager-dən rotasiya edin.

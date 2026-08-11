@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import test, { after } from 'node:test';
 
 process.env['LOG_LEVEL'] ||= 'silent';
+process.env['ALLOWED_ORIGINS'] ||= 'https://www.gundelikbaki.az';
 
 after(async () => {
   const { closePool } = await import('./db/pool.js');
@@ -30,6 +31,24 @@ test('admin və statik frontend faylları ümumi API rate limitinə düşmür', 
     assert.match(adminScript.body, /accountType: 'vendor'/);
     assert.match(adminScript.body, /adminPortalRoles/);
     assert.match(adminScript.body, /location\.replace\('\/satici-paneli\/'\)/);
+
+    const acceptedWwwOrigin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/forgot-password',
+      headers: { origin: 'https://www.gundelikbaki.az' },
+      payload: { email: 'origin-check@example.test' }
+    });
+    assert.equal(acceptedWwwOrigin.statusCode, 200);
+    assert.equal(acceptedWwwOrigin.headers['access-control-allow-origin'], 'https://www.gundelikbaki.az');
+
+    const rejectedOrigin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/forgot-password',
+      headers: { origin: 'https://untrusted.example' },
+      payload: { email: 'origin-check@example.test' }
+    });
+    assert.equal(rejectedOrigin.statusCode, 403);
+    assert.equal(rejectedOrigin.json().error.code, 'ORIGIN_REJECTED');
 
     for (let index = 0; index < 320; index += 1) {
       const asset = await app.inject({ method: 'GET', url: '/assets/css/kirki-styles.css' });

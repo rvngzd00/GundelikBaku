@@ -26,6 +26,7 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN tələb olunur}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       DATABASE_URL: postgresql://dailybaku:${POSTGRES_PASSWORD}@postgres:5432/dailybaku
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tələb olunur}
       COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET tələb olunur}
