@@ -18,6 +18,11 @@ const schema = z.object({
   PUBLIC_ORIGIN: z.url().default('http://127.0.0.1:3000'),
   ALLOWED_ORIGINS: z.string().trim().default(''),
   DATABASE_URL: z.string().min(1),
+  DATABASE_SSL: z.enum(['disable', 'require']).default('disable'),
+  DATABASE_SSL_REJECT_UNAUTHORIZED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
   JWT_SECRET: z.string().min(32),
   COOKIE_SECRET: z.string().min(32),
   ACCESS_TOKEN_TTL: z.string().default('15m'),

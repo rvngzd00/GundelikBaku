@@ -9,7 +9,11 @@ export const pool = new Pool({
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   application_name: 'daily-baku-api',
-  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false
+  // Docker-da PostgreSQL private şəbəkədə SSL-siz işləyir. Xarici managed
+  // database istifadə edilərsə DATABASE_SSL=require ilə açıq aktivləşdirilir.
+  ssl: env.DATABASE_SSL === 'require'
+    ? { rejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED }
+    : false
 });
 
 pool.on('error', (error) => {
