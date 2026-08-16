@@ -156,14 +156,13 @@ export const editorDefaults: { nav: NavEditorConfig; index: IndexEditorConfig; f
         { id: 'returns', label: 'Geri qaytarma', url: '/geri-qaytarma/', visible: true }
       ] },
       { id: 'partnership', title: 'Biznes əməkdaşlığı', visible: true, links: [
-        { id: 'ads', label: 'Reklam portalı', url: '/biznes/#reklam', visible: true },
-        { id: 'sponsorship', label: 'Sponsorluq', url: '/biznes/#sponsorluq', visible: true },
-        { id: 'showcase', label: 'Brend olun', url: '/biznes/#brend-vitrini', visible: true }
+        { id: 'ads', label: 'Reklam portalı', url: '/biznes/reklam-ver/', visible: true },
+        { id: 'sponsorship', label: 'Sponsorluq', url: '/biznes/sponsorluq/', visible: true },
+        { id: 'showcase', label: 'Brend olun', url: '/biznes/brend-vitrini/', visible: true }
       ] },
       { id: 'quick', title: 'Sürətli keçidlər', visible: true, links: [
         { id: 'journal', label: 'Son jurnal', url: '/jurnal/', visible: true },
-        { id: 'categories', label: 'Kateqoriyalar', url: '/magaza/', visible: true },
-        { id: 'classified', label: 'Elan yerləşdir', url: '/elanlar/', visible: true }
+        { id: 'categories', label: 'Kateqoriyalar', url: '/magaza/', visible: true }
       ] }
     ],
     contact: { address: 'Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan', addressUrl: '/elaqe/', phone: '+994 50 264 54 00', phoneUrl: 'tel:+994502645400', hours: 'Bazar ertəsi – Cümə: 09:00 – 18:00\nŞənbə: 10:00 – 15:00' },
@@ -186,5 +185,20 @@ function mergeValue<T>(fallback: T, stored: unknown): T {
 
 export function normalizedEditorConfig<S extends EditorScope>(scope: S, stored: unknown): typeof editorDefaults[S] {
   const merged = mergeValue(editorDefaults[scope], stored);
-  return editorSchemas[scope].parse(merged) as typeof editorDefaults[S];
+  const parsed = editorSchemas[scope].parse(merged) as typeof editorDefaults[S];
+  if (scope === 'footer') {
+    const footer = parsed as typeof editorDefaults.footer;
+    const protectedBusinessLinks: Record<string, string> = {
+      '/biznes/#reklam': '/biznes/reklam-ver/',
+      '/biznes/#sponsorluq': '/biznes/sponsorluq/',
+      '/biznes/#brend-vitrini': '/biznes/brend-vitrini/'
+    };
+    footer.linkGroups = footer.linkGroups.map((group) => ({
+      ...group,
+      links: group.links
+        .filter((link) => link.id !== 'classified' && link.label !== 'Elan yerləşdir')
+        .map((link) => ({ ...link, url: protectedBusinessLinks[link.url] ?? link.url }))
+    }));
+  }
+  return parsed;
 }

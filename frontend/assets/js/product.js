@@ -38,12 +38,14 @@
     if (details) {
       event.preventDefault();
       const expanded = details.getAttribute('aria-expanded') === 'true';
-      page.querySelectorAll('[data-product-summary-extra]').forEach((row) => {
+      const summary = details.closest('.db-product-summary');
+      summary?.querySelectorAll('[data-product-summary-extra]').forEach((row) => {
         row.hidden = expanded;
+        row.setAttribute('aria-hidden', String(expanded));
       });
       details.setAttribute('aria-expanded', String(!expanded));
       const label = details.querySelector('span');
-      if (label) label.textContent = expanded ? 'Ətraflı...' : 'Daha az göstər';
+      if (label) label.textContent = expanded ? 'Ətraflı' : 'Daha az göstər';
       return;
     }
 
@@ -234,6 +236,8 @@
   }
 
   let drag = null;
+  let dragFrame = 0;
+  let pendingDragLeft = 0;
   let blockClickUntil = 0;
   let blockClickCarousel = null;
 
@@ -265,12 +269,19 @@
       try { drag.carousel.setPointerCapture(event.pointerId); } catch { /* Optional enhancement. */ }
     }
     if (event.cancelable) event.preventDefault();
-    drag.carousel.scrollLeft = drag.scrollLeft - x;
+    pendingDragLeft = drag.scrollLeft - x;
+    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      if (drag) drag.carousel.scrollLeft = pendingDragLeft;
+    });
   });
 
   function finishDrag(event, cancelled = false) {
     if (!drag || drag.pointerId !== event.pointerId) return;
     const completed = drag;
+    cancelAnimationFrame(dragFrame);
+    dragFrame = 0;
+    if (completed.dragging) completed.carousel.scrollLeft = pendingDragLeft;
     drag = null;
     completed.carousel.classList.remove('is-dragging');
     try {

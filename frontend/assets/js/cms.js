@@ -6,6 +6,12 @@ const cmsBrandLogos = new Map();
 const localizeProduct = (product) => globalThis.DailyBakuI18n?.localizeProduct(product) || product;
 const localizePost = (post) => globalThis.DailyBakuI18n?.localizePost(post) || post;
 const localizeCategory = (category) => globalThis.DailyBakuI18n?.localizeCategory(category) || category;
+const topPickCategories = {
+  dcbe431: { slug: 'elektronika', label: 'Elektronika', icon: '/assets/wp-content/uploads/flash.svg' },
+  '47e695a': { slug: 'ev-metbex', label: 'Ev & Mətbəx', icon: '/assets/wp-content/uploads/category-home.svg' },
+  a66ade4: { slug: 'moda', label: 'Moda', icon: '/assets/wp-content/uploads/category-fashion.svg' },
+  d6aa696: { slug: 'gozellik-saglamliq', label: 'Gözəllik & Sağlamlıq', icon: '/assets/wp-content/uploads/category-beauty.svg' }
+};
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 })[character]);
@@ -22,6 +28,11 @@ function safeImageUrl(value) {
 
 function safeImage(value) {
   return escapeHtml(safeImageUrl(value));
+}
+
+function categoryPath(category) {
+  const slugs = Array.isArray(category?.path_slugs) && category.path_slugs.length ? category.path_slugs : [category?.slug];
+  return `/magaza/${slugs.filter(Boolean).map((slug) => encodeURIComponent(slug)).join('/')}/`;
 }
 
 function orderedSelection(items, ids = []) {
@@ -70,6 +81,10 @@ function renderCatalogData(categories = [], brands = [], editorConfig = null) {
   document.querySelectorAll('main a[href*="kateqoriya="]').forEach((link) => {
     const category = byCategory.get(new URL(link.href, location.origin).searchParams.get('kateqoriya'));
     const image = link.querySelector('img');
+    if (category) {
+      link.href = categoryPath(category);
+      link.dataset.categoryRuntime = category.id;
+    }
     if (category?.image_url && image) {
       image.src = safeImageUrl(category.image_url);
       image.alt = category.alt_text || category.name;
@@ -78,8 +93,8 @@ function renderCatalogData(categories = [], brands = [], editorConfig = null) {
   const selectedCategories = editorConfig?.categories?.categoryIds || [];
   if (selectedCategories.length) {
     const order = new Map(selectedCategories.map((id, index) => [id, index]));
-    document.querySelectorAll('main a[href*="kateqoriya="]').forEach((link) => {
-      const category = byCategory.get(new URL(link.href, location.origin).searchParams.get('kateqoriya'));
+    document.querySelectorAll('main a[data-category-runtime]').forEach((link) => {
+      const category = byCategoryId.get(link.dataset.categoryRuntime);
       const item = link.closest('li, .item, .swiper-slide, .elementor-element');
       if (!item || !category) return;
       item.hidden = !order.has(category.id);
@@ -87,7 +102,7 @@ function renderCatalogData(categories = [], brands = [], editorConfig = null) {
     });
     const sidebar = document.querySelector('#menu-categories-1');
     if (sidebar) {
-      sidebar.innerHTML = selectedCategories.map((id) => byCategoryId.get(id)).filter(Boolean).map((category) => `<li class="menu-item depth-0"><a href="/magaza/${escapeHtml(category.slug)}/" class="mi-link"><span class="txt">${escapeHtml(category.name)}</span><span class="arrow"></span></a></li>`).join('');
+      sidebar.innerHTML = selectedCategories.map((id) => byCategoryId.get(id)).filter(Boolean).map((category) => `<li class="menu-item depth-${Number(category.depth || 0)}"><a href="${escapeHtml(categoryPath(category))}" class="mi-link"><span class="txt">${escapeHtml(category.name)}</span><span class="arrow"></span></a></li>`).join('');
     }
   }
   document.querySelectorAll('main a[href*="brend="]').forEach((link) => {
@@ -117,12 +132,12 @@ function renderCatalogData(categories = [], brands = [], editorConfig = null) {
   const topPickCategoryIds = editorConfig?.topPicks?.categoryIds || [];
   if (topPickCategoryIds.length) {
     const slugs = new Set(topPickCategoryIds.map((id) => byCategoryId.get(id)?.slug).filter(Boolean));
-    const topPicksCategories = { dcbe431: 'power-tools', '47e695a': 'hand-tools', a66ade4: 'air-tools', d6aa696: 'machine-tools' };
-    Object.entries(topPicksCategories).forEach(([widgetId, slug]) => {
+    Object.entries(topPickCategories).forEach(([widgetId, definition]) => {
       const widget = document.querySelector(`[data-id="${widgetId}"][data-top-picks-products]`);
-      if (widget) widget.closest('.section-tab-item')?.toggleAttribute('hidden', !slugs.has(slug));
+      if (widget) widget.closest('.section-tab-item')?.toggleAttribute('hidden', !slugs.has(definition.slug));
     });
   }
+  globalThis.DailyBakuCatalogNavigation?.render(categories);
 }
 
 function encodedJson(value) {
@@ -421,8 +436,7 @@ function renderProducts(products, editorConfig = null) {
   document.querySelectorAll('.et__products_ajax, [data-cms-products]').forEach((container, containerIndex) => {
     const isFeatured = container.hasAttribute('data-featured-products') || container.dataset.id === '4dee5e4';
     const isPopular = container.hasAttribute('data-popular-products') || container.dataset.id === '52657d1';
-    const topPicksCategories = { dcbe431: 'power-tools', '47e695a': 'hand-tools', a66ade4: 'air-tools', d6aa696: 'machine-tools' };
-    const isTopPicks = container.hasAttribute('data-top-picks-products') || Object.hasOwn(topPicksCategories, container.dataset.id);
+    const isTopPicks = container.hasAttribute('data-top-picks-products') || Object.hasOwn(topPickCategories, container.dataset.id);
     if (!complete.length) {
       container.innerHTML = '<div class="db-cms-empty" role="status"><strong>Məhsul tapılmadı</strong><span>Dərc edilmiş məhsullar burada avtomatik görünəcək.</span></div>';
       container.dataset.cmsProducts = 'empty';
@@ -441,10 +455,14 @@ function renderProducts(products, editorConfig = null) {
     } else if (isTopPicks) {
       container.className = 'db-top-picks-products';
       container.dataset.topPicksProducts = '';
-      const category = topPicksCategories[container.dataset.id];
-      const categorized = category ? complete.filter((product) => Array.isArray(product.category_slugs) && product.category_slugs.includes(category)) : complete;
-      container.innerHTML = topPicksMarkup(categorized.length ? categorized : complete, editorConfig?.topPicks?.productIds || []);
-      initializeTopPicksSlider(container);
+      const category = topPickCategories[container.dataset.id];
+      const categorized = category
+        ? complete.filter((product) => Array.isArray(product.category_slugs) && product.category_slugs.includes(category.slug))
+        : complete;
+      container.innerHTML = categorized.length
+        ? topPicksMarkup(categorized, editorConfig?.topPicks?.productIds || [])
+        : `<div class="db-cms-empty" role="status"><strong>${escapeHtml(category?.label || 'Kateqoriya')} üzrə məhsul tapılmadı</strong><span>Bu kateqoriyaya məhsul əlavə edildikdə burada görünəcək.</span></div>`;
+      if (categorized.length) initializeTopPicksSlider(container);
     } else {
       const rotated = [...complete.slice(containerIndex % complete.length), ...complete.slice(0, containerIndex % complete.length)];
       container.className = 'db-products-grid';
@@ -470,6 +488,8 @@ function initializeFeaturedSlider(container) {
   let maxColumn = 0;
   let scrollFrame = 0;
   let pointerState = null;
+  let dragFrame = 0;
+  let pendingScrollLeft = 0;
   let suppressClickUntil = 0;
   let suppressClickTimer = 0;
   const actionSelector = '[data-add-cart], [data-wishlist], [data-quick-view], .db-product-whatsapp';
@@ -528,7 +548,11 @@ function initializeFeaturedSlider(container) {
       try { viewport.setPointerCapture(event.pointerId); } catch { /* Pointer capture starts only after a genuine drag. */ }
     }
     if (event.cancelable) event.preventDefault();
-    viewport.scrollLeft = pointerState.scrollLeft - distanceX;
+    pendingScrollLeft = pointerState.scrollLeft - distanceX;
+    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      viewport.scrollLeft = pendingScrollLeft;
+    });
   });
   const finishDrag = (event) => {
     if (!pointerState || pointerState.id !== event.pointerId) return;
@@ -563,6 +587,8 @@ function initializeFeaturedSlider(container) {
   window.addEventListener('resize', handleResize, { passive: true });
   container.featuredSliderCleanup = () => {
     window.removeEventListener('resize', handleResize);
+    cancelAnimationFrame(scrollFrame);
+    cancelAnimationFrame(dragFrame);
     clearTimeout(suppressClickTimer);
   };
   measure();
@@ -586,6 +612,8 @@ function initializePopularSlider(container) {
   let maxColumn = 0;
   let scrollFrame = 0;
   let pointerState = null;
+  let dragFrame = 0;
+  let pendingScrollLeft = 0;
   let suppressClickUntil = 0;
   let suppressClickTimer = 0;
   const actionSelector = '[data-add-cart], [data-wishlist], [data-quick-view], .db-product-whatsapp, [data-popular-prev], [data-popular-next], [data-popular-page]';
@@ -667,7 +695,11 @@ function initializePopularSlider(container) {
       try { viewport.setPointerCapture(event.pointerId); } catch { /* Pointer capture starts only after a genuine drag. */ }
     }
     if (event.cancelable) event.preventDefault();
-    viewport.scrollLeft = pointerState.scrollLeft - distanceX;
+    pendingScrollLeft = pointerState.scrollLeft - distanceX;
+    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      viewport.scrollLeft = pendingScrollLeft;
+    });
   });
   const finishDrag = (event) => {
     if (!pointerState || pointerState.id !== event.pointerId) return;
@@ -703,6 +735,7 @@ function initializePopularSlider(container) {
   container.popularSliderCleanup = () => {
     window.removeEventListener('resize', handleResize);
     cancelAnimationFrame(scrollFrame);
+    cancelAnimationFrame(dragFrame);
     clearTimeout(suppressClickTimer);
   };
   measure();
@@ -726,6 +759,8 @@ function initializeTopPicksSlider(container) {
   let maxColumn = 0;
   let scrollFrame = 0;
   let pointerState = null;
+  let dragFrame = 0;
+  let pendingScrollLeft = 0;
   let suppressClickUntil = 0;
   let suppressClickTimer = 0;
   const actionSelector = '[data-add-cart], [data-wishlist], [data-quick-view], .db-product-whatsapp, [data-top-picks-prev], [data-top-picks-next], [data-top-picks-page]';
@@ -809,7 +844,11 @@ function initializeTopPicksSlider(container) {
       try { viewport.setPointerCapture(event.pointerId); } catch { /* Pointer capture starts only after a genuine drag. */ }
     }
     if (event.cancelable) event.preventDefault();
-    viewport.scrollLeft = pointerState.scrollLeft - distanceX;
+    pendingScrollLeft = pointerState.scrollLeft - distanceX;
+    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      viewport.scrollLeft = pendingScrollLeft;
+    });
   });
   const finishDrag = (event) => {
     if (!pointerState || pointerState.id !== event.pointerId) return;
@@ -849,6 +888,7 @@ function initializeTopPicksSlider(container) {
     window.removeEventListener('resize', handleResize);
     resizeObserver?.disconnect();
     cancelAnimationFrame(scrollFrame);
+    cancelAnimationFrame(dragFrame);
     clearTimeout(suppressClickTimer);
   };
   if (measure()) goTo(0, false);
@@ -871,6 +911,8 @@ function initializeNewsSlider(container) {
   let maxColumn = 0;
   let scrollFrame = 0;
   let pointerState = null;
+  let dragFrame = 0;
+  let pendingScrollLeft = 0;
   let suppressClickUntil = 0;
   let suppressClickTimer = 0;
   const actionSelector = '[data-news-prev], [data-news-next], [data-news-page]';
@@ -951,7 +993,11 @@ function initializeNewsSlider(container) {
       try { viewport.setPointerCapture(event.pointerId); } catch { /* Pointer capture starts only after a genuine drag. */ }
     }
     if (event.cancelable) event.preventDefault();
-    viewport.scrollLeft = pointerState.scrollLeft - distanceX;
+    pendingScrollLeft = pointerState.scrollLeft - distanceX;
+    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      viewport.scrollLeft = pendingScrollLeft;
+    });
   });
   const finishDrag = (event) => {
     if (!pointerState || pointerState.id !== event.pointerId) return;
@@ -991,6 +1037,7 @@ function initializeNewsSlider(container) {
     window.removeEventListener('resize', handleResize);
     resizeObserver?.disconnect();
     cancelAnimationFrame(scrollFrame);
+    cancelAnimationFrame(dragFrame);
     clearTimeout(suppressClickTimer);
   };
   if (measure()) goTo(0, false);
@@ -1015,6 +1062,14 @@ function enhanceTopPicksTabs() {
     panels[index].id = panelId;
     panels[index].setAttribute('role', 'tabpanel');
     panels[index].setAttribute('aria-labelledby', tabId);
+    const definition = topPickCategories[panels[index].querySelector('[data-top-picks-products]')?.dataset.id];
+    const label = tab.querySelector('.txt');
+    const icon = tab.querySelector('.section-tab-icon');
+    if (definition && label) label.textContent = definition.label;
+    if (definition && icon) {
+      icon.style.mask = `url(${definition.icon}) no-repeat 50% 50% / contain`;
+      icon.style.webkitMask = `url(${definition.icon}) no-repeat 50% 50% / contain`;
+    }
   });
 
   const synchronize = () => {
@@ -1033,6 +1088,8 @@ function enhanceTopPicksTabs() {
       panel.hidden = !active;
     });
     synchronize();
+    const mobileLabel = tabset.querySelector('.mobile-tabset-nav');
+    if (mobileLabel) mobileLabel.textContent = tabs[index].textContent.trim();
     requestAnimationFrame(() => {
       const products = panels[index]?.querySelector('[data-top-picks-products], .db-top-picks-products');
       if (products && !products.topPicksSliderCleanup) initializeTopPicksSlider(products);
@@ -1044,6 +1101,7 @@ function enhanceTopPicksTabs() {
     const selected = event.target.closest('.section-tabset .tab');
     if (!selected) return;
     event.preventDefault();
+    event.stopPropagation();
     activate(tabs.indexOf(selected));
   };
   const handleKeydown = (event) => {
@@ -1060,11 +1118,11 @@ function enhanceTopPicksTabs() {
   };
   const observer = new MutationObserver(synchronize);
   tabs.forEach((tab) => observer.observe(tab, { attributes: true, attributeFilter: ['class'] }));
-  root.addEventListener('click', handleClick);
+  root.addEventListener('click', handleClick, true);
   root.addEventListener('keydown', handleKeydown);
   root.topPicksTabsCleanup = () => {
     observer.disconnect();
-    root.removeEventListener('click', handleClick);
+    root.removeEventListener('click', handleClick, true);
     root.removeEventListener('keydown', handleKeydown);
   };
   const initial = Math.max(0, tabs.findIndex((tab) => tab.classList.contains('active')));

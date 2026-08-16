@@ -51,6 +51,10 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
   app.post('/', { preHandler: app.requirePermission('media.upload') }, async (request, reply) => {
     const part = await request.file();
     if (!part) throw badRequest('FILE_REQUIRED', 'Fayl tələb olunur');
+    // Multipart fields that follow the file are not guaranteed to be populated
+    // until the file stream has been consumed. Read the stream first so uploads
+    // behave identically regardless of browser/FormData field ordering.
+    const buffer = await part.toBuffer();
     const fields = part.fields as Record<string, { value?: unknown }>;
     const input = z.object({
       storeId: z.uuid(), vendorId: z.uuid().optional(), altText: z.string().trim().max(300).default(''), title: z.string().trim().max(300).default('')
@@ -69,7 +73,6 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     }
     if (actor.vendorIds.length && !input.vendorId) throw badRequest('VENDOR_REQUIRED', 'Satıcı faylı vendor scope ilə yüklənməlidir');
 
-    const buffer = await part.toBuffer();
     const detectedMime = detectedMimeType(buffer);
     if (!detectedMime || !extensions.has(detectedMime)) throw badRequest('FILE_TYPE_REJECTED', 'Fayl JPG, PNG, WEBP, AVIF, PDF, MP4 və ya WEBM formatında olmalıdır');
     const declaredMime = normalizedDeclaredMime(part.mimetype);

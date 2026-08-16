@@ -15,6 +15,7 @@
     nodes.slice(1).forEach((node) => node.remove());
   });
   const mediaUrl = (data, id) => id && data.media?.[id]?.url;
+  const defaultLogoUrl = '/assets/images/categories/logoSite.png';
   const visible = (items) => (items || []).filter((item) => item.visible);
   const socialClass = (item) => {
     const aliases = { instagram: 'instagram', facebook: 'facebook', x: 'twitter', twitter: 'twitter', tiktok: 'tiktok', linkedin: 'linkedin', whatsapp: 'whatsapp' };
@@ -91,7 +92,16 @@
   function applyNav(config, data) {
     if (!config) return;
     const logo = mediaUrl(data, config.branding.logoAssetId);
-    if (logo) document.querySelectorAll('.page-logo img, .header-logo img.logo, .header-logo img.sticky-logo').forEach((image) => { image.src = logo; image.dataset.src = logo; });
+    document.querySelectorAll('.page-logo img, .header-logo img.logo, .header-logo img.sticky-logo').forEach((image) => {
+      image.addEventListener('error', () => {
+        image.src = defaultLogoUrl;
+        image.dataset.src = defaultLogoUrl;
+      }, { once: true });
+      if (logo) {
+        image.src = logo;
+        image.dataset.src = logo;
+      }
+    });
     document.querySelectorAll('.page-logo img, .header-logo img').forEach((image) => { image.alt = config.branding.logoAlt; });
 
     setOwnText('.page-topbar .page-topbar-item:first-child', config.announcement.address);
@@ -125,15 +135,21 @@
   function footerGroups(container, groups, page = false) {
     if (!container) return;
     container.replaceChildren();
+    const protectedBusinessLinks = new Map([
+      ['/biznes/#reklam', '/biznes/reklam-ver/'],
+      ['/biznes/#sponsorluq', '/biznes/sponsorluq/'],
+      ['/biznes/#brend-vitrini', '/biznes/brend-vitrini/']
+    ]);
     visible(groups).forEach((group) => {
+      const links = visible(group.links).filter((item) => item.id !== 'classified' && item.label !== 'Elan yerləşdir');
       if (page) {
         const section = document.createElement('section'); const heading = document.createElement('h2'); heading.textContent = group.title; section.append(heading);
-        visible(group.links).forEach((item) => { const a = document.createElement('a'); a.href = item.url; a.textContent = item.label; section.append(a); }); container.append(section); return;
+        links.forEach((item) => { const a = document.createElement('a'); a.href = protectedBusinessLinks.get(item.url) || item.url; a.textContent = item.label; section.append(a); }); container.append(section); return;
       }
       const li = document.createElement('li'); li.className = 'menu-item menu-item-has-children depth-0';
       const heading = document.createElement('a'); heading.className = 'mi-link'; const span = document.createElement('span'); span.className = 'txt'; span.textContent = group.title; heading.append(span); li.append(heading);
       const sub = document.createElement('ul'); sub.className = 'sub-menu';
-      visible(group.links).forEach((item) => { const child = document.createElement('li'); child.className = 'menu-item depth-1'; const a = document.createElement('a'); a.className = 'mi-link'; a.href = item.url; const label = document.createElement('span'); label.className = 'txt'; label.textContent = item.label; a.append(label); child.append(a); sub.append(child); });
+      links.forEach((item) => { const child = document.createElement('li'); child.className = 'menu-item depth-1'; const a = document.createElement('a'); a.className = 'mi-link'; a.href = protectedBusinessLinks.get(item.url) || item.url; const label = document.createElement('span'); label.className = 'txt'; label.textContent = item.label; a.append(label); child.append(a); sub.append(child); });
       li.append(sub); container.append(li);
     });
   }

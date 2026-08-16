@@ -121,6 +121,149 @@ const categoryImageUrls: Record<string, string> = {
   hediyyeler: '/assets/images/categories/baki-club/hediyyeler.jpg'
 };
 
+type StorefrontTaxonomy = {
+  department: string;
+  name: string;
+  slug: string;
+  children: Array<{ name: string; slug: string; description: string }>;
+};
+
+const storefrontTaxonomy: StorefrontTaxonomy[] = [
+  { department: 'elektronika', name: 'Peşəkar alətlər', slug: 'elektronika-pesekar-aletler', children: [
+    { name: 'Elektrik alətləri', slug: 'simsiz-elektrik-aletleri', description: 'Drel, vintaçan, cilalayıcı və peşəkar elektrik alətləri' },
+    { name: 'Ölçü cihazları', slug: 'olcu-cihazlari-elektronika', description: 'Lazer, səviyyəölçən və dəqiq ölçü cihazları' }
+  ] },
+  { department: 'elektronika', name: 'Ağıllı texnologiyalar', slug: 'agilli-texnologiyalar', children: [
+    { name: 'Ağıllı ev', slug: 'agilli-ev-cihazlari', description: 'Ağıllı ev mərkəzləri və qoşulan gündəlik cihazlar' },
+    { name: 'Enerji və şarj', slug: 'enerji-ve-sarj', description: 'Portativ enerji və şarj həlləri' }
+  ] },
+  { department: 'ev-metbex', name: 'Emalatxana', slug: 'ev-emalatxana', children: [
+    { name: 'Dəzgah və kəsim', slug: 'dezgah-ve-kesim', description: 'Kəsim, qazma, frez və emalatxana dəzgahları' },
+    { name: 'Kompressor və pnevmatika', slug: 'kompressor-pnevmatika', description: 'Hava kompressorları və pnevmatik avadanlıq' }
+  ] },
+  { department: 'ev-metbex', name: 'Əl alətləri və saxlama', slug: 'el-aletleri-saxlama', children: [
+    { name: 'Alət dəstləri', slug: 'el-alet-destleri', description: 'Təmir və montaj üçün hazır əl aləti dəstləri' },
+    { name: 'Aksesuar və saxlama', slug: 'alet-aksesuarlari', description: 'Burğu, çanta, organizer və alət aksesuarları' }
+  ] },
+  { department: 'moda', name: 'Geyim', slug: 'moda-geyim', children: [
+    { name: 'Üst geyim', slug: 'ust-geyim', description: 'Gödəkçə, sviter və mövsümi üst geyimləri' },
+    { name: 'Gündəlik geyim', slug: 'gundelik-geyim', description: 'Rahat gündəlik geyim seçimləri' }
+  ] },
+  { department: 'moda', name: 'Moda aksesuarları', slug: 'moda-aksesuarlari', children: [
+    { name: 'Çanta və kəmərlər', slug: 'canta-kemer', description: 'Şəhər çantaları, bel çantaları və dəri kəmərlər' },
+    { name: 'Saat və eynəklər', slug: 'saat-eynek', description: 'Qol saatı, gün eynəyi və aksesuarlar' }
+  ] },
+  { department: 'moda', name: 'Ayaqqabılar', slug: 'moda-ayaqqabilar', children: [
+    { name: 'Gündəlik ayaqqabı', slug: 'gundelik-ayaqqabi', description: 'Şəhər və gündəlik istifadə üçün ayaqqabılar' },
+    { name: 'Uşaq ayaqqabısı', slug: 'usaq-ayaqqabisi', description: 'Uşaqlar üçün rahat ayaqqabı seçimləri' }
+  ] },
+  { department: 'gozellik-saglamliq', name: 'Dəri və saç baxımı', slug: 'deri-sac-baximi', children: [
+    { name: 'Üz və dəri baxımı', slug: 'uz-deri-baximi', description: 'Üz kremi, serum və günəşdən qorunma məhsulları' },
+    { name: 'Saç və bədən baxımı', slug: 'sac-beden-baximi', description: 'Saç, bədən və aromatik qulluq məhsulları' }
+  ] },
+  { department: 'gozellik-saglamliq', name: 'Sağlamlıq məhsulları', slug: 'saglamliq-mehsullari', children: [
+    { name: 'Vitaminlər', slug: 'vitaminler', description: 'Gündəlik vitamin və sağlam həyat əlavələri' },
+    { name: 'Sağlamlıq cihazları', slug: 'saglamliq-cihazlari', description: 'Təzyiq ölçən və rahatlıq cihazları' }
+  ] },
+  { department: 'qida', name: 'İçkilər', slug: 'icgiler', children: [
+    { name: 'Çay və qəhvə', slug: 'cay-qehve', description: 'Seçilmiş çay və qəhvə kolleksiyaları' },
+    { name: 'Təbii şirələr', slug: 'tebii-sireler', description: 'Təbii və yerli meyvə şirələri' }
+  ] },
+  { department: 'qida', name: 'Təbii və yerli məhsullar', slug: 'yerli-mehsullar', children: [
+    { name: 'Bal, yağ və mürəbbə', slug: 'bal-yag-murebbe', description: 'Yerli bal, yağ və ənənəvi mürəbbələr' },
+    { name: 'Şirniyyat və çərəzlər', slug: 'sirniyyat-cerez', description: 'Şirniyyat, çərəz və hədiyyə qutuları' }
+  ] },
+  { department: 'usaq', name: 'Oyuncaq və inkişaf', slug: 'oyuncaq-inkisaf', children: [
+    { name: 'İnkişaf oyunları', slug: 'inkisaf-oyunlari', description: 'Məntiq, yaddaş və erkən inkişaf oyunları' },
+    { name: 'Yaradıcı dəstlər', slug: 'yaradici-destler', description: 'Konstruktor, rəsm və yaradıcı fəaliyyət dəstləri' }
+  ] },
+  { department: 'usaq', name: 'Məktəb və gündəlik', slug: 'mekteb-gundelik', children: [
+    { name: 'Məktəb ləvazimatları', slug: 'mekteb-levazimatlari', description: 'Məktəb çantası, kitab və tədris ləvazimatları' },
+    { name: 'Tekstil və qidalanma', slug: 'usaq-tekstili-qidalanma', description: 'Uşaq tekstili, termos və nahar qutuları' }
+  ] },
+  { department: 'usaq', name: 'Körpə baxımı', slug: 'korpe-baximi', children: [
+    { name: 'Körpə gigiyenası', slug: 'korpe-gigiyenasi', description: 'Körpələr üçün gündəlik qulluq məhsulları' },
+    { name: 'Körpə geyimi', slug: 'korpe-geyimi', description: 'Körpələr üçün yumşaq və rahat geyimlər' }
+  ] },
+  { department: 'avtomobil', name: 'Avtomobil elektronikası', slug: 'avtomobil-elektronikasi', children: [
+    { name: 'Video və enerji', slug: 'video-enerji', description: 'Videoqeydiyyatçı, şarj və portativ enerji cihazları' },
+    { name: 'Təzyiq və diaqnostika', slug: 'tezyiq-diaqnostika', description: 'Təzyiq və diaqnostika vasitələri' }
+  ] },
+  { department: 'avtomobil', name: 'Qulluq və aksesuar', slug: 'qulluq-aksesuar', children: [
+    { name: 'Salon və təşkilat', slug: 'salon-teskilat', description: 'Ayaqaltı, organizer və salon aksesuarları' },
+    { name: 'Təhlükəsizlik və qulluq', slug: 'tehlukesizlik-qulluq', description: 'Təcili yardım və kuzov qulluq dəstləri' }
+  ] },
+  { department: 'xidmetler', name: 'Ev xidmətləri', slug: 'ev-xidmetleri', children: [
+    { name: 'Təmir və usta', slug: 'temir-usta', description: 'Elektrik, santexnika və məişət təmiri xidmətləri' },
+    { name: 'Təmizlik və mebel', slug: 'temizlik-mebel', description: 'Ev təmizliyi və mebel yığılması xidmətləri' }
+  ] },
+  { department: 'xidmetler', name: 'Texniki və mobil xidmətlər', slug: 'texniki-mobil-xidmetler', children: [
+    { name: 'Texniki dəstək', slug: 'texniki-destek', description: 'Kompüter və səyyar texniki dəstək xidmətləri' },
+    { name: 'Çatdırılma və çəkiliş', slug: 'catdirilma-cekilis', description: 'Kuryer, foto və video xidmətləri' }
+  ] },
+  { department: 'hediyyeler', name: 'Hədiyyə seçimləri', slug: 'hediyye-secimleri', children: [
+    { name: 'Texnologiya hədiyyələri', slug: 'texnologiya-hediyyeleri', description: 'Texnologiya sevənlər üçün seçilmiş hədiyyələr' },
+    { name: 'Ev üçün hədiyyələr', slug: 'ev-ucun-hediyyeler', description: 'Ev üçün praktik hədiyyələr' }
+  ] },
+  { department: 'hediyyeler', name: 'Xüsusi günlər', slug: 'xususi-gunler', children: [
+    { name: 'Ad günü', slug: 'ad-gunu-hediyyeleri', description: 'Ad günü üçün seçilmiş hədiyyə ideyaları' },
+    { name: 'Korporativ hədiyyələr', slug: 'korporativ-hediyyeler', description: 'Komandalar üçün korporativ hədiyyələr' }
+  ] }
+];
+
+function storefrontLeafForProduct(item: typeof demoProducts[number]): string | null {
+  const title = item.title.toLocaleLowerCase('az-AZ');
+  if (item.category === 'elektronika') {
+    if (/lazer|səviyyə|tərəzi/.test(title)) return 'olcu-cihazlari-elektronika';
+    if (title.includes('ağıllı ev')) return 'agilli-ev-cihazlari';
+    if (title.includes('enerji stansiyası')) return 'enerji-ve-sarj';
+    return 'simsiz-elektrik-aletleri';
+  }
+  if (item.category === 'ev-metbex') {
+    if (title.includes('kompressor')) return 'kompressor-pnevmatika';
+    if (/dəst|çəkic/.test(title)) return 'el-alet-destleri';
+    if (/çanta|burğu/.test(title)) return 'alet-aksesuarlari';
+    return 'dezgah-ve-kesim';
+  }
+  if (item.category === 'moda') {
+    if (title.includes('ayaqqabı')) return 'gundelik-ayaqqabi';
+    if (/çanta|kəmər/.test(title)) return 'canta-kemer';
+    if (/saat|eynək|şərf/.test(title)) return 'saat-eynek';
+    return /gödəkçə|sviter/.test(title) ? 'ust-geyim' : 'gundelik-geyim';
+  }
+  if (item.category === 'gozellik-saglamliq') {
+    if (/saç|bədən|yağ/.test(title)) return 'sac-beden-baximi';
+    if (title.includes('vitamin')) return 'vitaminler';
+    if (/təzyiq|yastıq/.test(title)) return 'saglamliq-cihazlari';
+    return 'uz-deri-baximi';
+  }
+  if (item.category === 'qida') {
+    if (/çay|qəhvə/.test(title)) return 'cay-qehve';
+    if (title.includes('şirə')) return 'tebii-sireler';
+    if (/bal|yağ|mürəbbə/.test(title)) return 'bal-yag-murebbe';
+    return 'sirniyyat-cerez';
+  }
+  if (item.category === 'usaq') {
+    if (/konstruktor|rəsm/.test(title)) return 'yaradici-destler';
+    if (/məktəb|kitab|əlifba/.test(title)) return 'mekteb-levazimatlari';
+    if (/tekstili|termos|nahar/.test(title)) return 'usaq-tekstili-qidalanma';
+    return 'inkisaf-oyunlari';
+  }
+  if (item.category === 'avtomobil') {
+    if (/video|şarj|kompressor/.test(title)) return 'video-enerji';
+    if (/təzyiq|diaqnostika/.test(title)) return 'tezyiq-diaqnostika';
+    if (/ayaqaltı|organizer|tutacaq/.test(title)) return 'salon-teskilat';
+    return 'tehlukesizlik-qulluq';
+  }
+  if (item.category === 'xidmetler') {
+    if (/elektrik|santexnika|kondisioner|heyvan/.test(title)) return 'temir-usta';
+    if (/təmizlik|mebel/.test(title)) return 'temizlik-mebel';
+    if (/kompüter|diaqnostika/.test(title)) return 'texniki-destek';
+    return 'catdirilma-cekilis';
+  }
+  return null;
+}
+
 const operationalModerators = [
   {
     email: 'seide@gundelikbaki.az',
@@ -300,6 +443,29 @@ async function seed(): Promise<void> {
       `, [storeId, name, slug, description, categoryMedia.rows[0]!.id, position, `${name} | Gündəlik Bakı`, `${description}. Gündəlik Bakıda sərfəli seçimləri kəşf edin.`]);
       categoryIds.set(slug, result.rows[0]!.id);
     }
+    for (const [mainPosition, main] of storefrontTaxonomy.entries()) {
+      const departmentId = categoryIds.get(main.department)!;
+      const mainCategory = await client.query<{ id: string }>(`
+        INSERT INTO categories(store_id,parent_id,name,slug,description,image_asset_id,position,status,seo_title,seo_description)
+        SELECT $1,$2,$3,$4,$5,image_asset_id,$6,'active',$7,$8 FROM categories WHERE id=$2
+        ON CONFLICT(store_id,slug) DO UPDATE SET parent_id=EXCLUDED.parent_id,name=EXCLUDED.name,
+          description=EXCLUDED.description,image_asset_id=coalesce(categories.image_asset_id,EXCLUDED.image_asset_id),
+          position=EXCLUDED.position,status='active',seo_title=EXCLUDED.seo_title,seo_description=EXCLUDED.seo_description
+        RETURNING id
+      `, [storeId, departmentId, main.name, main.slug, `${main.name} üzrə seçilmiş məhsullar`, mainPosition, `${main.name} | Gündəlik Bakı`, `${main.name} məhsulları və aktual qiymətlər.`]);
+      categoryIds.set(main.slug, mainCategory.rows[0]!.id);
+      for (const [childPosition, child] of main.children.entries()) {
+        const childCategory = await client.query<{ id: string }>(`
+          INSERT INTO categories(store_id,parent_id,name,slug,description,image_asset_id,position,status,seo_title,seo_description)
+          SELECT $1,$2,$3,$4,$5,image_asset_id,$6,'active',$7,$8 FROM categories WHERE id=$2
+          ON CONFLICT(store_id,slug) DO UPDATE SET parent_id=EXCLUDED.parent_id,name=EXCLUDED.name,
+            description=EXCLUDED.description,image_asset_id=coalesce(categories.image_asset_id,EXCLUDED.image_asset_id),
+            position=EXCLUDED.position,status='active',seo_title=EXCLUDED.seo_title,seo_description=EXCLUDED.seo_description
+          RETURNING id
+        `, [storeId, mainCategory.rows[0]!.id, child.name, child.slug, child.description, childPosition, `${child.name} | Gündəlik Bakı`, `${child.description}. Aktual qiymət və seçimlərə baxın.`]);
+        categoryIds.set(child.slug, childCategory.rows[0]!.id);
+      }
+    }
     await client.query(`
       UPDATE categories SET status='inactive'
       WHERE store_id=$1 AND slug=ANY($2::text[])
@@ -436,12 +602,24 @@ async function seed(): Promise<void> {
         VALUES ($1, $2, true)
         ON CONFLICT (product_id, category_id) DO UPDATE SET is_primary=true
       `, [productId, primaryCategoryId]);
+      const storefrontLeaf = storefrontLeafForProduct(item);
+      if (storefrontLeaf && categoryIds.has(storefrontLeaf)) {
+        await client.query(`
+          INSERT INTO product_categories(product_id,category_id,is_primary)
+          VALUES($1,$2,false) ON CONFLICT(product_id,category_id) DO NOTHING
+        `, [productId, categoryIds.get(storefrontLeaf)]);
+      }
       if ([0, 1, 3, 6, 7, 8, 10, 13, 15, 17].includes(productIndex)) {
         await client.query(`
           INSERT INTO product_categories (product_id, category_id, is_primary)
           VALUES ($1, $2, false)
           ON CONFLICT (product_id, category_id) DO NOTHING
         `, [productId, categoryIds.get('hediyyeler')]);
+        const giftLeaf = item.category === 'elektronika' ? 'texnologiya-hediyyeleri' : 'ev-ucun-hediyyeler';
+        await client.query(`
+          INSERT INTO product_categories(product_id,category_id,is_primary)
+          VALUES($1,$2,false) ON CONFLICT(product_id,category_id) DO NOTHING
+        `, [productId, categoryIds.get(giftLeaf)]);
       }
       await client.query(`
         INSERT INTO product_media (product_id, media_asset_id, position, is_primary)

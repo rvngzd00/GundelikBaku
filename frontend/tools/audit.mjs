@@ -11,6 +11,7 @@ const cms = readFileSync(join(root, 'assets/js/cms.js'), 'utf8');
 const auth = readFileSync(join(root, 'assets/js/auth.js'), 'utf8');
 const commerce = readFileSync(join(root, 'assets/js/commerce.js'), 'utf8');
 const i18n = readFileSync(join(root, 'assets/js/i18n.js'), 'utf8');
+const siteEditor = readFileSync(join(root, 'assets/js/site-editor.js'), 'utf8');
 const siteCss = readFileSync(join(root, 'assets/css/site.css'), 'utf8');
 const accountCss = readFileSync(join(root, 'assets/css/account.css'), 'utf8');
 const mobilePanels = readFileSync(join(root, 'assets/js/mobile-panels.js'), 'utf8');
@@ -101,6 +102,8 @@ const required = [
   ['structured data', /type="application\/ld\+json"/i.test(html)],
   ['Gündəlik Bakı metadata and schema branding', /property="og:site_name" content="Gündəlik Bakı"/.test(html) && /"@type":"WebSite","name":"Gündəlik Bakı"/.test(html) && !/Daily\s+Baku/i.test(html.replaceAll('Gündəlik Bakı Poçtu-Daily Baku Mail', ''))],
   ['Gündəlik Bakı logo', (html.match(/assets\/images\/categories\/logoSite\.png/gi) || []).length >= 6 && !/assets\/brand\/(?:daily-baku-logo\.svg|gundelik-baki-logo(?:-white)?\.png)/i.test(html)],
+  ['homepage logo has a non-collapsing responsive slot and one visible variant', /\.header-logo a\s*\{[\s\S]*?height:\s*62px\s*!important;[\s\S]*?flex:\s*0 0 200px;/s.test(siteCss) && /\.et__header \.header-logo img\.logo,[\s\S]*?display:\s*block\s*!important;/s.test(siteCss) && /\.et__header \.header-logo img\.sticky-logo,[\s\S]*?display:\s*none\s*!important;/s.test(siteCss) && /\.header-logo a\s*\{[\s\S]*?height:\s*50px\s*!important;/s.test(siteCss)],
+  ['editor logo has a safe static fallback', /defaultLogoUrl\s*=\s*['"]\/assets\/images\/categories\/logoSite\.png['"]/.test(siteEditor) && /addEventListener\(['"]error['"][\s\S]*?image\.src\s*=\s*defaultLogoUrl/.test(siteEditor)],
   ['brand favicon', /assets\/brand\/favicon-32\.png/i.test(html)],
   ['legacy language selectors removed', !/elementor-widget-et_language_switcher|class="current-lang"/i.test(html)],
   ['responsive custom AZ and EN language pickers', (html.match(/data-language-picker/g) || []).length === 2 && (html.match(/data-language-trigger/g) || []).length === 2 && (html.match(/data-language-option="az"/g) || []).length === 2 && (html.match(/data-language-option="en"/g) || []).length === 2 && !/data-language-select|db-language-switcher-label/.test(html)],
@@ -132,8 +135,9 @@ const required = [
   ['popular product slider', /class="db-popular-track"/.test(html) && /data-popular-prev/.test(html) && /data-popular-next/.test(html) && /class="db-popular-pagination"/.test(html)],
   ['popular and top-picks sliders have 68 horizontal products', (html.match(/class="db-popular-card"/g) || []).length === 68],
   ['top-picks has four category sliders', (html.match(/data-top-picks-products/g) || []).length === 4 && (html.match(/class="db-top-picks-track"/g) || []).length === 4],
-  ['top-picks category controls', /data-section-tab-title="Power Tools"/.test(html) && /data-section-tab-title="Hand Tools"/.test(html) && /data-section-tab-title="Air Tools"/.test(html) && /data-section-tab-title="Machine tools"/.test(html)],
-  ['top-picks category controller updates panels directly', /function enhanceTopPicksTabs/.test(cms) && /panel\.classList\.toggle\('active', active\)/.test(cms) && /activate\(tabs\.indexOf\(selected\)\)/.test(cms)],
+  ['top-picks category controls', /data-section-tab-title="Elektronika"/.test(html) && /data-section-tab-title="Ev &amp; Mətbəx"/.test(html) && /data-section-tab-title="Moda"/.test(html) && /data-section-tab-title="Gözəllik &amp; Sağlamlıq"/.test(html)],
+  ['top-picks category controller updates distinct product panels', /function enhanceTopPicksTabs/.test(cms) && /panel\.classList\.toggle\('active', active\)/.test(cms) && /activate\(tabs\.indexOf\(selected\)\)/.test(cms) && /category_slugs\.includes\(category\.slug\)/.test(cms) && !/categorized\.length \? categorized : complete/.test(cms)],
+  ['hero copy geometry is configured before Slider Revolution initializes', /const heroLayout = \{/.test(html) && /layer\.position\.y = responsiveValue\(layout\.y\)/.test(html) && /layer\.idle\.fontSize = responsiveValue\(layout\.font\)/.test(html) && html.indexOf('const heroLayout = {') < html.indexOf('if (SR7.F.init) SR7.F.init()')],
   ['Gündəlik Bakı news slider', /class="db-news-track"/.test(html) && /data-news-prev/.test(html) && /data-news-next/.test(html) && /class="db-news-pagination"/.test(html)],
   ['Gündəlik Bakı news slider has eight cards', (html.match(/class="db-news-card"/g) || []).length === 8],
   ['Gündəlik Bakı news cards have no hover actions', !/db-news-(?:actions?|wishlist|quick-view|whatsapp)/.test(html)],

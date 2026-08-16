@@ -8,6 +8,7 @@ const adminPortalRoles = new Set(['super_admin', 'admin', 'editor', 'seo', 'mode
 const vendorPortalRoles = new Set(['vendor_owner', 'vendor_staff']);
 let productImages = [];
 let draggedProductImage = null;
+let productCategoryOptions = [];
 let notificationTimer = null;
 const $ = (selector) => document.querySelector(selector);
 const passwordEyeIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.75"/><path class="password-eye-slash" d="m4 4 16 16"/></svg>`;
@@ -125,7 +126,7 @@ const roleLabels = {
 };
 
 const createPermissions = {
-  vendors: 'vendors.manage', 'seller-users': 'users.manage', products: 'catalog.create', categories: 'catalog.create', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
+  vendors: 'vendors.manage', 'seller-users': 'users.manage', products: 'catalog.create', categories: 'categories.manage', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
   posts: 'posts.create', 'post-categories': 'posts.create', pages: 'cms.create', seo: 'seo.manage',
   campaigns: 'campaigns.manage', coupons: 'coupons.manage', qr: 'qr.manage', rewards: 'loyalty.manage',
   journal: 'journal.create', classifieds: 'classifieds.moderate'
@@ -332,8 +333,8 @@ const configs = {
     { label: 'Tarix', render: (row) => date(row.created_at) }
   ] },
   categories: { path: '/catalog/categories', columns: [
-    { label: 'Kateqoriya', key: 'name' }, { label: 'Slug', key: 'slug' }, { label: 'Məhsul', key: 'product_count' }, { label: 'Sıra', key: 'position' }, { label: 'Status', render: (row) => badge(row.status) },
-    { label: '', render: (row) => `<button class="table-action" data-category-edit="${esc(row.id)}">Redaktə et</button> <button class="table-action danger" data-category-delete="${esc(row.id)}">Sil</button>` }
+    { label: 'Kateqoriya', render: (row) => `<span class="category-tree-name depth-${Number(row.depth || 0)}">${esc(row.name)}</span><small class="cell-note">${['Departament','Əsas kateqoriya','Alt kateqoriya'][Number(row.depth || 0)] || 'Kateqoriya'}</small>` }, { label: 'Slug', key: 'slug' }, { label: 'Məhsul', key: 'subtree_product_count' }, { label: 'Sıra', key: 'position' }, { label: 'Status', render: (row) => badge(row.status) },
+    { label: '', render: (row) => can('categories.manage') ? `<button class="table-action" data-category-edit="${esc(row.id)}">Redaktə et</button> <button class="table-action danger" data-category-delete="${esc(row.id)}">Sil</button>` : '—' }
   ] },
   brands: { path: '/catalog/brands', columns: [
     { label: 'Brend', key: 'name' }, { label: 'Slug', key: 'slug' }, { label: 'Sayt', key: 'website_url' }, { label: 'Status', render: (row) => badge(row.status) },
@@ -516,6 +517,8 @@ async function catalogOptions(storeId, includeMedia = true) {
 }
 
 function productFields(vendors, options, generatedSku = '') {
+  productCategoryOptions = options.categories || [];
+  const departments = productCategoryOptions.filter((category) => !category.parent_id && category.status === 'active');
   return field('vendorId', 'Satıcı', 'select', true, vendors)
     + `<div class="product-brand-field"><label>Brend<select name="brandId"><option value="">Brendsiz</option>${options.brands.map((brand) => `<option value="${esc(brand.id)}">${esc(brand.name)}</option>`).join('')}<option value="__create__">＋ Yeni brend əlavə et</option></select></label><div class="inline-brand-create" data-inline-brand hidden><input type="text" data-inline-brand-name minlength="2" maxlength="160" placeholder="Yeni brendin adı" aria-label="Yeni brendin adı"><button type="button" class="secondary" data-product-brand-create>Brendi yarat</button><small data-inline-brand-status></small></div></div>`
     + field('sku', 'Məhsul SKU-su', 'text', true, [], `readonly aria-readonly="true" value="${esc(generatedSku)}" data-product-sku`)
@@ -524,7 +527,7 @@ function productFields(vendors, options, generatedSku = '') {
     + field('productType', 'Məhsul növü', 'select', true, [['physical', 'Fiziki'], ['digital', 'Rəqəmsal'], ['service', 'Xidmət']])
     + field('price', 'Satış qiyməti', 'number', true, [], 'min="0" step="0.01"')
     + field('compareAtPrice', 'Köhnə qiymət', 'number', false, [], 'min="0" step="0.01"')
-    + `<label>Kateqoriyalar<select name="categoryIds" multiple size="${Math.min(7, Math.max(3, options.categories.length))}">${options.categories.map((category) => `<option value="${esc(category.id)}">${esc(category.name)}</option>`).join('')}</select><small>Birinci seçim əsas kateqoriya olur.</small></label>`
+    + `<fieldset class="wide choice-field product-category-picker"><legend>Kateqoriya yolu</legend><p class="muted">Departamentdən başlayaraq mövcud əsas və alt kateqoriyanı seçin.</p><div class="category-picker-grid"><label>Departament<select name="categoryIds" data-category-depth="0" required><option value="">Departamenti seçin</option>${departments.map((category) => `<option value="${esc(category.id)}">${esc(category.name)}</option>`).join('')}</select></label><label>Əsas kateqoriya<select name="categoryIds" data-category-depth="1" disabled><option value="">Əsas kateqoriya yoxdur</option></select></label><label>Alt kateqoriya<select name="categoryIds" data-category-depth="2" disabled><option value="">Alt kateqoriya yoxdur</option></select></label></div><small data-category-picker-status>Ən dərin mövcud səviyyəni seçmək məhsulun düzgün filtrlənməsini təmin edir.</small></fieldset>`
     + field('warehouseId', 'İlkin stok anbarı', 'select', false, [['', 'Stok daxil edilməyəcək'], ...options.warehouses.map((warehouse) => [warehouse.id, `${warehouse.name} (${warehouse.code})`])])
     + field('initialStock', 'İlkin stok', 'number', false, [], 'min="0" step="1" value="0"')
     + field('displayPosition', 'Vitrin sırası', 'number', true, [], 'min="0" step="1" value="0"')
@@ -534,6 +537,48 @@ function productFields(vendors, options, generatedSku = '') {
     + `<fieldset class="wide choice-field product-attributes"><legend>Atributlar</legend><p class="muted">Atribut adı və dəyərini cüt şəklində daxil edin.</p><div class="attribute-list" data-product-attributes></div><button type="button" class="secondary attribute-add" data-attribute-add>＋ Əlavə et</button></fieldset>`
     + field('seoTitle', 'SEO başlığı') + field('seoDescription', 'Meta təsvir', 'textarea')
     + `<fieldset class="wide choice-field product-image-field"><legend>Məhsul şəkilləri</legend><p class="muted">Şəkilləri yükləyin və sürüşdürərək sıralayın. Birinci şəkil avtomatik əsas şəkil olur.</p><label class="product-image-dropzone" data-product-image-dropzone><input type="file" data-product-image-input accept="image/jpeg,image/png,image/webp,image/avif" multiple><strong>Şəkilləri seçin və ya bura atın</strong><small>JPG, PNG, WEBP və AVIF · ən çox 12 şəkil</small></label><div class="product-image-list" data-product-image-list></div><p class="product-upload-status" data-product-upload-status aria-live="polite"></p></fieldset>`;
+}
+
+function categoryChildren(parentId) {
+  return productCategoryOptions.filter((category) => category.parent_id === parentId && category.status === 'active');
+}
+
+function populateCategorySelect(select, items, placeholder, value = '') {
+  select.innerHTML = `<option value="">${esc(placeholder)}</option>${items.map((item) => `<option value="${esc(item.id)}">${esc(item.name)}</option>`).join('')}`;
+  select.disabled = items.length === 0;
+  select.required = items.length > 0;
+  if (value && items.some((item) => item.id === value)) select.value = value;
+}
+
+function synchronizeProductCategoryPicker(changedDepth = -1, selectedIds = []) {
+  const form = $('#createForm');
+  if (form?.dataset.view !== 'products') return;
+  const selects = [0, 1, 2].map((depth) => form.querySelector(`[data-category-depth="${depth}"]`));
+  if (selects.some((select) => !select)) return;
+  const selectedSet = new Set(selectedIds);
+  // Reconstruct a complete path for older products that may have only the
+  // deepest category stored, while preserving current three-level records.
+  for (const selectedId of selectedIds) {
+    let current = productCategoryOptions.find((category) => category.id === selectedId);
+    while (current?.parent_id) {
+      selectedSet.add(current.parent_id);
+      current = productCategoryOptions.find((category) => category.id === current.parent_id);
+    }
+  }
+  const selectedDepartment = changedDepth < 0
+    ? productCategoryOptions.find((category) => !category.parent_id && selectedSet.has(category.id))?.id || ''
+    : selects[0].value;
+  if (changedDepth < 0 && selectedDepartment) selects[0].value = selectedDepartment;
+  const mains = categoryChildren(selects[0].value);
+  const selectedMain = changedDepth < 0
+    ? mains.find((category) => selectedSet.has(category.id))?.id || ''
+    : changedDepth === 0 ? '' : selects[1].value;
+  populateCategorySelect(selects[1], mains, mains.length ? 'Əsas kateqoriyanı seçin' : 'Əsas kateqoriya yoxdur', selectedMain);
+  const subs = categoryChildren(selects[1].value);
+  const selectedSub = changedDepth < 0
+    ? subs.find((category) => selectedSet.has(category.id))?.id || ''
+    : changedDepth <= 1 ? '' : selects[2].value;
+  populateCategorySelect(selects[2], subs, subs.length ? 'Alt kateqoriyanı seçin' : 'Alt kateqoriya yoxdur', selectedSub);
 }
 
 function attributeRow(name = '', value = '') {
@@ -744,11 +789,11 @@ async function openProductEdit(id) {
   setDialogValues({
     vendorId:data.vendor_id,brandId:data.brand_id||'',sku:data.sku,name:data.name,title:data.title,
     slug:data.slug,productType:data.product_type,price:data.price,compareAtPrice:data.compare_at_price||'',
-    categoryIds:(data.categories||[]).map((item)=>item.id),
     shortDescription:data.short_description,description:data.listing_description||data.description,
     seoTitle:data.seo_title||'',seoDescription:data.seo_description||'',
     isFeatured:data.is_featured,isPopular:data.is_popular,isTopPick:data.is_top_pick,displayPosition:data.display_position||0,merchandisingBadge:data.merchandising_badge||'none'
   });
+  synchronizeProductCategoryPicker(-1, (data.categories || []).map((item) => item.id));
   setProductAttributes(data.attributes || {});
   initializeProductEditor(data.media || [], false);
 }
@@ -756,6 +801,14 @@ async function openProductEdit(id) {
 async function openCategoryEdit(id) {
   const storeId=state.user.storeIds[0]; const {data}=await api(`/catalog/categories?storeId=${encodeURIComponent(storeId)}`); const row=data.find((item)=>item.id===id); if(!row)throw new Error('Kateqoriya tapılmadı');
   await openCreate('categories'); $('#dialogTitle').textContent='Kateqoriyanı redaktə et'; $('#createForm').dataset.recordId=id;
+  const unavailableParents = new Set([id]);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const category of data) if (unavailableParents.has(category.parent_id) && !unavailableParents.has(category.id)) { unavailableParents.add(category.id); changed = true; }
+  }
+  $('#createForm').querySelectorAll('select[name="parentId"] option').forEach((option) => {
+    if (unavailableParents.has(option.value)) option.remove();
+  });
   setDialogValues({parentId:row.parent_id||'',name:row.name,slug:row.slug,position:row.position,description:row.description,seoTitle:row.seo_title||'',seoDescription:row.seo_description||'',imageAssetId:row.image_asset_id||'',status:row.status});
 }
 
@@ -866,7 +919,7 @@ async function openCreate(view) {
   } else if (view === 'categories') {
     const options = await catalogOptions(storeId);
     const images=options.media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
-    fields = field('parentId', 'Üst kateqoriya', 'select', false, [['', 'Əsas kateqoriya'], ...options.categories.map((category) => [category.id, category.name])]) + field('name', 'Kateqoriya adı') + field('slug', 'Slug', 'text', false) + field('imageAssetId','Kateqoriya şəkli','select',false,[['','Şəkilsiz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('position', 'Sıra', 'number', true, [], 'min="0" step="1" value="0"') + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
+    fields = field('parentId', 'Üst kateqoriya', 'select', false, [['', 'Departament (üst səviyyə)'], ...options.categories.filter((category) => Number(category.depth) < 2 && category.status === 'active').map((category) => [category.id, `${'— '.repeat(Number(category.depth) + 1)}${category.name}`])]) + '<p class="wide category-level-help">Üst kateqoriya seçilməzsə departament, departament seçilərsə əsas kateqoriya, əsas kateqoriya seçilərsə alt kateqoriya yaradılır.</p>' + field('name', 'Kateqoriya adı') + field('slug', 'Slug', 'text', false) + field('imageAssetId','Kateqoriya şəkli','select',false,[['','Şəkilsiz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('position', 'Sıra', 'number', true, [], 'min="0" step="1" value="0"') + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
   } else if (view === 'brands') {
     const options=await catalogOptions(storeId);const images=options.media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
     fields = field('name', 'Brend adı') + field('slug', 'Slug', 'text', false) + field('logoAssetId','Brend loqosu','select',false,[['','Loqosuz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('websiteUrl', 'Rəsmi sayt', 'url', false) + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
@@ -930,7 +983,7 @@ $('#createForm').addEventListener('submit', async (event) => {
       if (!vendorId) throw new Error('Satıcı seçilməlidir');
       const attributes = readProductAttributes();
       const mediaIds = await uploadProductImages({ storeId: form.dataset.storeId, vendorId, altText: String(body.title || body.name || '') });
-      Object.assign(body, { price: Number(body.price), currency: 'AZN', brandId:brandId||null, compareAtPrice:String(formData.get('compareAtPrice')||'')?Number(formData.get('compareAtPrice')):null, categoryIds: formData.getAll('categoryIds').map(String), mediaIds, attributes, isFeatured:formData.has('isFeatured'),isPopular:formData.has('isPopular'),isTopPick:formData.has('isTopPick'),displayPosition:Number(body.displayPosition||0) });
+      Object.assign(body, { price: Number(body.price), currency: 'AZN', brandId:brandId||null, compareAtPrice:String(formData.get('compareAtPrice')||'')?Number(formData.get('compareAtPrice')):null, categoryIds: formData.getAll('categoryIds').map(String).filter(Boolean), mediaIds, attributes, isFeatured:formData.has('isFeatured'),isPopular:formData.has('isPopular'),isTopPick:formData.has('isTopPick'),displayPosition:Number(body.displayPosition||0) });
       body.initialStock=Number(body.initialStock||0);
       if(form.dataset.recordId){delete body.storeId;delete body.vendorId;delete body.initialStock;delete body.warehouseId;}
     } else if (view === 'categories') {
@@ -1116,6 +1169,11 @@ document.addEventListener('submit', async (event) => {
 });
 
 document.addEventListener('change', async (event) => {
+  const productCategory = event.target.closest('#createForm[data-view="products"] [data-category-depth]');
+  if (productCategory) {
+    synchronizeProductCategoryPicker(Number(productCategory.dataset.categoryDepth));
+    return;
+  }
   const productVendor = event.target.closest('#createForm[data-view="products"] select[name="vendorId"]');
   if (productVendor) {
     await refreshProductSku();

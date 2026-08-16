@@ -13,6 +13,7 @@ type ProductMedia = {
 type ProductCategory = {
   name: string;
   slug: string;
+  path_slugs?: string[];
 };
 
 export type ProductReviewView = {
@@ -117,7 +118,8 @@ function informationRows(product: ProductDetailView): Array<[string, string]> {
     ['Brend', valueText(product.brand_name)],
     ['Satıcı', valueText(product.vendor_name)],
     ['Məhsul növü', productTypeText(product.product_type)],
-    ['Stok', Number(product.stock) > 0 ? `${Number(product.stock)} ədəd` : 'Stokda yoxdur']
+    ['Stok', Number(product.stock) > 0 ? `${Number(product.stock)} ədəd` : 'Stokda yoxdur'],
+    ['Məhsul kodu', valueText(product.sku || product.slug.toUpperCase())]
   ];
   Object.entries(product.attributes ?? {}).forEach(([key, value]) => {
     const label = attributeLabel(key);
@@ -187,7 +189,7 @@ export function renderProductDetail(options: ProductDetailOptions): string {
   };
   const whatsappMessage = encodeURIComponent(`Salam, ${product.title} məhsulu haqqında məlumat almaq istəyirəm.`);
   const categoryLinks = categories.length
-    ? categories.map((category) => `<a href="/magaza/${encodeURIComponent(category.slug)}/">${escapeHtml(category.name)}</a>`).join(', ')
+    ? categories.map((category) => `<a href="/magaza/${(category.path_slugs?.length ? category.path_slugs : [category.slug]).map(encodeURIComponent).join('/')}/">${escapeHtml(category.name)}</a>`).join(', ')
     : '<a href="/magaza/">Mağaza</a>';
   const tabs = [
     ['description', 'Təsvir'],
@@ -217,6 +219,7 @@ export function renderProductDetail(options: ProductDetailOptions): string {
       <div class="page-detail-info">
         <p class="db-product-recommended">${icon.recommended}<span>TÖVSİYƏ EDİLİR!</span></p>
         <h1 id="product-title">${escapeHtml(product.title)}</h1>
+        ${product.short_description ? `<p class="db-product-short-description" data-product-short-description>${escapeHtml(product.short_description)}</p>` : ''}
         <div class="db-product-brand-card">
           <span class="db-product-brand-logo">${logo ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(brand)} loqosu" width="120" height="54">` : `<b>${escapeHtml(brand)}</b>`}</span>
           <span><strong>${escapeHtml(brand)}</strong><small>Brend</small></span>
@@ -228,11 +231,11 @@ export function renderProductDetail(options: ProductDetailOptions): string {
         </p>
         <div class="db-product-summary">
           <h2>Məhsul məlumatı</h2>
-          <dl>
+          <dl id="product-summary-information">
             ${visibleRows.map(([label, value]) => `<div><dt>${escapeHtml(label)}:</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}
-            ${extraRows.map(([label, value]) => `<div data-product-summary-extra hidden><dt>${escapeHtml(label)}:</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}
+            ${extraRows.map(([label, value]) => `<div data-product-summary-extra hidden aria-hidden="true"><dt>${escapeHtml(label)}:</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}
           </dl>
-          <button type="button" data-product-details aria-expanded="false"><span>Ətraflı...</span>${icon.info}</button>
+          ${extraRows.length ? `<button type="button" data-product-details aria-expanded="false" aria-controls="product-summary-information"><span>Ətraflı</span>${icon.info}</button>` : ''}
         </div>
         <div class="db-product-inline-actions">
           <button class="db-product-wishlist" type="button" data-wishlist="${escapeHtml(product.slug)}" aria-label="Seçilmişlərə əlavə et" aria-pressed="false">${icon.heart}</button>
@@ -258,7 +261,7 @@ export function renderProductDetail(options: ProductDetailOptions): string {
       </div>
       <article class="db-product-tabpanel" id="product-description" role="tabpanel" aria-labelledby="product-tab-description" data-product-panel="description" data-product-section>
         <h2>Təsvir</h2>
-        <p>${escapeHtml(product.description || product.short_description || 'Məhsul haqqında ətraflı məlumat hazırlanır.')}</p>
+        <p data-product-full-description>${escapeHtml(product.description || product.short_description || 'Məhsul haqqında ətraflı məlumat hazırlanır.')}</p>
       </article>
       <article class="db-product-tabpanel" id="product-additional-information" role="tabpanel" aria-labelledby="product-tab-additional-information" data-product-panel="additional-information" data-product-section hidden>
         <h2>Əlavə məlumat</h2>

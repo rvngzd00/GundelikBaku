@@ -2,6 +2,7 @@ export const PERMISSIONS = [
   'platform.manage', 'dashboard.read', 'audit.read',
   'users.read', 'users.manage', 'roles.manage',
   'vendors.read', 'vendors.manage', 'vendors.approve',
+  'categories.manage',
   'catalog.read', 'catalog.create', 'catalog.update', 'catalog.delete', 'catalog.publish',
   'inventory.read', 'inventory.manage',
   'orders.read', 'orders.manage', 'orders.refund',

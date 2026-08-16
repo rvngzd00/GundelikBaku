@@ -95,7 +95,8 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(home.body, /VÖEN 2007614681/);
     assert.match(home.body, /tel:\+994502645400/);
     assert.match(home.body, /assets\/images\/categories\/logoSite\.png/);
-    assert.doesNotMatch(home.body, /assets\/brand\/gundelik-baki-logo/);
+    assert.doesNotMatch(home.body, /assets\/brand\/gundelik-baki-logo-white\.png/);
+    assert.doesNotMatch(home.body, />Elan yerləşdir<\//);
     assert.match(home.body, /Cəfər Cabbarlı 33, AZ1065, Bakı\/Azərbaycan/);
     assert.doesNotMatch(home.body, /Bakı şəhəri, Azərbaycan/);
     assert.doesNotMatch(home.body, /37499833889|tel:55555555/);
@@ -113,6 +114,14 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.ok(Array.isArray(homeApi.json().data.categories));
     assert.ok(Array.isArray(homeApi.json().data.brands));
     assert.ok(homeApi.json().data.products.every((item: { review_count: number; category_slugs: string[] }) => Number.isInteger(item.review_count) && Array.isArray(item.category_slugs)));
+    const topPickSlugs = ['elektronika', 'ev-metbex', 'moda', 'gozellik-saglamliq'];
+    const topPickSets = topPickSlugs.map((slug) => homeApi.json().data.products
+      .filter((item: { category_slugs: string[] }) => item.category_slugs.includes(slug))
+      .map((item: { id: string }) => item.id));
+    assert.ok(topPickSets.every((items) => items.length > 0));
+    assert.equal(new Set(topPickSets.map((items) => items.join(','))).size, topPickSets.length);
+    assert.ok(homeApi.json().data.categories.some((item: { path_slugs: string[] }) =>
+      item.path_slugs?.join('/') === 'elektronika/elektronika-pesekar-aletler/simsiz-elektrik-aletleri'));
 
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
     assert.equal(page.statusCode, 200);
@@ -139,6 +148,14 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(page.body, /href="\/baki-club\/xal-qazanma\/"/);
     assert.match(page.body, /class="page-submenu"/);
     assert.doesNotMatch(page.body, />Ana səhifə<\/a><\/li>/);
+
+    const protectedBusiness = await app.inject({ method: 'GET', url: '/biznes/reklam-ver/' });
+    assert.equal(protectedBusiness.statusCode, 200);
+    assert.match(protectedBusiness.headers['cache-control'] ?? '', /no-store/);
+    assert.match(protectedBusiness.body, /Satıcı hesabı tələb olunur/);
+    assert.match(protectedBusiness.body, /href="\/satici-girisi\/"/);
+    assert.match(protectedBusiness.body, /href="\/satici-qeydiyyati\/"/);
+    assert.doesNotMatch(protectedBusiness.body, /Auditoriyanıza uyğun reklam/);
 
     const redirect = await app.inject({ method: 'GET', url: '/baki-club' });
     assert.equal(redirect.statusCode, 308);
@@ -183,6 +200,24 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(gifts.body, /href="\/magaza\/hediyyeler\/" aria-current="page"/);
     assert.match(gifts.body, /class="db-product-card"/);
 
+    const electronics = await app.inject({ method: 'GET', url: '/magaza/elektronika/' });
+    assert.equal(electronics.statusCode, 200);
+    assert.match(electronics.body, /class="page-category-explorer"/);
+    assert.match(electronics.body, /Peşəkar alətlər/);
+    assert.match(electronics.body, /href="\/magaza\/elektronika\/elektronika-pesekar-aletler\/simsiz-elektrik-aletleri\/"/);
+    assert.match(electronics.body, /src="\/assets\/js\/catalog-navigation\.js\?v=20260816-2"/);
+    assert.doesNotMatch(electronics.body, />Elan yerləşdir<\//);
+
+    const emptySubcategory = await app.inject({ method: 'GET', url: '/magaza/usaq/korpe-baximi/korpe-geyimi/' });
+    assert.equal(emptySubcategory.statusCode, 200);
+    assert.match(emptySubcategory.body, /<h1>Körpə geyimi<\/h1>/);
+    assert.match(emptySubcategory.body, /Digər alt kateqoriyalar/);
+    assert.match(emptySubcategory.body, /Bu kateqoriyada məhsul yoxdur/);
+
+    const sitemap = await app.inject({ method: 'GET', url: '/api/v1/public/sitemap.xml' });
+    assert.equal(sitemap.statusCode, 200);
+    assert.match(sitemap.body, /\/magaza\/elektronika\/elektronika-pesekar-aletler\/simsiz-elektrik-aletleri\//);
+
     const search = await app.inject({ method: 'GET', url: '/api/v1/public/search?q=milwaukee&limit=5' });
     assert.equal(search.statusCode, 200);
     const searchBody = search.json();
@@ -201,10 +236,13 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(product.body, /data-product-sticky-buy/);
     assert.match(product.body, /data-review-form/);
     assert.match(product.body, /data-product-copy-sku/);
+    assert.match(product.body, /<dt>Məhsul kodu:<\/dt>/);
+    assert.match(product.body, /data-product-summary-extra hidden aria-hidden="true"/);
+    assert.match(product.body, /data-product-details aria-expanded="false" aria-controls="product-summary-information"/);
     assert.doesNotMatch(product.body, /data-product-compare/);
     assert.match(product.body, /https:\/\/wa\.me\/994502645400/);
     assert.doesNotMatch(product.body, /37499833889/);
-    assert.match(product.body, /src="\/assets\/js\/product\.js"/);
+    assert.match(product.body, /src="\/assets\/js\/product\.js\?v=20260816-2"/);
     assert.match(product.body, /src="\/assets\/js\/mobile-panels\.js"/);
 
     const authorName = `Codex test ${Date.now()}`;
@@ -552,6 +590,7 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
   const suffix = randomUUID().slice(0, 8);
   const adminEmail = `self-vendor-admin-${suffix}@example.test`;
   const vendorEmail = `self-vendor-${suffix}@example.test`;
+  const vendorPhoneDigits = String(Number.parseInt(suffix, 16) % 10_000_000).padStart(7, '0');
   const adminPassword = 'SelfVendorAdmin!2026';
   const vendorPassword = 'SelfVendorOwner!2026';
   let adminUserId = '';
@@ -614,7 +653,7 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
       legalName: `Self Service Market ${suffix} MMC`,
       taxId: `20${suffix.replace(/[^0-9]/g, '').padEnd(8, '7').slice(0, 8)}`,
       email: vendorEmail,
-      phone: `+994 55 7${suffix.replace(/[^0-9]/g, '').padEnd(6, '3').slice(0, 2)} ${suffix.replace(/[^0-9]/g, '').padEnd(4, '4').slice(0, 2)} ${suffix.replace(/[^0-9]/g, '').padEnd(2, '5').slice(0, 2)}`,
+      phone: `+994 55 ${vendorPhoneDigits.slice(0, 3)} ${vendorPhoneDigits.slice(3, 5)} ${vendorPhoneDigits.slice(5, 7)}`,
       firstName: 'Onlayn',
       lastName: 'Satıcı',
       password: vendorPassword,
@@ -638,6 +677,12 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     assert.equal(registrationMe.statusCode, 200, registrationMe.body);
     assert.deepEqual(registrationMe.json().data.roles, ['vendor_owner']);
     assert.deepEqual(registrationMe.json().data.vendorIds, [vendorId]);
+    const pendingBusiness = await app.inject({
+      method: 'GET', url: '/biznes/reklam-ver/', headers: authHeaders(registrationJar)
+    });
+    assert.equal(pendingBusiness.statusCode, 200, pendingBusiness.body);
+    assert.match(pendingBusiness.body, /Təsdiq gözlənilir/);
+    assert.match(pendingBusiness.body, /href="\/satici-paneli\/"/);
 
     const duplicateRegistration = await app.inject({
       method: 'POST', url: '/api/v1/auth/vendor-register', payload: vendorRegistrationPayload
@@ -733,6 +778,11 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     });
     assert.equal(approval.statusCode, 200, approval.body);
     assert.equal(approval.json().data.status, 'active');
+    const approvedBusiness = await app.inject({
+      method: 'GET', url: '/biznes/reklam-ver/', headers: authHeaders(registrationJar)
+    });
+    assert.equal(approvedBusiness.statusCode, 303, approvedBusiness.body);
+    assert.equal(approvedBusiness.headers.location, '/satici-paneli/');
 
     const visiblePublicProduct = await app.inject({ method: 'GET', url: `/api/v1/public/products/${productSlug}` });
     assert.equal(visiblePublicProduct.statusCode, 200, visiblePublicProduct.body);
@@ -784,6 +834,9 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
   const createdUserIds: string[] = [];
   let vendorId = '';
   let categoryId = '';
+  let mainCategoryId = '';
+  let subcategoryId = '';
+  let categoryPath = '';
   let brandId = '';
   let mediaId = '';
   let pdfMediaId = '';
@@ -1151,6 +1204,37 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.equal(updatedCategory.statusCode, 200);
     assert.equal(updatedCategory.json().data.seo_title, `Audit kateqoriyası ${suffix}`);
 
+    const vendorCategoryAttempt = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/categories', headers: authHeaders(ownerJar),
+      payload: { storeId: storeRow.id, name: `İcazəsiz kateqoriya ${suffix}` }
+    });
+    assert.equal(vendorCategoryAttempt.statusCode, 403);
+
+    const createdMainCategory = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/categories', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, parentId: categoryId, name: `Audit əsas kateqoriya ${suffix}`, position: 1 }
+    });
+    assert.equal(createdMainCategory.statusCode, 201, createdMainCategory.body);
+    mainCategoryId = createdMainCategory.json().data.id;
+    const createdSubcategory = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/categories', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, parentId: mainCategoryId, name: `Audit alt kateqoriya ${suffix}`, position: 1 }
+    });
+    assert.equal(createdSubcategory.statusCode, 201, createdSubcategory.body);
+    subcategoryId = createdSubcategory.json().data.id;
+    categoryPath = [createdCategory.json().data.slug, createdMainCategory.json().data.slug, createdSubcategory.json().data.slug].join('/');
+
+    const fourthLevelCategory = await app.inject({
+      method: 'POST', url: '/api/v1/catalog/categories', headers: authHeaders(adminJar),
+      payload: { storeId: storeRow.id, parentId: subcategoryId, name: `Yolverilməz dördüncü səviyyə ${suffix}` }
+    });
+    assert.equal(fourthLevelCategory.statusCode, 400);
+    const categoryTree = await app.inject({ method: 'GET', url: '/api/v1/catalog/categories', headers: authHeaders(adminJar) });
+    assert.equal(categoryTree.statusCode, 200, categoryTree.body);
+    assert.equal(categoryTree.json().data.find((row: { id: string }) => row.id === categoryId)?.depth, 0);
+    assert.equal(categoryTree.json().data.find((row: { id: string }) => row.id === mainCategoryId)?.depth, 1);
+    assert.equal(categoryTree.json().data.find((row: { id: string }) => row.id === subcategoryId)?.depth, 2);
+
     const createdBrand = await app.inject({
       method: 'POST', url: '/api/v1/catalog/brands', headers: authHeaders(adminJar),
       payload: { storeId: storeRow.id, name: `Audit brendi ${suffix}`, description: 'Avtomatik brend auditi', websiteUrl: 'https://example.com' }
@@ -1165,14 +1249,18 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.equal(updatedBrand.json().data.seo_title, `Audit brendi ${suffix}`);
 
     const boundary = `audit-${suffix}`;
+    // The file deliberately comes before metadata: browsers are free to use
+    // this order and the upload route must consume it before reading fields.
     const multipartHead = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="storeId"\r\n\r\n${storeRow.id}\r\n`
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audit.png"\r\nContent-Type: application/octet-stream\r\n\r\n`
+    );
+    const multipartTail = Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="storeId"\r\n\r\n${storeRow.id}\r\n`
       + `--${boundary}\r\nContent-Disposition: form-data; name="vendorId"\r\n\r\n${vendorId}\r\n`
       + `--${boundary}\r\nContent-Disposition: form-data; name="altText"\r\n\r\nAudit məhsul şəkli\r\n`
       + `--${boundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nAudit media ${suffix}\r\n`
-      + `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audit.png"\r\nContent-Type: application/octet-stream\r\n\r\n`
+      + `--${boundary}--\r\n`
     );
-    const multipartTail = Buffer.from(`\r\n--${boundary}--\r\n`);
     const uploadedMedia = await app.inject({
       method: 'POST', url: '/api/v1/media',
       headers: { ...authHeaders(adminJar), 'content-type': `multipart/form-data; boundary=${boundary}` },
@@ -1220,7 +1308,7 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
         storeId: storeRow.id, vendorId, sku: identifierPreview.json().data.sku, name: `Audit məhsulu ${suffix}`,
         shortDescription: 'Audit məhsulunun qısa təsviri.',
         description: 'Admin məhsul yaratma və status axınını yoxlayan audit məhsuludur.',
-        price: 19.9, currency: 'AZN', brandId, categoryIds: [categoryId], mediaIds: [mediaId], attributes: { material: 'Audit' },
+        price: 19.9, currency: 'AZN', brandId, categoryIds: [categoryId, mainCategoryId, subcategoryId], mediaIds: [mediaId], attributes: { material: 'Audit' },
         isFeatured: true, isPopular: true, isTopPick: true, displayPosition: 987, merchandisingBadge: 'recommended',
         seoTitle: `Audit məhsulu ${suffix}`, seoDescription: 'Audit məhsulunun avtomatik SEO təsviri.',
         warehouseId: warehouses.json().data[0].id, initialStock: 3
@@ -1235,7 +1323,19 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     const productDetail = await app.inject({ method: 'GET', url: `/api/v1/catalog/products/${productId}`, headers: authHeaders(adminJar) });
     assert.equal(productDetail.statusCode, 200);
     assert.equal(productDetail.json().data.brand_id, brandId);
-    assert.equal(productDetail.json().data.categories[0].id, categoryId);
+    assert.deepEqual(
+      new Set(productDetail.json().data.categories.map((category: { id: string }) => category.id)),
+      new Set([categoryId, mainCategoryId, subcategoryId])
+    );
+    const invalidProductCategoryPath = await app.inject({
+      method: 'PATCH', url: `/api/v1/catalog/products/${productId}`, headers: authHeaders(adminJar),
+      payload: { categoryIds: [categoryId, subcategoryId] }
+    });
+    assert.equal(invalidProductCategoryPath.statusCode, 400);
+    assert.equal(invalidProductCategoryPath.json().error.code, 'CATEGORY_PATH_INVALID');
+    const newestProducts = await app.inject({ method: 'GET', url: `/api/v1/catalog/products?storeId=${storeRow.id}&limit=10`, headers: authHeaders(adminJar) });
+    assert.equal(newestProducts.statusCode, 200, newestProducts.body);
+    assert.equal(newestProducts.json().data[0].id, productId);
     assert.equal(productDetail.json().data.media[0].id, mediaId);
     assert.equal(Number(productDetail.json().data.variants[0].inventory[0].quantity), 3);
     assert.equal(productDetail.json().data.is_featured, true);
@@ -1246,6 +1346,25 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     });
     assert.equal(publishedProduct.statusCode, 200);
     assert.equal(publishedProduct.json().data.status, 'published');
+    const updatedPublishedProduct = await app.inject({
+      method: 'PATCH', url: `/api/v1/catalog/products/${productId}`, headers: authHeaders(adminJar),
+      payload: {
+        shortDescription: 'Audit məhsulunun yenilənmiş qısa təsviri.',
+        description: 'Admin tərəfindən yenilənmiş ətraflı məhsul təsviri.'
+      }
+    });
+    assert.equal(updatedPublishedProduct.statusCode, 200, updatedPublishedProduct.body);
+    assert.equal(updatedPublishedProduct.json().data.listing.status, 'published');
+    const publicProductPage = await app.inject({ method: 'GET', url: `/mehsul/${createdProduct.json().data.listing.slug}/` });
+    assert.equal(publicProductPage.statusCode, 200, publicProductPage.body);
+    assert.match(String(publicProductPage.headers['cache-control']), /max-age=0, must-revalidate/);
+    assert.match(publicProductPage.body, /class="db-product-short-description"/);
+    assert.match(publicProductPage.body, /Audit məhsulunun yenilənmiş qısa təsviri/);
+    assert.match(publicProductPage.body, /data-product-full-description>Admin tərəfindən yenilənmiş ətraflı məhsul təsviri\.<\/p>/);
+    const publicNestedCategory = await app.inject({ method: 'GET', url: `/magaza/${categoryPath}/` });
+    assert.equal(publicNestedCategory.statusCode, 200, publicNestedCategory.body);
+    assert.match(publicNestedCategory.body, new RegExp(`Audit məhsulu ${suffix}`));
+    assert.match(publicNestedCategory.body, /Audit məhsulunun yenilənmiş qısa təsviri/);
 
     const submittedProductReview = await app.inject({
       method: 'POST', url: `/api/v1/customer/products/${createdProduct.json().data.listing.slug}/reviews`, headers: authHeaders(originalCustomerJar),
@@ -1519,7 +1638,9 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
       }
     }
     if (brandId) await pool.query('DELETE FROM brands WHERE id=$1', [brandId]);
-    if (categoryId) await pool.query('DELETE FROM categories WHERE id=$1', [categoryId]);
+    for (const currentCategoryId of [subcategoryId, mainCategoryId, categoryId].filter(Boolean)) {
+      await pool.query('DELETE FROM categories WHERE id=$1', [currentCategoryId]);
+    }
     if (createdUserIds.length || vendorId) {
       await pool.query(`DELETE FROM audit_logs WHERE actor_user_id=ANY($1::uuid[])
         OR entity_id=ANY($2::text[]) OR vendor_id=$3`, [createdUserIds, [...createdUserIds, vendorId].filter(Boolean), vendorId || null]);

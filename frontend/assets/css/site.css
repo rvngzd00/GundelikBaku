@@ -7,6 +7,218 @@
   src: url("../wp-content/themes/bigxon/fonts/Poppins-Regular.woff2") format("woff2");
 }
 
+/* Dynamic Mağaza taxonomy: department → main category → subcategory. */
+@media (min-width:1024px) {
+  #menu-desktop-menu-with-categories .db-store-menu-root,
+  .page-navigation-root .db-store-menu-root,
+  .db-store-flyout-item {
+    position:relative;
+  }
+  #menu-desktop-menu-with-categories .db-store-menu-root > .db-store-flyout,
+  .page-navigation-root .db-store-menu-root > .db-store-flyout {
+    position:absolute;
+    z-index:500;
+    top:100%;
+    left:0;
+    display:none;
+    width:248px;
+    min-width:248px;
+    margin:0;
+    padding:7px;
+    overflow:visible;
+    background:#fff;
+    border:1px solid #dde3ec;
+    border-radius:0 0 9px 9px;
+    box-shadow:0 18px 42px rgba(7,31,82,.2);
+    list-style:none;
+  }
+  #menu-desktop-menu-with-categories .db-store-menu-root:hover > .db-store-flyout,
+  #menu-desktop-menu-with-categories .db-store-menu-root:focus-within > .db-store-flyout,
+  .page-navigation-root .db-store-menu-root:hover > .db-store-flyout,
+  .page-navigation-root .db-store-menu-root:focus-within > .db-store-flyout {
+    display:block;
+  }
+  #menu-desktop-menu-with-categories .db-store-flyout .db-store-flyout,
+  .page-navigation-root .db-store-flyout .db-store-flyout {
+    position:absolute;
+    z-index:2;
+    top:-8px;
+    left:calc(100% + 7px);
+    display:none;
+    width:248px;
+    min-width:248px;
+    margin:0;
+    padding:7px;
+    overflow:visible;
+    background:#fff;
+    border:1px solid #dde3ec;
+    border-radius:8px;
+    box-shadow:0 18px 42px rgba(7,31,82,.18);
+    list-style:none;
+  }
+  #menu-desktop-menu-with-categories .db-store-flyout .db-store-flyout::before,
+  .page-navigation-root .db-store-flyout .db-store-flyout::before {
+    content:'';
+    position:absolute;
+    top:-6px;
+    right:100%;
+    width:8px;
+    height:calc(100% + 12px);
+  }
+  #menu-desktop-menu-with-categories .db-store-flyout-item:hover > .db-store-flyout,
+  #menu-desktop-menu-with-categories .db-store-flyout-item:focus-within > .db-store-flyout,
+  .page-navigation-root .db-store-flyout-item:hover > .db-store-flyout,
+  .page-navigation-root .db-store-flyout-item:focus-within > .db-store-flyout {
+    display:block;
+  }
+  #menu-desktop-menu-with-categories .db-store-flyout-item > a,
+  .page-navigation-root .db-store-flyout-item > a {
+    display:flex;
+    min-height:38px;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:9px 11px;
+    color:#131a2a;
+    background:transparent;
+    border:0;
+    border-radius:5px;
+    font-size:12px;
+    font-weight:650;
+    line-height:1.25;
+    text-align:left;
+    text-transform:none;
+    white-space:normal;
+  }
+  #menu-desktop-menu-with-categories .db-store-flyout-item > a:hover,
+  .page-navigation-root .db-store-flyout-item > a:hover {
+    color:#174dd8;
+    background:#f0f5ff;
+  }
+  .db-store-menu-chevron {
+    width:7px;
+    height:7px;
+    flex:0 0 7px;
+    border-top:1.5px solid currentColor;
+    border-right:1.5px solid currentColor;
+    transform:rotate(45deg);
+  }
+  .db-store-level-2 > .db-store-flyout-item > a {
+    font-weight:550;
+  }
+}
+
+@media (max-width:1023px) {
+  #menu-mobile-store.db-mobile-taxonomy,
+  .page-store-navigation.db-mobile-taxonomy {
+    display:block;
+    width:100%;
+    margin:0;
+    padding:4px 0 18px;
+    overflow:visible;
+    list-style:none;
+  }
+  .db-mobile-taxonomy-department {
+    width:100%;
+    margin:0;
+    border-bottom:1px solid #e5e8ee;
+  }
+  .db-mobile-taxonomy-department > details > summary,
+  .db-mobile-taxonomy-main > summary {
+    display:grid;
+    align-items:center;
+    cursor:pointer;
+    list-style:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .db-mobile-taxonomy-department > details > summary::-webkit-details-marker,
+  .db-mobile-taxonomy-main > summary::-webkit-details-marker {
+    display:none;
+  }
+  .db-mobile-taxonomy-department > details > summary {
+    grid-template-columns:44px minmax(0,1fr) 12px;
+    gap:11px;
+    min-height:61px;
+    padding:8px 4px;
+    color:#111827;
+    font-size:13px;
+    font-weight:750;
+  }
+  .db-mobile-taxonomy-image {
+    width:42px;
+    height:42px;
+    overflow:hidden;
+    background:#fff;
+    border:1px solid #dde2ea;
+    border-radius:50%;
+  }
+  .db-mobile-taxonomy-image img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+  .db-mobile-taxonomy summary > i {
+    width:8px;
+    height:8px;
+    justify-self:end;
+    border-right:1.5px solid #3155cf;
+    border-bottom:1.5px solid #3155cf;
+    transform:rotate(45deg);
+    transition:transform .2s ease;
+  }
+  .db-mobile-taxonomy details[open] > summary > i {
+    transform:rotate(225deg);
+  }
+  .db-mobile-taxonomy-panel {
+    padding:2px 0 10px 55px;
+  }
+  .db-mobile-taxonomy-department-all,
+  .db-mobile-taxonomy-links > a {
+    display:flex;
+    min-height:36px;
+    align-items:center;
+    padding:8px 10px;
+    color:#2850e8;
+    background:#f3f6ff;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:750;
+  }
+  .db-mobile-taxonomy-main {
+    border-bottom:1px solid #eef0f4;
+  }
+  .db-mobile-taxonomy-main > summary {
+    grid-template-columns:minmax(0,1fr) 10px;
+    min-height:40px;
+    padding:9px 8px;
+    color:#25304a;
+    font-size:11px;
+    font-weight:700;
+  }
+  .db-mobile-taxonomy-links {
+    display:grid;
+    gap:3px;
+    padding:0 0 8px 9px;
+  }
+  .db-mobile-taxonomy-links > a {
+    min-height:32px;
+    color:#626c82;
+    background:transparent;
+    font-size:10px;
+    font-weight:600;
+  }
+  .db-mobile-taxonomy-links > a::after {
+    content:'›';
+    margin-left:auto;
+    color:#2850e8;
+    font-size:18px;
+  }
+  .db-mobile-taxonomy-links > .db-mobile-taxonomy-all {
+    color:#2850e8;
+    font-weight:700;
+  }
+}
+
 @font-face {
   font-family: "Poppins";
   font-style: normal;
@@ -603,30 +815,76 @@
 
 .db-cms-empty{display:grid;width:100%;min-height:180px;padding:32px;place-content:center;gap:7px;text-align:center;color:#68707a;background:#f7f8fa;border:1px solid #e7e9ed;border-radius:10px}.db-cms-empty strong{color:#171a1f;font-size:17px}.db-cms-empty span{font-size:12px;line-height:1.6}
 
-/* Keep the original logo slots while centering the visible artwork in logoSite.png. */
+/* The current artwork has a large canvas around the actual mark. Give the
+   header logo an explicit, non-collapsing slot and crop the canvas inside it.
+   The explicit height is important in the exported Elementor flex header:
+   absolutely positioned images must not be the slot's only height source. */
 .header-logo a {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  width: min(261px, 100%);
-  aspect-ratio: 261 / 81;
-  overflow: hidden;
+  justify-content: center;
+  width: 200px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-width: 100% !important;
+  aspect-ratio: auto !important;
+  flex: 0 0 200px;
+  overflow: hidden !important;
   padding: 0;
   background: transparent;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .header-logo img.logo,
 .header-logo img.sticky-logo {
-  display: block;
-  width: 100%;
-  height: 100% !important;
-  max-height: none;
-  object-fit: cover;
-  object-position: center;
-  transform: translateY(6px) scale(1.48);
-  transform-origin: center;
+  position: absolute !important;
+  z-index: 1;
+  top: 50% !important;
+  left: 50% !important;
+  display: block !important;
+  width: 145% !important;
+  min-width: 145% !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(-50%, -50%) !important;
+  image-rendering: auto;
+}
+
+/* Both exported variants currently point to the same CMS image. Always keep a
+   single real image visible, including after the sticky header activates. */
+.et__header .header-logo img.logo,
+.et__header.sticky.active .header-logo img.logo {
+  display: block !important;
+}
+
+.et__header .header-logo img.sticky-logo,
+.et__header.sticky.active .header-logo img.sticky-logo {
+  display: none !important;
+}
+
+.mobile-container .header-logo img.logo {
+  display: block !important;
+}
+
+.mobile-container .header-logo img.sticky-logo {
+  display: none !important;
+}
+
+.header-logo,
+.elementor-element-4a2767a,
+.elementor-element-4a2767a > .elementor-widget-container {
+  min-width: 0;
 }
 
 .et__footer .elementor-element-1ac52de .et__image {
+  position: relative;
   display: inline-flex;
   width: min(261px, 100%);
   aspect-ratio: 261 / 81;
@@ -636,13 +894,17 @@
 }
 
 .et__footer .elementor-element-1ac52de .et__image img {
+  position: absolute;
+  top: 66%;
+  left: 50%;
   display: block;
-  width: 100%;
-  height: 100% !important;
-  object-fit: cover;
-  object-position: center;
-  transform: translateY(4px) scale(1.48);
-  transform-origin: center;
+  width: 145%;
+  height: auto !important;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  transform: translate(-50%, -50%);
+  image-rendering: auto;
 }
 
 .et__footer .elementor-element.elementor-element-351a1d5 .icon-box-title {
@@ -887,11 +1149,12 @@
   place-items: center;
   min-height: 210px;
   padding: 18px;
+  overflow: hidden;
   background: #f7f8fa;
 }
 
-.db-product-media a { display: block; width: 100%; }
-.db-product-media img { width: 100%; height: 190px; object-fit: contain; }
+.db-product-media a { display: grid; width: 100%; min-width: 0; height: 100%; place-items: center; overflow: hidden; }
+.db-product-media img { display:block; width: 100%; height: 190px; max-width:100%; max-height:100%; object-fit: contain; object-position:center; }
 
 .db-product-sale,
 .db-product-new {
@@ -969,7 +1232,7 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-y;
   cursor: default;
@@ -1020,7 +1283,7 @@
   min-width: 0;
   flex-direction: column;
   scroll-snap-align: start;
-  scroll-snap-stop: always;
+  scroll-snap-stop: normal;
   border: 1px solid #dcdde1;
   border-radius: 6px;
   box-shadow: none;
@@ -1302,7 +1565,7 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-y;
   cursor: default;
@@ -1352,7 +1615,7 @@
   border-radius: 6px;
   box-shadow: none;
   scroll-snap-align: start;
-  scroll-snap-stop: always;
+  scroll-snap-stop: normal;
   transform: none;
   transition: border-color .2s ease;
 }
@@ -1371,6 +1634,7 @@
   height: 100%;
   padding: 17px 10px 43px;
   place-items: center;
+  overflow:hidden;
   background: #fff;
 }
 
@@ -1391,7 +1655,10 @@
   display: block;
   width: 100%;
   height: 112px;
+  max-width:100%;
+  max-height:100%;
   object-fit: contain;
+  object-position:center;
   transition: transform .22s ease;
 }
 
@@ -1856,7 +2123,7 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-y;
   cursor: default;
@@ -2016,7 +2283,7 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-y;
   cursor: default;
@@ -3018,10 +3285,15 @@ html.db-quick-view-open {
     display: none !important;
   }
 
-  .header-logo a { width: 175px; }
+  .header-logo a {
+    width: 160px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    flex-basis: 160px;
+  }
 
   .header-logo img.logo,
-  .header-logo img.sticky-logo { width: 100%; }
+  .header-logo img.sticky-logo { width: 145% !important; min-width: 145% !important; }
 
   .elementor-element-4ff0915 .et__mobile-toggle {
     display: grid !important;
@@ -3293,3 +3565,196 @@ html.db-quick-view-open {
 /* CMS navigation thumbnails keep the exported menu geometry intact. */
 .db-editor-menu-thumb{display:inline-grid;width:34px;height:34px;flex:0 0 34px;margin-right:10px;place-items:center;overflow:hidden;background:#f4f6f4;border-radius:50%;vertical-align:middle}.db-editor-menu-thumb img{width:100%;height:100%;object-fit:contain}
 @media(max-width:767px){.db-editor-desktop-only{display:none!important}}
+
+/* Stable intrinsic sizing around the desktop/tablet breakpoint. */
+@media (min-width:900px) and (max-width:1319px) {
+  .elementor-element-961f2f0,.elementor-element-2de0fa9,
+  .elementor-element-f440f34,.elementor-element-4dee5e4,.db-featured-products,.db-featured-viewport {
+    width:100%!important;max-width:100%!important;min-width:0!important;
+  }
+  /* The left rail already has a fixed responsive width; let flexbox subtract
+     that width and the parent's gap instead of duplicating the calculation. */
+  .elementor-element-800aaa0>.e-con-inner>.elementor-element-f291284 {
+    --width:auto!important;width:auto!important;max-width:none!important;min-width:0!important;flex:1 1 0!important;
+  }
+  .elementor-element-961f2f0{padding-inline:clamp(14px,2vw,24px)!important}
+  .elementor-element-2de0fa9 .et__attributes_filter{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .elementor-element-2de0fa9 select,.elementor-element-2de0fa9 button{width:100%;min-width:0}
+}
+
+/* The real responsive typography is part of the Slider Revolution model and
+   is measured before initialization. Masks stay open as a final webfont-swap
+   safeguard, without overriding the dimensions calculated by the slider. */
+#SR7_5_1 sr7-mask,
+#SR7_5_1 sr7-txt[id$="-3"],
+#SR7_5_1 sr7-txt[id$="-4"],
+#SR7_5_1 sr7-txt[id$="-5"] {
+  overflow:visible!important;
+}
+
+/* Mobile store taxonomy: a real three-level drill-down rather than nested
+   dropdowns. Shared by the homepage drawer and every inner-page menu. */
+@media(max-width:1023px) {
+  #menu-mobile-store.db-mobile-taxonomy,
+  .page-navigation .page-store-navigation.db-mobile-taxonomy {
+    display:block;
+    width:100%;
+    margin:0;
+    padding:0 0 max(22px,env(safe-area-inset-bottom));
+    overflow:hidden;
+    background:#fff;
+    list-style:none;
+  }
+  .db-mobile-taxonomy > li {
+    width:100%;
+    margin:0;
+    background:#fff;
+    border-bottom:1px solid #e6e9ef;
+    list-style:none;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-control,
+  .page-navigation .page-store-navigation.db-mobile-taxonomy .db-mobile-taxonomy-control,
+  .db-mobile-taxonomy .db-mobile-taxonomy-back,
+  .db-mobile-taxonomy .db-mobile-taxonomy-all {
+    display:flex;
+    width:100%;
+    min-height:58px;
+    align-items:center;
+    gap:12px;
+    margin:0;
+    padding:8px 18px;
+    color:#111827;
+    background:#fff;
+    border:0;
+    border-radius:0;
+    font-family:Poppins,Arial,sans-serif;
+    line-height:1.35;
+    text-align:left;
+    text-transform:none;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .db-mobile-taxonomy-level-0 .db-mobile-taxonomy-control {
+    min-height:64px;
+    font-size:14px;
+    font-weight:800;
+  }
+  .db-mobile-taxonomy-level-1 .db-mobile-taxonomy-control {
+    min-height:54px;
+    padding-left:20px;
+    font-size:12.5px;
+    font-weight:700;
+  }
+  .db-mobile-taxonomy-level-2 .db-mobile-taxonomy-control {
+    min-height:50px;
+    padding-left:22px;
+    color:#4b5568;
+    font-size:11.5px;
+    font-weight:600;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-title {
+    min-width:0;
+    flex:1 1 auto;
+    overflow-wrap:anywhere;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-image {
+    display:grid;
+    width:42px;
+    height:42px;
+    flex:0 0 42px;
+    place-items:center;
+    overflow:hidden;
+    background:#f7f8fb;
+    border:1px solid #e0e5ed;
+    border-radius:50%;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-image img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+  .db-mobile-taxonomy-chevron {
+    display:block;
+    width:8px;
+    height:14px;
+    flex:0 0 8px;
+    margin-left:auto;
+    background:#174dd8;
+    -webkit-mask:url("../wp-content/uploads/mobile-menu-chevron.svg") center/contain no-repeat;
+    mask:url("../wp-content/uploads/mobile-menu-chevron.svg") center/contain no-repeat;
+  }
+  .db-mobile-taxonomy-chevron.is-back {
+    margin:0;
+    transform:rotate(180deg);
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-heading {
+    border-bottom:1px solid #dce3f2;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-back {
+    min-height:60px;
+    color:#174dd8;
+    background:#f6f8fd;
+    font-size:14px;
+    font-weight:800;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-all {
+    min-height:48px;
+    color:#174dd8;
+    background:#fff;
+    font-size:11px;
+    font-weight:700;
+  }
+  .db-mobile-taxonomy .db-mobile-taxonomy-empty {
+    padding:22px 18px;
+    color:#737d90;
+    font-size:11px;
+    line-height:1.6;
+  }
+  .db-mobile-taxonomy.db-taxonomy-forward > li {
+    animation:db-taxonomy-forward .32s cubic-bezier(.16,1,.3,1) both;
+  }
+  .db-mobile-taxonomy.db-taxonomy-back > li {
+    animation:db-taxonomy-back .28s cubic-bezier(.16,1,.3,1) both;
+  }
+}
+
+@media(max-width:767px) {
+  .mobile-container {
+    width:min(100vw,400px)!important;
+    max-width:100vw!important;
+    height:100dvh!important;
+    overflow:hidden!important;
+  }
+  .mobile-container .mobile-tabs-container {
+    min-height:0;
+    flex:1 1 auto;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .mobile-container .mobile-tabset .mobile-tab-item {
+    min-height:52px;
+    padding:9px 7px;
+    font-size:13px;
+    line-height:18px;
+  }
+  .mobile-container .mobile-tabset .mobile-icon {
+    width:20px;
+    height:20px;
+    flex-basis:20px;
+  }
+}
+
+@keyframes db-taxonomy-forward {
+  from {opacity:.3;transform:translateX(42px)}
+  to {opacity:1;transform:translateX(0)}
+}
+@keyframes db-taxonomy-back {
+  from {opacity:.35;transform:translateX(-34px)}
+  to {opacity:1;transform:translateX(0)}
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .db-mobile-taxonomy.db-taxonomy-forward > li,
+  .db-mobile-taxonomy.db-taxonomy-back > li {animation:none}
+}

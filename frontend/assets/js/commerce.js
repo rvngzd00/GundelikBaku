@@ -629,11 +629,16 @@
   });
 
   let relatedDrag = null;
+  let relatedDragFrame = 0;
+  let relatedPendingLeft = 0;
   let relatedClickBlock = null;
 
   const finishRelatedDrag = (event, cancelled = false) => {
     if (!relatedDrag || relatedDrag.pointerId !== event.pointerId) return;
     const drag = relatedDrag;
+    cancelAnimationFrame(relatedDragFrame);
+    relatedDragFrame = 0;
+    if (drag.dragging) drag.track.scrollLeft = relatedPendingLeft;
     relatedDrag = null;
     drag.track.classList.remove('is-dragging');
     try {
@@ -676,7 +681,11 @@
       try { relatedDrag.track.setPointerCapture(event.pointerId); } catch { /* Dragging also works without capture. */ }
     }
     if (event.cancelable) event.preventDefault();
-    relatedDrag.track.scrollLeft = relatedDrag.scrollLeft - distanceX;
+    relatedPendingLeft = relatedDrag.scrollLeft - distanceX;
+    if (!relatedDragFrame) relatedDragFrame = requestAnimationFrame(() => {
+      relatedDragFrame = 0;
+      if (relatedDrag) relatedDrag.track.scrollLeft = relatedPendingLeft;
+    });
   });
   document.addEventListener('pointerup', (event) => finishRelatedDrag(event));
   document.addEventListener('pointercancel', (event) => finishRelatedDrag(event, true));

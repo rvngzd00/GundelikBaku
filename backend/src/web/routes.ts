@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
@@ -6,7 +6,10 @@ import { findNavigationSection, navigationSections, type NavigationChild, type N
 import { renderProductDetail, type ProductReviewView } from './product-detail.js';
 import { accountShell, breadcrumb, categoryNavigation, emptyState, escapeHtml, layout, money, productCard, type ProductView } from './templates.js';
 
-const productSelect = `SELECT pl.id,pl.title,pl.slug,pl.short_description,pl.description,pl.price,pl.compare_at_price,
+const productSelect = `SELECT pl.id,pl.title,pl.slug,
+  coalesce(nullif(pl.short_description,''),nullif(p.description,'')) AS short_description,
+  coalesce(nullif(pl.description,''),nullif(p.description,''),nullif(pl.short_description,'')) AS description,
+  pl.price,pl.compare_at_price,
   pl.currency,pl.seo_title,pl.seo_description,pl.canonical_url,pl.schema_data,p.id AS product_id,p.sku,p.attributes,
   p.product_type,v.display_name AS vendor_name,b.name AS brand_name,ma.public_url AS image_url,ma.alt_text,
   (SELECT pv.id FROM product_variants pv WHERE pv.product_id=p.id AND pv.status='active' ORDER BY pv.created_at LIMIT 1) AS variant_id,
@@ -98,6 +101,118 @@ function categoryContext(section: NavigationSection, child: NavigationChild): st
   return `<div class="page-container">${breadcrumb([[section.label, section.href], [child.label]])}</div>${categoryNavigation(section, child.slug)}`;
 }
 
+type DatabaseCategory = {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  description: string;
+  seo_title: string | null;
+  seo_description: string | null;
+  image_url: string | null;
+  image_alt: string | null;
+  depth: number;
+  path_slugs: string[];
+  path_names: string[];
+};
+
+type StoreCategoryOption = DatabaseCategory & { product_count: number };
+
+function storeCategoryHref(category: Pick<DatabaseCategory, 'path_slugs'>): string {
+  return `/magaza/${category.path_slugs.map(encodeURIComponent).join('/')}/`;
+}
+
+function renderStoreCategoryExplorer(category: DatabaseCategory, categories: StoreCategoryOption[]): string {
+  const directChildren = categories.filter((item) => item.parent_id === category.id);
+  const visibleItems = category.depth === 2
+    ? categories.filter((item) => item.parent_id === category.parent_id)
+    : directChildren;
+  if (!visibleItems.length) return '';
+
+  const heading = category.depth === 0
+    ? `${category.name}: əsas və alt kateqoriyalar`
+    : category.depth === 1 ? `${category.name} alt kateqoriyaları` : 'Digər alt kateqoriyalar';
+  const groups = visibleItems.map((item) => {
+    const children = categories.filter((candidate) => candidate.parent_id === item.id);
+    const current = item.id === category.id;
+    return `<article class="page-category-group${current ? ' is-current' : ''}">
+      <a class="page-category-group-head" href="${storeCategoryHref(item)}"${current ? ' aria-current="page"' : ''}>
+        <span class="page-category-group-image"><img src="${escapeHtml(item.image_url || '/assets/wp-content/uploads/other-cat.webp')}" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
+        <span><strong>${escapeHtml(item.name)}</strong><small>${item.product_count} məhsul</small></span><i aria-hidden="true">›</i>
+      </a>
+      ${children.length ? `<ul>${children.map((child) => `<li><a href="${storeCategoryHref(child)}"><span>${escapeHtml(child.name)}</span><small>${child.product_count ? `${child.product_count} məhsul` : 'Məhsul yoxdur'}</small><i aria-hidden="true">›</i></a></li>`).join('')}</ul>` : ''}
+    </article>`;
+  }).join('');
+  return `<section class="page-category-explorer" aria-labelledby="database-category-children"><div class="page-container">
+    <div class="page-category-heading"><p>KATEQORİYANI SEÇİN</p><h2 id="database-category-children">${escapeHtml(heading)}</h2></div>
+    <div class="page-category-groups">${groups}</div>
+  </div></section>`;
+}
+
+async function databaseCategoryByPath(slugs: string[]): Promise<DatabaseCategory | undefined> {
+  const result = await pool.query<DatabaseCategory>(`
+    WITH RECURSIVE tree AS (
+      SELECT c.id,c.parent_id,c.name,c.slug,c.description,c.seo_title,c.seo_description,c.image_asset_id,
+        0 AS depth,ARRAY[c.slug] AS path_slugs,ARRAY[c.name] AS path_names
+      FROM categories c JOIN stores s ON s.id=c.store_id
+      WHERE s.code=$1 AND c.parent_id IS NULL AND c.status='active'
+      UNION ALL
+      SELECT c.id,c.parent_id,c.name,c.slug,c.description,c.seo_title,c.seo_description,c.image_asset_id,
+        tree.depth+1,tree.path_slugs||c.slug,tree.path_names||c.name
+      FROM categories c JOIN tree ON c.parent_id=tree.id
+      WHERE c.status='active' AND tree.depth<2
+    )
+    SELECT tree.*,ma.public_url AS image_url,ma.alt_text AS image_alt
+    FROM tree LEFT JOIN media_assets ma ON ma.id=tree.image_asset_id
+    WHERE tree.path_slugs=$2::text[] LIMIT 1
+  `, [env.DEFAULT_STORE_CODE, slugs]);
+  return result.rows[0];
+}
+
+async function renderDatabaseCategoryPage(slugs: string[]): Promise<{ html: string; category: DatabaseCategory } | null> {
+  const category = await databaseCategoryByPath(slugs);
+  if (!category) return null;
+  const [categoryOptions, products] = await Promise.all([
+    pool.query<StoreCategoryOption>(`WITH RECURSIVE tree AS (
+        SELECT c.id,c.parent_id,c.name,c.slug,c.description,c.seo_title,c.seo_description,c.image_asset_id,
+          0 AS depth,ARRAY[c.position] AS position_path,ARRAY[c.slug] AS path_slugs,ARRAY[c.name] AS path_names
+        FROM categories c JOIN stores s ON s.id=c.store_id
+        WHERE s.code=$1 AND c.parent_id IS NULL AND c.status='active'
+        UNION ALL
+        SELECT c.id,c.parent_id,c.name,c.slug,c.description,c.seo_title,c.seo_description,c.image_asset_id,
+          tree.depth+1,tree.position_path||c.position,tree.path_slugs||c.slug,tree.path_names||c.name
+        FROM categories c JOIN tree ON c.parent_id=tree.id WHERE c.status='active' AND tree.depth<2
+      ) SELECT tree.id,tree.parent_id,tree.name,tree.slug,tree.description,tree.seo_title,tree.seo_description,
+        ma.public_url AS image_url,ma.alt_text AS image_alt,tree.depth,tree.path_slugs,tree.path_names,
+        (SELECT count(DISTINCT pl.product_id)::int FROM product_listings pl
+          JOIN products p ON p.id=pl.product_id AND p.deleted_at IS NULL
+          JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
+          WHERE pl.status='published' AND EXISTS (
+            WITH RECURSIVE descendants AS (
+              SELECT tree.id AS id UNION ALL
+              SELECT child.id FROM categories child JOIN descendants d ON child.parent_id=d.id WHERE child.status='active'
+            ) SELECT 1 FROM descendants d JOIN product_categories pc ON pc.category_id=d.id WHERE pc.product_id=p.id
+          )) AS product_count
+      FROM tree LEFT JOIN media_assets ma ON ma.id=tree.image_asset_id ORDER BY tree.position_path,tree.name`, [env.DEFAULT_STORE_CODE]),
+    pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id
+      WHERE s.code=$1 AND pl.status='published' AND p.deleted_at IS NULL AND EXISTS (
+        WITH RECURSIVE descendants AS (
+          SELECT id FROM categories WHERE id=$2
+          UNION ALL SELECT child.id FROM categories child JOIN descendants d ON child.parent_id=d.id WHERE child.status='active'
+        ) SELECT 1 FROM descendants d JOIN product_categories pc ON pc.category_id=d.id WHERE pc.product_id=p.id
+      ) ORDER BY pl.published_at DESC`, [env.DEFAULT_STORE_CODE, category.id])
+  ]);
+  const path = `/magaza/${category.path_slugs.map(encodeURIComponent).join('/')}/`;
+  const crumbs: Array<[string, string?]> = [['Mağaza', '/magaza/']];
+  category.path_names.forEach((name, index) => {
+    if (index < category.path_names.length - 1) crumbs.push([name, `/magaza/${category.path_slugs.slice(0, index + 1).map(encodeURIComponent).join('/')}/`]);
+    else crumbs.push([name]);
+  });
+  const categoryExplorer = renderStoreCategoryExplorer(category, categoryOptions.rows);
+  const html = `${pageHero('GÜNDƏLİK BAKI MAĞAZA', category.name, category.description || `${category.name} üzrə seçilmiş məhsulları kəşf edin.`)}<div class="page-container">${breadcrumb(crumbs)}</div>${categoryExplorer}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>SEÇİLMİŞ MƏHSULLAR</p><h2>${escapeHtml(category.name)} məhsulları</h2></div><a href="/magaza/">Bütün məhsullar →</a></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Bu kateqoriyada məhsul yoxdur', 'Yeni məhsullar əlavə edilən kimi burada görünəcək. Digər alt kateqoriyalara baxa bilərsiniz.', '/magaza/', 'Mağazaya bax')}</div></section>`;
+  return { category, html: layout({ title: category.seo_title || `${category.name} | Gündəlik Bakı`, description: category.seo_description || category.description || `${category.name} məhsulları`, path, active: 'magaza', content: html }) };
+}
+
 function renderCampaignCards(campaigns: Array<Record<string, unknown>>): string {
   return campaigns.map((campaign) => `<article id="${escapeHtml(campaign['slug'])}"><div><span>${escapeHtml(campaign['campaign_type'])}</span><small>${escapeHtml(campaign['vendor_name'] || 'Gündəlik Bakı')}</small></div><h2>${escapeHtml(campaign['name'])}</h2><p>${escapeHtml(campaign['description'])}</p><time>${new Intl.DateTimeFormat('az-AZ', { dateStyle: 'long' }).format(new Date(String(campaign['ends_at'])))} tarixinədək</time><a href="/magaza/">Məhsullara bax →</a></article>`).join('');
 }
@@ -181,7 +296,7 @@ async function renderCategoryChild(section: NavigationSection, child: Navigation
 
 const staticPages: Record<string, { active?: string; title: string; description: string; kicker: string; body: string }> = {
   'baki-club': { active: 'baki-club', title: 'Bakı Club — Oxu, skan et, qazan', description: 'Gündəlik Bakı platformasında alış-veriş, QR skanları və kampaniyalar vasitəsilə xal və hədiyyələr qazanın.', kicker: 'LOYALLIQ PROQRAMI', body: `<div class="page-feature-grid"><article id="xal-qazan"><b>01</b><h2>Xal qazan</h2><p>Alış-veriş, kampaniya və QR skanlarından avtomatik xal toplayın.</p></article><article id="hediyyeler"><b>02</b><h2>Hədiyyələri seç</h2><p>Topladığınız xalları eksklüziv məhsul və endirimlərlə dəyişin.</p></article><article id="giveaway"><b>03</b><h2>Giveaway-lərə qoşul</h2><p>Club üzvləri üçün keçirilən xüsusi çəkilişlərdə iştirak edin.</p></article><article id="qr-cuzdan"><b>04</b><h2>QR cüzdan</h2><p>Kupon və bonuslarınızı bir mərkəzdən izləyin.</p></article></div>` },
-  biznes: { active: 'biznes', title: 'Biznesinizi Gündəlik Bakı ilə böyüdün', description: 'Reklam, sponsorluq, məhsul vitrini və ölçülə bilən kampaniyalar üçün vahid biznes platforması.', kicker: 'BİZNES ÜÇÜN', body: `<div class="page-feature-grid"><article id="reklam"><b>01</b><h2>Reklam ver</h2><p>Hədəf auditoriyaya uyğun banner və yerli kampaniyalar yaradın.</p></article><article id="sponsorluq"><b>02</b><h2>Sponsorluq</h2><p>Jurnal, tədbir və xüsusi layihələrdə brendinizlə iştirak edin.</p></article><article id="brend-vitrini"><b>03</b><h2>Brend vitrini</h2><p>Məhsullarınızı SEO-dostu kataloqda və kampaniyalarda nümayiş etdirin.</p></article><article id="analitika"><b>04</b><h2>Analitika paneli</h2><p>Baxış, klik, QR skanı, sifariş və dönüşümləri izləyin.</p></article></div><section class="page-cta"><h2>Əməkdaşlığa başlayaq</h2><p>Komandamız biznesiniz üçün uyğun rəqəmsal həlli hazırlasın.</p><a class="page-primary" href="/elaqe/">Bizimlə əlaqə</a></section>` },
+  biznes: { active: 'biznes', title: 'Biznesinizi Gündəlik Bakı ilə böyüdün', description: 'Reklam, sponsorluq, məhsul vitrini və ölçülə bilən kampaniyalar üçün vahid biznes platforması.', kicker: 'BİZNES ÜÇÜN', body: `<div class="page-feature-grid db-business-feature-grid"><a href="/biznes/reklam-ver/"><article id="reklam"><b>01</b><h2>Reklam ver</h2><p>Hədəf auditoriyaya uyğun banner və yerli kampaniyalar yaradın.</p><span>Davam et →</span></article></a><a href="/biznes/sponsorluq/"><article id="sponsorluq"><b>02</b><h2>Sponsorluq</h2><p>Jurnal, tədbir və xüsusi layihələrdə brendinizlə iştirak edin.</p><span>Davam et →</span></article></a><a href="/biznes/brend-vitrini/"><article id="brend-vitrini"><b>03</b><h2>Brend vitrini</h2><p>Məhsullarınızı SEO-dostu kataloqda və kampaniyalarda nümayiş etdirin.</p><span>Davam et →</span></article></a><a href="/biznes/analitika-paneli/"><article id="analitika"><b>04</b><h2>Analitika paneli</h2><p>Baxış, klik, QR skanı, sifariş və dönüşümləri izləyin.</p><span>Davam et →</span></article></a></div><section class="page-cta"><h2>Əməkdaşlığa başlayaq</h2><p>Biznes alətlərindən istifadə etmək üçün satıcı hesabınıza keçin.</p><a class="page-primary" href="/satici-girisi/">Satıcı olaraq daxil ol</a></section>` },
   haqqimizda: { title: 'Gündəlik Bakı haqqında', description: 'Gündəlik Bakı şəhərin alış-veriş, endirim, jurnal və biznes ekosistemidir.', kicker: 'BİZ KİMİK', body: `<section class="page-prose"><h2>Şəhərin fürsətlərini bir platformada birləşdiririk</h2><p>Gündəlik Bakı istifadəçiləri etibarlı bizneslər, məhsullar, kampaniyalar və faydalı şəhər kontenti ilə əlaqələndirir.</p><h2>Missiyamız</h2><p>Yerli bizneslərin rəqəmsal görünürlüğünü artırmaq, istifadəçilərə isə daha rahat və sərfəli seçim imkanı yaratmaqdır.</p></section>` },
   elaqe: { title: 'Gündəlik Bakı ilə əlaqə', description: 'Satış, reklam, texniki dəstək və tərəfdaşlıq üçün Gündəlik Bakı komandası ilə əlaqə saxlayın.', kicker: 'ƏLAQƏ', body: `<div class="page-contact-grid"><article><h2>Biznes və reklam</h2><a href="mailto:business@gundelikbaki.az">business@gundelikbaki.az</a><a href="tel:+994502645400">+994 50 264 54 00</a></article><article><h2>Müştəri dəstəyi</h2><a href="mailto:support@gundelikbaki.az">support@gundelikbaki.az</a><p>B.e.–Cümə, 09:00–18:00</p></article><article><h2>Ünvan</h2><p>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</p></article></div>` },
   faq: { title: 'Tez-tez verilən suallar', description: 'Gündəlik Bakı alış-veriş, sifariş, kampaniya və Bakı Club haqqında tez-tez verilən suallar.', kicker: 'DƏSTƏK', body: `<section class="page-faq"><details open><summary>Sifarişi necə verə bilərəm?</summary><p>Məhsulu səbətə əlavə edin, səbət səhifəsində sifariş məlumatlarını tamamlayın.</p></details><details><summary>Satıcılarla necə əməkdaşlıq edə bilərəm?</summary><p>Biznes üçün bölməsindən əlaqə saxlayaraq satıcı hesabı əldə edə bilərsiniz.</p></details><details><summary>Bakı Club xalları necə qazanılır?</summary><p>Uyğun alış-veriş və QR kampaniyalarından sonra xallar hesabınıza əlavə olunur.</p></details></section>` },
@@ -197,11 +312,59 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   const slashed = [...navigationSections.map((section) => section.href.slice(0, -1)), '/sebet', ...accountPaths, ...authPaths, '/haqqimizda', '/elaqe', '/faq', '/catdirilma', '/geri-qaytarma', '/mexfilik', '/istifade-sertleri'];
   for (const path of slashed) app.get(path, async (_request, reply) => reply.redirect(`${path}/`, 308));
 
+  const businessAccess = async (request: FastifyRequest, reply: FastifyReply): Promise<'guest' | 'customer' | 'pending' | 'active' | 'inactive'> => {
+    try {
+      await app.authenticate(request, reply);
+    } catch {
+      return 'guest';
+    }
+    if (!request.actor) return 'guest';
+    const result = await pool.query<{ has_vendor_role: boolean; has_active: boolean; has_pending: boolean }>(`
+      SELECT
+        bool_or(r.code IN ('vendor_owner','vendor_staff')) AS has_vendor_role,
+        bool_or(r.code IN ('vendor_owner','vendor_staff') AND v.status='active' AND v.deleted_at IS NULL) AS has_active,
+        bool_or(r.code IN ('vendor_owner','vendor_staff') AND v.status='pending' AND v.deleted_at IS NULL) AS has_pending
+      FROM user_roles ur
+      JOIN roles r ON r.id=ur.role_id
+      LEFT JOIN vendors v ON v.id=ur.vendor_id
+      WHERE ur.user_id=$1
+    `, [request.actor.userId]);
+    const access = result.rows[0];
+    if (!access?.has_vendor_role) return 'customer';
+    if (access.has_active) return 'active';
+    if (access.has_pending) return 'pending';
+    return 'inactive';
+  };
+
+  const businessGate = (section: NavigationSection, child: NavigationChild, access: 'guest' | 'customer' | 'pending' | 'inactive'): string => {
+    const lead = `${pageHero(section.kicker, child.label, child.description)}${categoryContext(section, child)}`;
+    if (access === 'pending') return `${lead}<section class="page-section db-business-gate"><div class="page-container"><div class="db-business-gate-card is-pending"><span class="db-business-gate-icon" aria-hidden="true">⌛</span><p class="db-business-gate-kicker">SATICI HESABI YOXLANILIR</p><h2>Təsdiq gözlənilir</h2><p>Satıcı müraciətiniz administrator tərəfindən yoxlanılır. Kabinetinizdən məhsulları hazırlaya bilərsiniz; biznes alətləri və məhsulların saytda görünməsi hesab təsdiqləndikdən sonra aktiv olacaq.</p><div class="db-business-gate-actions"><a class="page-primary" href="/satici-paneli/">Satıcı kabinetinə keç</a><a href="/elaqe/">Dəstəklə əlaqə</a></div></div></div></section>`;
+    if (access === 'inactive') return `${lead}<section class="page-section db-business-gate"><div class="page-container"><div class="db-business-gate-card is-inactive"><span class="db-business-gate-icon" aria-hidden="true">!</span><p class="db-business-gate-kicker">SATICI HESABI AKTİV DEYİL</p><h2>Satıcı statusunuzu yoxlayın</h2><p>Bu biznes alətinə giriş üçün aktiv satıcı hesabı tələb olunur. Statusun dəqiqləşdirilməsi üçün administratorla əlaqə saxlayın.</p><div class="db-business-gate-actions"><a class="page-primary" href="/elaqe/">Dəstəklə əlaqə</a><a href="/satici-paneli/">Satıcı kabineti</a></div></div></div></section>`;
+    const accountNote = access === 'customer' ? 'Hazırda adi istifadəçi hesabı ilə daxil olmusunuz. ' : '';
+    return `${lead}<section class="page-section db-business-gate"><div class="page-container"><div class="db-business-gate-card"><span class="db-business-gate-icon" aria-hidden="true">B</span><p class="db-business-gate-kicker">BİZNES ALƏTLƏRİ</p><h2>Satıcı hesabı tələb olunur</h2><p>${accountNote}${escapeHtml(child.label)} bölməsindən istifadə etmək üçün satıcı kimi daxil olun və ya partnyorluq qeydiyyatını tamamlayın.</p><div class="db-business-gate-actions"><a class="page-primary" href="/satici-girisi/">Satıcı olaraq daxil ol</a><a href="/satici-qeydiyyati/">Satıcı qeydiyyatından keç</a></div></div></div></section>`;
+  };
+
   for (const section of navigationSections) {
     for (const child of section.children) {
       const pathWithoutSlash = child.href.slice(0, -1);
       app.get(pathWithoutSlash, async (_request, reply) => reply.redirect(child.href, 308));
-      app.get(child.href, async (_request, reply) => {
+      app.get(child.href, async (request, reply) => {
+        if (section.key === 'biznes') {
+          const access = await businessAccess(request, reply);
+          if (access === 'active') return reply.redirect('/satici-paneli/', 303);
+          return sendHtml(reply, layout({
+            title: `${child.label} — Satıcı girişi | Gündəlik Bakı`,
+            description: child.description,
+            path: child.href,
+            active: section.key,
+            robots: 'noindex,follow',
+            content: businessGate(section, child, access)
+          }), 200, 'private, no-store');
+        }
+        if (section.key === 'magaza') {
+          const databasePage = await renderDatabaseCategoryPage([child.slug]);
+          if (databasePage) return sendHtml(reply, databasePage.html);
+        }
         const content = await renderCategoryChild(section, child);
         return sendHtml(reply, layout({
           title: `${child.label} — ${section.label} | Gündəlik Bakı`,
@@ -216,11 +379,25 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
     }
   }
 
+  const databaseCategoryRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    const params = request.params as Record<string, string>;
+    const slugs = [params['department'], params['main'], params['sub']].filter(Boolean).map((value) => z.string().min(1).max(180).parse(value));
+    const page = await renderDatabaseCategoryPage(slugs);
+    if (!page) return reply.callNotFound();
+    return sendHtml(reply, page.html);
+  };
+  for (const route of ['/magaza/:department/:main/', '/magaza/:department/:main/:sub/']) {
+    app.get(route.slice(0, -1), async (request, reply) => reply.redirect(`${request.url.split('?')[0]}/`, 308));
+    app.get(route, databaseCategoryRoute);
+  }
+  // Categories created after deployment are not part of the static navigation
+  // registry, but their department URLs must still resolve immediately.
+  app.get('/magaza/:department/', databaseCategoryRoute);
+
   app.get('/magaza/', async (request, reply) => {
     const query = z.object({ axtaris: z.string().trim().max(100).optional(), kateqoriya: z.string().trim().max(100).optional(), brend: z.string().trim().max(100).optional(), mense: z.string().trim().max(100).optional() }).parse(request.query);
     const params: unknown[] = [env.DEFAULT_STORE_CODE];
     const where = [`s.code=$1`, `pl.status='published'`, `p.deleted_at IS NULL`];
-    let joins = '';
     let orderBy = 'pl.published_at DESC';
     if (query.axtaris) {
       const normalized = normalizeSearchTerm(query.axtaris);
@@ -246,23 +423,35 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
         ELSE 4
       END, pl.published_at DESC`;
     }
-    if (query.kateqoriya) { joins = ' JOIN product_categories pc ON pc.product_id=p.id JOIN categories c ON c.id=pc.category_id'; params.push(query.kateqoriya); where.push(`c.slug=$${params.length}`); }
+    if (query.kateqoriya) {
+      params.push(query.kateqoriya);
+      where.push(`EXISTS (
+        WITH RECURSIVE selected AS (
+          SELECT id FROM categories WHERE store_id=s.id AND slug=$${params.length} AND status='active'
+          UNION ALL SELECT child.id FROM categories child JOIN selected parent ON child.parent_id=parent.id WHERE child.status='active'
+        ) SELECT 1 FROM selected JOIN product_categories pc ON pc.category_id=selected.id WHERE pc.product_id=p.id
+      )`);
+    }
     if (query.brend) { params.push(query.brend); where.push(`b.slug=$${params.length}`); }
     if (query.mense) { params.push(query.mense); where.push(`EXISTS (SELECT 1 FROM jsonb_each_text(p.attributes) attribute WHERE translate(lower(attribute.key),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC') IN ('mense','mense olkesi','country of origin') AND trim(both '-' FROM regexp_replace(translate(lower(attribute.value),'əğıöşüçƏĞIÖŞÜÇ','egiosucEGIOSUC'),'[^a-z0-9]+','-','g'))=$${params.length})`); }
     const [products, categories] = await Promise.all([
-      pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id ${joins} WHERE ${where.join(' AND ')} ORDER BY ${orderBy}`, params),
-      pool.query(`SELECT c.name,c.slug,count(DISTINCT pl.product_id)::int AS product_count
-        FROM categories c JOIN stores s ON s.id=c.store_id
-        LEFT JOIN product_categories pc ON pc.category_id=c.id
-        LEFT JOIN products p ON p.id=pc.product_id AND p.deleted_at IS NULL
-        LEFT JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
-        LEFT JOIN product_listings pl ON pl.product_id=p.id AND v.id IS NOT NULL AND pl.store_id=c.store_id AND pl.status='published'
-        WHERE s.code=$1 AND c.status='active' GROUP BY c.id ORDER BY c.position,c.name`, [env.DEFAULT_STORE_CODE])
+      pool.query<ProductView>(`${productSelect} JOIN stores s ON s.id=pl.store_id WHERE ${where.join(' AND ')} ORDER BY ${orderBy}`, params),
+      pool.query(`WITH RECURSIVE tree AS (
+          SELECT c.id,c.parent_id,c.name,c.slug,c.position,0 AS depth,ARRAY[c.position] AS position_path,ARRAY[c.slug] AS path_slugs
+          FROM categories c JOIN stores s ON s.id=c.store_id WHERE s.code=$1 AND c.parent_id IS NULL AND c.status='active'
+          UNION ALL SELECT c.id,c.parent_id,c.name,c.slug,c.position,tree.depth+1,tree.position_path||c.position,tree.path_slugs||c.slug
+          FROM categories c JOIN tree ON c.parent_id=tree.id WHERE c.status='active' AND tree.depth<2
+        ) SELECT tree.*,(SELECT count(DISTINCT pl.product_id)::int FROM product_listings pl JOIN products p ON p.id=pl.product_id
+          JOIN vendors v ON v.id=p.vendor_id AND v.status='active' AND v.deleted_at IS NULL
+          WHERE pl.status='published' AND p.deleted_at IS NULL AND EXISTS (
+            WITH RECURSIVE descendants AS (SELECT tree.id AS id UNION ALL SELECT child.id FROM categories child JOIN descendants d ON child.parent_id=d.id WHERE child.status='active')
+            SELECT 1 FROM descendants d JOIN product_categories pc ON pc.category_id=d.id WHERE pc.product_id=p.id
+          )) AS product_count FROM tree ORDER BY position_path,name`, [env.DEFAULT_STORE_CODE])
     ]);
     const heading = query.axtaris ? `“${query.axtaris}” üçün nəticələr` : 'Bütün məhsullar';
     const section = requiredNavigationSection('magaza');
     const content = `${pageHero('GÜNDƏLİK BAKI MAĞAZA', heading, 'Etibarlı satıcılardan seçilmiş məhsullar, aktual qiymətlər və kampaniyalar.')}${categoryNavigation(section)}
-      <section class="page-section"><div class="page-container page-shop-layout"><aside class="page-filter"><h2>Kateqoriyalar</h2><a href="/magaza/"${!query.kateqoriya ? ' aria-current="page"' : ''}>Hamısı</a>${categories.rows.map((c) => `<a href="/magaza/?kateqoriya=${encodeURIComponent(c.slug)}"${query.kateqoriya === c.slug ? ' aria-current="page"' : ''}>${escapeHtml(c.name)} <span>${c.product_count}</span></a>`).join('')}</aside><div><div class="page-results-head"><p><strong>${products.rowCount ?? 0}</strong> məhsul tapıldı</p></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Məhsul tapılmadı', 'Axtarış və ya filtr seçimini dəyişərək yenidən yoxlayın.')}</div></div></section>`;
+      <section class="page-section"><div class="page-container page-shop-layout"><aside class="page-filter"><h2>Kateqoriyalar</h2><a href="/magaza/"${!query.kateqoriya ? ' aria-current="page"' : ''}>Hamısı</a>${categories.rows.map((c) => `<a class="page-filter-depth-${Number(c.depth || 0)}" href="/magaza/${c.path_slugs.map(encodeURIComponent).join('/')}/"${query.kateqoriya === c.slug ? ' aria-current="page"' : ''}>${escapeHtml(c.name)} <span>${c.product_count}</span></a>`).join('')}</aside><div><div class="page-results-head"><p><strong>${products.rowCount ?? 0}</strong> məhsul tapıldı</p></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Məhsul tapılmadı', 'Axtarış və ya filtr seçimini dəyişərək yenidən yoxlayın.')}</div></div></section>`;
     return sendHtml(reply, layout({ title: `${heading} | Gündəlik Bakı`, description: 'Gündəlik Bakı mağazasında məhsullar, qiymətlər və endirimlər.', path: '/magaza/', active: 'magaza', schema: categorySchemas(section), ...(query.axtaris ? { robots: 'noindex,follow' } : {}), content }));
   });
 
@@ -279,9 +468,14 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
       pool.query<{ public_url: string; alt_text: string | null }>(`SELECT ma.public_url,ma.alt_text
         FROM product_media pm JOIN media_assets ma ON ma.id=pm.media_asset_id
         WHERE pm.product_id=$1 ORDER BY pm.is_primary DESC,pm.position,ma.created_at`, [product.product_id]),
-      pool.query<{ name: string; slug: string }>(`SELECT DISTINCT c.name,c.slug
-        FROM product_categories pc JOIN categories c ON c.id=pc.category_id
-        WHERE pc.product_id=$1 AND c.status='active' ORDER BY c.name`, [product.product_id]),
+      pool.query<{ name: string; slug: string; path_slugs: string[] }>(`WITH RECURSIVE ancestry AS (
+          SELECT c.id,c.parent_id,c.name,c.slug,ARRAY[c.slug] AS reverse_slugs
+          FROM product_categories pc JOIN categories c ON c.id=pc.category_id
+          WHERE pc.product_id=$1 AND c.status='active'
+            AND NOT EXISTS (SELECT 1 FROM product_categories child_pc JOIN categories child ON child.id=child_pc.category_id WHERE child_pc.product_id=$1 AND child.parent_id=c.id)
+          UNION ALL SELECT parent.id,parent.parent_id,ancestry.name,ancestry.slug,ancestry.reverse_slugs||parent.slug
+          FROM categories parent JOIN ancestry ON ancestry.parent_id=parent.id WHERE parent.status='active'
+        ) SELECT DISTINCT name,slug,ARRAY(SELECT value FROM unnest(reverse_slugs) WITH ORDINALITY values(value,ord) ORDER BY ord DESC) AS path_slugs FROM ancestry WHERE parent_id IS NULL ORDER BY name`, [product.product_id]),
       pool.query<ProductReviewView>(`SELECT id,author_name,rating,title,body,verified_purchase,created_at
         FROM product_reviews WHERE product_id=$1 AND status='published'
         ORDER BY created_at DESC LIMIT 100`, [product.product_id]),
@@ -316,7 +510,12 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
       reviewSummary: reviewSummary.rows[0] ?? { average: 0, count: 0 },
       cartItem
     })}`;
-    return sendHtml(reply, layout({ title: product.seo_title || `${product.title} | Gündəlik Bakı`, description: product.seo_description || product.short_description, path: `/mehsul/${product.slug}/`, active: 'magaza', schema, content, image: productImage, ogType: 'product' }));
+    return sendHtml(
+      reply,
+      layout({ title: product.seo_title || `${product.title} | Gündəlik Bakı`, description: product.seo_description || product.short_description, path: `/mehsul/${product.slug}/`, active: 'magaza', schema, content, image: productImage, ogType: 'product' }),
+      200,
+      'public, max-age=0, must-revalidate'
+    );
   });
 
   app.get('/endirimler/', async (_request, reply) => {

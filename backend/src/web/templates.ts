@@ -220,12 +220,12 @@ export function layout(options: LayoutOptions): string {
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
-  <link rel="stylesheet" href="/assets/css/pages.css">
-  <link rel="stylesheet" href="/assets/css/site.css">
+  <link rel="stylesheet" href="/assets/css/pages.css?v=20260816-2">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20260816-8">
   <link rel="stylesheet" href="/assets/css/commerce.css">
   <link rel="stylesheet" href="/assets/css/search.css">
   <link rel="stylesheet" href="/assets/css/account.css">
-  <link rel="stylesheet" href="/assets/css/product.css">
+  <link rel="stylesheet" href="/assets/css/product.css?v=20260816-3">
   <link rel="stylesheet" href="/assets/css/mobile-panels.css">
   <script type="application/ld+json">${safeJson(websiteSchema)}</script>
   ${schemas.map((schema) => `<script type="application/ld+json">${safeJson(schema)}</script>`).join('\n')}
@@ -234,8 +234,9 @@ export function layout(options: LayoutOptions): string {
   <script src="/assets/js/mobile-panels.js" defer></script>
   <script src="/assets/js/search.js" defer></script>
   <script src="/assets/js/pages.js" defer></script>
-  <script src="/assets/js/product.js" defer></script>
-  <script src="/assets/js/site-editor.js" defer></script>
+  <script src="/assets/js/product.js?v=20260816-2" defer></script>
+  <script src="/assets/js/catalog-navigation.js?v=20260816-2" defer></script>
+  <script src="/assets/js/site-editor.js?v=20260816-3" defer></script>
 </head>
 <body id="top" data-page="${escapeHtml(options.active || '')}">
   <a class="page-skip" href="#main-content">Əsas məzmuna keç</a>
@@ -247,7 +248,7 @@ export function layout(options: LayoutOptions): string {
   </div></div>
   <header class="page-header">
     <div class="page-container page-header-main">
-      <a class="page-logo" href="/" aria-label="Gündəlik Bakı ana səhifə"><img src="/assets/images/categories/logoSite.png" width="220" height="68" alt="Gündəlik Bakı"></a>
+      <a class="page-logo" href="/" aria-label="Gündəlik Bakı ana səhifə"><img src="/assets/images/categories/logoSite.png" width="1536" height="1024" alt="Gündəlik Bakı"></a>
       <form class="page-search" action="/magaza/" method="get" role="search" data-db-search><label class="sr-only" for="site-search">Məhsul axtarışı</label><i class="page-shell-icon search" aria-hidden="true"></i><input id="site-search" name="axtaris" type="search" placeholder="Nə axtarırsınız?"><button>Axtarış</button></form>
       <a class="page-support page-header-contact" href="tel:+994502645400"><i class="page-shell-icon phone" aria-hidden="true"></i><span><strong>+994 50 264 54 00</strong><small>Müştəri və biznes dəstəyi</small></span></a>
       <a class="page-live-chat page-header-contact" href="/elaqe/"><i class="page-shell-icon chat" aria-hidden="true"></i><span><strong>Canlı çat</strong><small>Mütəxəssislə danış</small></span></a>
@@ -270,8 +271,8 @@ export function layout(options: LayoutOptions): string {
       <div class="page-footer-links">
         <section><h2>Platforma haqqında</h2><a href="/haqqimizda/">Biz kimik</a><a href="/baki-club/">Bakı Club</a><a href="/biznes/">Biznes üçün</a></section>
         <section><h2>Müştəri dəstəyi</h2><a href="/faq/">Tez-tez verilən suallar</a><a href="/elaqe/">Əlaqə</a><a href="/catdirilma/">Çatdırılma siyasəti</a><a href="/geri-qaytarma/">Geri qaytarma</a></section>
-        <section><h2>Biznes əməkdaşlığı</h2><a href="/biznes/#reklam">Reklam portalı</a><a href="/biznes/#sponsorluq">Sponsorluq</a><a href="/biznes/#brend-vitrini">Brend olun</a></section>
-        <section><h2>Sürətli keçidlər</h2><a href="/jurnal/">Son jurnal</a><a href="/magaza/">Kateqoriyalar</a><a href="/elanlar/">Elan yerləşdir</a></section>
+        <section><h2>Biznes əməkdaşlığı</h2><a href="/biznes/reklam-ver/">Reklam portalı</a><a href="/biznes/sponsorluq/">Sponsorluq</a><a href="/biznes/brend-vitrini/">Brend olun</a></section>
+        <section><h2>Sürətli keçidlər</h2><a href="/jurnal/">Son jurnal</a><a href="/magaza/">Kateqoriyalar</a></section>
       </div>
       <div class="page-footer-contact">
         <a href="/elaqe/"><i class="page-shell-icon pin" aria-hidden="true"></i><span>Cəfər Cabbarlı 33, AZ1065, Bakı/Azərbaycan</span></a>

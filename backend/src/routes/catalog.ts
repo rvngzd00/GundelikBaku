@@ -100,6 +100,68 @@ async function createProductSku(client: Pick<import('pg').PoolClient, 'query'>, 
   throw badRequest('SKU_GENERATION_FAILED', 'Məhsul SKU-su yaradıla bilmədi, yenidən cəhd edin');
 }
 
+type CategoryTreeRow = { id: string; parent_id: string | null; store_id: string; status: string; depth: number };
+
+async function categoryTreeRow(client: Pick<import('pg').PoolClient, 'query'>, id: string): Promise<CategoryTreeRow | undefined> {
+  const result = await client.query<CategoryTreeRow>(`
+    WITH RECURSIVE ancestry AS (
+      SELECT c.id,c.parent_id,c.store_id,c.status,0 AS depth FROM categories c WHERE c.id=$1
+      UNION ALL
+      SELECT parent.id,parent.parent_id,parent.store_id,parent.status,ancestry.depth+1
+      FROM categories parent JOIN ancestry ON ancestry.parent_id=parent.id
+      WHERE ancestry.depth<3
+    )
+    SELECT id,parent_id,store_id,status,(SELECT max(depth) FROM ancestry)::int AS depth
+    FROM ancestry WHERE id=$1
+  `, [id]);
+  return result.rows[0];
+}
+
+async function validateCategoryParent(
+  client: Pick<import('pg').PoolClient, 'query'>,
+  storeId: string,
+  parentId: string | null | undefined,
+  categoryId?: string
+): Promise<void> {
+  if (!parentId) return;
+  if (parentId === categoryId) throw badRequest('CATEGORY_PARENT_SELF', 'Kateqoriya özünün üst kateqoriyası ola bilməz');
+  const parent = await categoryTreeRow(client, parentId);
+  if (!parent || parent.store_id !== storeId) throw badRequest('PARENT_CATEGORY_INVALID', 'Üst kateqoriya bu mağazaya aid deyil');
+  if (parent.status !== 'active') throw badRequest('PARENT_CATEGORY_INACTIVE', 'Yalnız aktiv kateqoriya üst kateqoriya seçilə bilər');
+  if (parent.depth >= 2) throw badRequest('CATEGORY_DEPTH_EXCEEDED', 'Kateqoriya ağacı ən çox Departament → Əsas kateqoriya → Alt kateqoriya ola bilər');
+  if (categoryId) {
+    const descendant = await client.query(`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM categories WHERE parent_id=$1
+        UNION ALL SELECT c.id FROM categories c JOIN descendants d ON c.parent_id=d.id
+      ) SELECT 1 FROM descendants WHERE id=$2 LIMIT 1
+    `, [categoryId, parentId]);
+    if (descendant.rows[0]) throw badRequest('CATEGORY_CYCLE', 'Kateqoriya öz alt kateqoriyasının altına köçürülə bilməz');
+  }
+}
+
+async function validateProductCategories(
+  client: Pick<import('pg').PoolClient, 'query'>,
+  storeId: string,
+  categoryIds: string[]
+): Promise<void> {
+  if (!categoryIds.length) return;
+  if (new Set(categoryIds).size !== categoryIds.length) throw badRequest('CATEGORY_DUPLICATE', 'Eyni kateqoriya bir neçə dəfə seçilə bilməz');
+  if (categoryIds.length > 3) throw badRequest('CATEGORY_PATH_INVALID', 'Məhsul yalnız bir departament, əsas kateqoriya və alt kateqoriya zəncirinə aid edilə bilər');
+  const valid = await client.query<{ id: string; parent_id: string | null }>(`
+    SELECT id,parent_id FROM categories
+    WHERE store_id=$1 AND status='active' AND id=ANY($2::uuid[])
+  `, [storeId, categoryIds]);
+  if (valid.rowCount !== categoryIds.length) throw badRequest('CATEGORY_SCOPE_INVALID', 'Kateqoriyalardan biri aktiv deyil və ya mağazaya aid deyil');
+  const byId = new Map(valid.rows.map((row) => [row.id, row]));
+  if (byId.get(categoryIds[0]!)?.parent_id !== null) throw badRequest('CATEGORY_PATH_INVALID', 'Kateqoriya yolu departamentdən başlamalıdır');
+  for (let index = 1; index < categoryIds.length; index += 1) {
+    if (byId.get(categoryIds[index]!)?.parent_id !== categoryIds[index - 1]) {
+      throw badRequest('CATEGORY_PATH_INVALID', 'Seçilən departament, əsas və alt kateqoriya eyni ardıcıl zəncirə aid deyil');
+    }
+  }
+}
+
 export async function catalogRoutes(app: FastifyInstance): Promise<void> {
   app.get('/product-identifiers/preview', { preHandler: app.requirePermission('catalog.create') }, async (request) => {
     const input = z.object({ storeId: z.uuid(), vendorId: z.uuid() }).parse(request.query);
@@ -113,32 +175,46 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
     const query=z.object({storeId:z.uuid().optional(),search:z.string().trim().max(100).optional()}).passthrough().parse(request.query);
     const storeId = z.uuid().parse(query.storeId ?? actor.storeIds[0]);
     assertStoreScope(actor, storeId);
-    const result = await pool.query(`SELECT c.*, count(p.product_id)::int AS product_count FROM categories c LEFT JOIN product_categories p ON p.category_id=c.id WHERE c.store_id=$1 AND ($2::text IS NULL OR c.name ILIKE $2 OR c.slug ILIKE $2) GROUP BY c.id ORDER BY c.position,c.name`, [storeId,query.search?`%${query.search}%`:null]);
+    const result = await pool.query(`WITH RECURSIVE tree AS (
+      SELECT c.id,c.parent_id,0 AS depth,ARRAY[c.position] AS position_path,ARRAY[c.name] AS name_path
+      FROM categories c WHERE c.store_id=$1 AND c.parent_id IS NULL
+      UNION ALL
+      SELECT c.id,c.parent_id,tree.depth+1,tree.position_path||c.position,tree.name_path||c.name
+      FROM categories c JOIN tree ON c.parent_id=tree.id WHERE c.store_id=$1 AND tree.depth<2
+    )
+    SELECT c.*,coalesce(tree.depth,0)::int AS depth,coalesce(tree.name_path,ARRAY[c.name]) AS name_path,
+      count(DISTINCT direct.product_id)::int AS product_count,
+      count(DISTINCT subtree.product_id)::int AS subtree_product_count
+    FROM categories c LEFT JOIN tree ON tree.id=c.id
+    LEFT JOIN product_categories direct ON direct.category_id=c.id
+    LEFT JOIN LATERAL (
+      WITH RECURSIVE descendants AS (SELECT c.id UNION ALL SELECT child.id FROM categories child JOIN descendants d ON child.parent_id=d.id)
+      SELECT pc.product_id FROM descendants d JOIN product_categories pc ON pc.category_id=d.id
+    ) subtree ON true
+    WHERE c.store_id=$1 AND ($2::text IS NULL OR c.name ILIKE $2 OR c.slug ILIKE $2)
+    GROUP BY c.id,tree.depth,tree.position_path,tree.name_path
+    ORDER BY tree.position_path,tree.name_path`, [storeId,query.search?`%${query.search}%`:null]);
     return { data: result.rows };
   });
 
-  app.post('/categories', { preHandler: app.requirePermission('catalog.create') }, async (request, reply) => {
+  app.post('/categories', { preHandler: app.requirePermission('categories.manage') }, async (request, reply) => {
     const input = categoryInput.parse(request.body); const actor = actorOf(request); assertStoreScope(actor, input.storeId);
-    if (input.parentId) {
-      const parent = await pool.query('SELECT id FROM categories WHERE id=$1 AND store_id=$2', [input.parentId, input.storeId]);
-      if (!parent.rows[0]) throw badRequest('PARENT_CATEGORY_INVALID', 'Üst kateqoriya bu store-a aid deyil');
-    }
+    await validateCategoryParent(pool, input.storeId, input.parentId);
     if (input.imageAssetId) { const media=await pool.query('SELECT id FROM media_assets WHERE id=$1 AND store_id=$2',[input.imageAssetId,input.storeId]); if(!media.rows[0])throw badRequest('MEDIA_SCOPE_INVALID','Kateqoriya şəkli bu mağazaya aid deyil'); }
     const result = await pool.query(`INSERT INTO categories(store_id,parent_id,name,slug,description,position,seo_title,seo_description,image_asset_id,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::record_status) RETURNING *`, [input.storeId,input.parentId??null,input.name,slugify(input.slug??input.name),input.description,input.position,input.seoTitle??null,input.seoDescription??null,input.imageAssetId??null,input.status]);
     return reply.code(201).send({ data: result.rows[0] });
   });
 
-  app.patch('/categories/:id', { preHandler: app.requirePermission('catalog.update') }, async (request) => {
+  app.patch('/categories/:id', { preHandler: app.requirePermission('categories.manage') }, async (request) => {
     const id = z.uuid().parse((request.params as { id: string }).id); const input = categoryUpdate.parse(request.body); const actor = actorOf(request);
     const current = await pool.query('SELECT * FROM categories WHERE id=$1', [id]); if (!current.rows[0]) throw notFound('Kateqoriya'); assertStoreScope(actor, current.rows[0].store_id);
-    if (input.parentId === id) throw badRequest('CATEGORY_PARENT_SELF', 'Kateqoriya özünün üst kateqoriyası ola bilməz');
-    if (input.parentId) { const parent = await pool.query('SELECT id FROM categories WHERE id=$1 AND store_id=$2', [input.parentId, current.rows[0].store_id]); if (!parent.rows[0]) throw badRequest('PARENT_CATEGORY_INVALID', 'Üst kateqoriya bu mağazaya aid deyil'); }
+    if (Object.hasOwn(input, 'parentId')) await validateCategoryParent(pool, current.rows[0].store_id, input.parentId, id);
     if (input.imageAssetId) { const media=await pool.query('SELECT id FROM media_assets WHERE id=$1 AND store_id=$2',[input.imageAssetId,current.rows[0].store_id]); if(!media.rows[0])throw badRequest('MEDIA_SCOPE_INVALID','Kateqoriya şəkli bu mağazaya aid deyil'); }
     const result = await pool.query(`UPDATE categories SET parent_id=CASE WHEN $2 THEN $3 ELSE parent_id END,name=coalesce($4,name),slug=coalesce($5,slug),description=coalesce($6,description),position=coalesce($7,position),seo_title=coalesce($8,seo_title),seo_description=coalesce($9,seo_description),image_asset_id=CASE WHEN $10 THEN $11 ELSE image_asset_id END,status=coalesce($12::record_status,status) WHERE id=$1 RETURNING *`, [id,Object.hasOwn(input,'parentId'),input.parentId??null,input.name??null,input.slug?slugify(input.slug):null,input.description??null,input.position??null,input.seoTitle??null,input.seoDescription??null,Object.hasOwn(input,'imageAssetId'),input.imageAssetId??null,input.status??null]);
     return { data: result.rows[0] };
   });
 
-  app.delete('/categories/:id', { preHandler: app.requirePermission('catalog.delete') }, async (request, reply) => {
+  app.delete('/categories/:id', { preHandler: app.requirePermission('categories.manage') }, async (request, reply) => {
     const id = z.uuid().parse((request.params as { id: string }).id); const actor = actorOf(request);
     const current = await pool.query('SELECT * FROM categories WHERE id=$1', [id]); if (!current.rows[0]) throw notFound('Kateqoriya'); assertStoreScope(actor, current.rows[0].store_id);
     const usage = await pool.query<{ products: number; children: number }>('SELECT (SELECT count(*)::int FROM product_categories WHERE category_id=$1) products,(SELECT count(*)::int FROM categories WHERE parent_id=$1) children', [id]);
@@ -183,7 +259,7 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
     if (query.search) { params.push(`%${query.search}%`); conditions.push(`(p.name ILIKE $${params.length} OR p.sku ILIKE $${params.length} OR pl.title ILIKE $${params.length})`); }
     if (query.status) { params.push(query.status); conditions.push(`pl.status::text=$${params.length}`); }
     params.push(query.limit,(query.page-1)*query.limit);
-    const result=await pool.query(`SELECT p.id,p.vendor_id,p.sku,p.name,p.status,p.created_at,v.display_name AS vendor_name,pl.store_id,pl.title,pl.slug,pl.price,pl.compare_at_price,pl.currency,pl.status AS listing_status,pl.published_at,pl.is_featured,pl.is_popular,pl.is_top_pick,pl.display_position,pl.merchandising_badge,count(*) OVER()::int AS total_count FROM products p JOIN vendors v ON v.id=p.vendor_id JOIN product_listings pl ON pl.product_id=p.id WHERE ${conditions.join(' AND ')} ORDER BY pl.display_position,p.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`,params);
+    const result=await pool.query(`SELECT p.id,p.vendor_id,p.sku,p.name,p.status,p.created_at,v.display_name AS vendor_name,pl.store_id,pl.title,pl.slug,pl.price,pl.compare_at_price,pl.currency,pl.status AS listing_status,pl.published_at,pl.is_featured,pl.is_popular,pl.is_top_pick,pl.display_position,pl.merchandising_badge,count(*) OVER()::int AS total_count FROM products p JOIN vendors v ON v.id=p.vendor_id JOIN product_listings pl ON pl.product_id=p.id WHERE ${conditions.join(' AND ')} ORDER BY p.created_at DESC,p.id DESC LIMIT $${params.length-1} OFFSET $${params.length}`,params);
     const total=Number(result.rows[0]?.total_count??0); return {data:result.rows.map(({total_count:_,...row})=>row),meta:paginationMeta(query.page,query.limit,total)};
   });
 
@@ -191,7 +267,7 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
     const id=z.uuid().parse((request.params as {id:string}).id); const actor=actorOf(request); await getScopedProduct(actor,id);
     const product=await pool.query(`SELECT p.*,pl.id AS listing_id,pl.store_id,pl.title,pl.slug,pl.short_description,pl.description AS listing_description,pl.price,pl.compare_at_price,pl.currency,pl.status AS listing_status,pl.seo_title,pl.seo_description,pl.is_featured,pl.is_popular,pl.is_top_pick,pl.display_position,pl.merchandising_badge,b.name AS brand_name,v.display_name AS vendor_name FROM products p JOIN product_listings pl ON pl.product_id=p.id JOIN vendors v ON v.id=p.vendor_id LEFT JOIN brands b ON b.id=p.brand_id WHERE p.id=$1`,[id]);
     const [categories,media,variants]=await Promise.all([
-      pool.query(`SELECT c.id,c.name,c.slug,pc.is_primary FROM product_categories pc JOIN categories c ON c.id=pc.category_id WHERE pc.product_id=$1 ORDER BY pc.is_primary DESC,c.name`,[id]),
+      pool.query(`SELECT c.id,c.parent_id,c.name,c.slug,pc.is_primary FROM product_categories pc JOIN categories c ON c.id=pc.category_id WHERE pc.product_id=$1 ORDER BY pc.is_primary DESC,c.name`,[id]),
       pool.query(`SELECT ma.*,pm.position,pm.is_primary FROM product_media pm JOIN media_assets ma ON ma.id=pm.media_asset_id WHERE pm.product_id=$1 ORDER BY pm.position`,[id]),
       pool.query(`SELECT pv.*,coalesce(jsonb_agg(jsonb_build_object('warehouseId',w.id,'warehouseName',w.name,'quantity',i.quantity,'reserved',i.reserved)) FILTER(WHERE i.warehouse_id IS NOT NULL),'[]'::jsonb) AS inventory FROM product_variants pv LEFT JOIN inventory i ON i.variant_id=pv.id LEFT JOIN warehouses w ON w.id=i.warehouse_id WHERE pv.product_id=$1 GROUP BY pv.id ORDER BY pv.created_at`,[id])
     ]);
@@ -222,7 +298,7 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
   app.post('/products', { preHandler: app.requirePermission('catalog.create') }, async (request, reply) => {
     const input=productInput.parse(request.body); const actor=actorOf(request); await resolveVendor(actor,input.vendorId,input.storeId);
     const data=await withTransaction(async(client)=>{
-      if (input.categoryIds.length) { const valid=await client.query('SELECT count(*)::int AS count FROM categories WHERE store_id=$1 AND id=ANY($2::uuid[])',[input.storeId,input.categoryIds]); if(valid.rows[0].count!==input.categoryIds.length) throw badRequest('CATEGORY_SCOPE_INVALID','Kateqoriyalardan biri store-a aid deyil'); }
+      await validateProductCategories(client,input.storeId,input.categoryIds);
       if (input.brandId) { const valid=await client.query('SELECT id FROM brands WHERE id=$1 AND store_id=$2',[input.brandId,input.storeId]); if(!valid.rows[0]) throw badRequest('BRAND_SCOPE_INVALID','Brend bu mağazaya aid deyil'); }
       const productSku=input.sku??await createProductSku(client,input.vendorId); const barcode=input.barcode??null;
       const p=await client.query(`INSERT INTO products(vendor_id,brand_id,sku,barcode,name,description,product_type,attributes,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[input.vendorId,input.brandId??null,productSku,barcode,input.name,input.description,input.productType,JSON.stringify(input.attributes),actor.userId]);
@@ -238,14 +314,14 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.patch('/products/:id', { preHandler: app.requirePermission('catalog.update') }, async (request) => {
-    const id=z.uuid().parse((request.params as {id:string}).id); const input=productUpdate.parse(request.body); const actor=actorOf(request); const current=await getScopedProduct(actor,id);
+    const id=z.uuid().parse((request.params as {id:string}).id); const rawInput=(request.body??{}) as Record<string,unknown>; const input=productUpdate.parse(rawInput); const includes=(key:string)=>Object.hasOwn(rawInput,key); const actor=actorOf(request); const current=await getScopedProduct(actor,id);
     const data=await withTransaction(async(client)=>{
-      if (input.brandId) { const valid=await client.query('SELECT id FROM brands WHERE id=$1 AND store_id=$2',[input.brandId,current.store_id]); if(!valid.rows[0]) throw badRequest('BRAND_SCOPE_INVALID','Brend bu mağazaya aid deyil'); }
-      const p=await client.query(`UPDATE products SET brand_id=CASE WHEN $2 THEN $3 ELSE brand_id END,sku=coalesce($4,sku),barcode=CASE WHEN $5 THEN $6 ELSE barcode END,name=coalesce($7,name),description=coalesce($8,description),product_type=coalesce($9,product_type),attributes=coalesce($10,attributes) WHERE id=$1 RETURNING *`,[id,Object.hasOwn(input,'brandId'),input.brandId??null,input.sku??null,Object.hasOwn(input,'barcode'),input.barcode??null,input.name??null,input.description??null,input.productType??null,input.attributes?JSON.stringify(input.attributes):null]);
-      const l=await client.query(`UPDATE product_listings SET title=coalesce($2,title),slug=coalesce($3,slug),short_description=coalesce($4,short_description),description=coalesce($5,description),price=coalesce($6,price),compare_at_price=CASE WHEN $7 THEN $8 ELSE compare_at_price END,currency=coalesce($9,currency),seo_title=coalesce($10,seo_title),seo_description=coalesce($11,seo_description),is_featured=coalesce($12,is_featured),is_popular=coalesce($13,is_popular),is_top_pick=coalesce($14,is_top_pick),display_position=coalesce($15,display_position),merchandising_badge=coalesce($16,merchandising_badge),status=CASE WHEN status='published' THEN 'review'::product_status ELSE status END WHERE product_id=$1 RETURNING *`,[id,input.title??null,input.slug?slugify(input.slug):null,input.shortDescription??null,input.description??null,input.price??null,Object.hasOwn(input,'compareAtPrice'),input.compareAtPrice??null,input.currency?.toUpperCase()??null,input.seoTitle??null,input.seoDescription??null,input.isFeatured??null,input.isPopular??null,input.isTopPick??null,input.displayPosition??null,input.merchandisingBadge??null]);
-      if(input.categoryIds){const valid=await client.query('SELECT count(*)::int AS count FROM categories WHERE store_id=$1 AND id=ANY($2::uuid[])',[current.store_id,input.categoryIds]);if(valid.rows[0].count!==input.categoryIds.length)throw badRequest('CATEGORY_SCOPE_INVALID','Kateqoriyalardan biri store-a aid deyil');await client.query('DELETE FROM product_categories WHERE product_id=$1',[id]);for(const[index,c]of input.categoryIds.entries())await client.query('INSERT INTO product_categories(product_id,category_id,is_primary) VALUES($1,$2,$3)',[id,c,index===0]);}
-      if(input.mediaIds)await syncProductMedia(client,id,current.store_id,current.vendor_id,input.mediaIds);
-      if(input.variant){await client.query(`UPDATE product_variants SET sku=coalesce($2,sku),title=coalesce($3,title) WHERE id=(SELECT id FROM product_variants WHERE product_id=$1 ORDER BY created_at LIMIT 1)`,[id,input.variant.sku??null,input.variant.title??null]);}
+      if (includes('brandId')&&input.brandId) { const valid=await client.query('SELECT id FROM brands WHERE id=$1 AND store_id=$2',[input.brandId,current.store_id]); if(!valid.rows[0]) throw badRequest('BRAND_SCOPE_INVALID','Brend bu mağazaya aid deyil'); }
+      const p=await client.query(`UPDATE products SET brand_id=CASE WHEN $2 THEN $3 ELSE brand_id END,sku=coalesce($4,sku),barcode=CASE WHEN $5 THEN $6 ELSE barcode END,name=coalesce($7,name),description=coalesce($8,description),product_type=coalesce($9,product_type),attributes=coalesce($10,attributes) WHERE id=$1 RETURNING *`,[id,includes('brandId'),input.brandId??null,includes('sku')?input.sku??null:null,includes('barcode'),input.barcode??null,includes('name')?input.name??null:null,includes('description')?input.description??null:null,includes('productType')?input.productType??null:null,includes('attributes')?JSON.stringify(input.attributes):null]);
+      const l=await client.query(`UPDATE product_listings SET title=coalesce($2,title),slug=coalesce($3,slug),short_description=coalesce($4,short_description),description=coalesce($5,description),price=coalesce($6,price),compare_at_price=CASE WHEN $7 THEN $8 ELSE compare_at_price END,currency=coalesce($9,currency),seo_title=coalesce($10,seo_title),seo_description=coalesce($11,seo_description),is_featured=coalesce($12,is_featured),is_popular=coalesce($13,is_popular),is_top_pick=coalesce($14,is_top_pick),display_position=coalesce($15,display_position),merchandising_badge=coalesce($16,merchandising_badge),status=CASE WHEN status='published' AND NOT $17::boolean THEN 'review'::product_status ELSE status END WHERE product_id=$1 RETURNING *`,[id,includes('title')?input.title??null:null,includes('slug')&&input.slug?slugify(input.slug):null,includes('shortDescription')?input.shortDescription??null:null,includes('description')?input.description??null:null,includes('price')?input.price??null:null,includes('compareAtPrice'),input.compareAtPrice??null,includes('currency')?input.currency?.toUpperCase()??null:null,includes('seoTitle')?input.seoTitle??null:null,includes('seoDescription')?input.seoDescription??null:null,includes('isFeatured')?input.isFeatured??null:null,includes('isPopular')?input.isPopular??null:null,includes('isTopPick')?input.isTopPick??null:null,includes('displayPosition')?input.displayPosition??null:null,includes('merchandisingBadge')?input.merchandisingBadge??null:null,actor.permissions.has('catalog.publish')]);
+      if(includes('categoryIds')&&input.categoryIds){await validateProductCategories(client,current.store_id,input.categoryIds);await client.query('DELETE FROM product_categories WHERE product_id=$1',[id]);for(const[index,c]of input.categoryIds.entries())await client.query('INSERT INTO product_categories(product_id,category_id,is_primary) VALUES($1,$2,$3)',[id,c,index===0]);}
+      if(includes('mediaIds')&&input.mediaIds)await syncProductMedia(client,id,current.store_id,current.vendor_id,input.mediaIds);
+      if(includes('variant')&&input.variant){await client.query(`UPDATE product_variants SET sku=coalesce($2,sku),title=coalesce($3,title) WHERE id=(SELECT id FROM product_variants WHERE product_id=$1 ORDER BY created_at LIMIT 1)`,[id,input.variant.sku??null,input.variant.title??null]);}
       await writeAudit(client,{actorUserId:actor.userId,storeId:current.store_id,vendorId:current.vendor_id,action:'product.update',entityType:'product',entityId:id,beforeData:current,afterData:{product:p.rows[0],listing:l.rows[0]},requestId:request.id}); return {...p.rows[0],listing:l.rows[0]};
     }); return {data};
   });
