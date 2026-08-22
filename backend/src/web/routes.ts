@@ -125,26 +125,21 @@ function storeCategoryHref(category: Pick<DatabaseCategory, 'path_slugs'>): stri
 function renderStoreCategoryExplorer(category: DatabaseCategory, categories: StoreCategoryOption[]): string {
   const directChildren = categories.filter((item) => item.parent_id === category.id);
   const visibleItems = category.depth === 2
-    ? categories.filter((item) => item.parent_id === category.parent_id)
+    ? categories.filter((item) => item.parent_id === category.parent_id && item.id !== category.id)
     : directChildren;
   if (!visibleItems.length) return '';
 
-  const heading = category.depth === 0
-    ? `${category.name}: əsas və alt kateqoriyalar`
-    : category.depth === 1 ? `${category.name} alt kateqoriyaları` : 'Digər alt kateqoriyalar';
   const groups = visibleItems.map((item) => {
     const children = categories.filter((candidate) => candidate.parent_id === item.id);
-    const current = item.id === category.id;
-    return `<article class="page-category-group${current ? ' is-current' : ''}">
-      <a class="page-category-group-head" href="${storeCategoryHref(item)}"${current ? ' aria-current="page"' : ''}>
+    return `<article class="page-category-group">
+      <a class="page-category-group-head" href="${storeCategoryHref(item)}">
         <span class="page-category-group-image"><img src="${escapeHtml(item.image_url || '/assets/wp-content/uploads/other-cat.webp')}" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
         <span><strong>${escapeHtml(item.name)}</strong><small>${item.product_count} məhsul</small></span><i aria-hidden="true">›</i>
       </a>
       ${children.length ? `<ul>${children.map((child) => `<li><a href="${storeCategoryHref(child)}"><span>${escapeHtml(child.name)}</span><small>${child.product_count ? `${child.product_count} məhsul` : 'Məhsul yoxdur'}</small><i aria-hidden="true">›</i></a></li>`).join('')}</ul>` : ''}
     </article>`;
   }).join('');
-  return `<section class="page-category-explorer" aria-labelledby="database-category-children"><div class="page-container">
-    <div class="page-category-heading"><p>KATEQORİYANI SEÇİN</p><h2 id="database-category-children">${escapeHtml(heading)}</h2></div>
+  return `<section class="page-category-explorer" aria-label="Kateqoriyalar"><div class="page-container">
     <div class="page-category-groups">${groups}</div>
   </div></section>`;
 }
@@ -208,9 +203,81 @@ async function renderDatabaseCategoryPage(slugs: string[]): Promise<{ html: stri
     if (index < category.path_names.length - 1) crumbs.push([name, `/magaza/${category.path_slugs.slice(0, index + 1).map(encodeURIComponent).join('/')}/`]);
     else crumbs.push([name]);
   });
+  const categoryDescription = category.description?.trim() || 'Bu bölmədə seçilmiş məhsulları rahat şəkildə kəşf edin.';
   const categoryExplorer = renderStoreCategoryExplorer(category, categoryOptions.rows);
-  const html = `${pageHero('GÜNDƏLİK BAKI MAĞAZA', category.name, category.description || `${category.name} üzrə seçilmiş məhsulları kəşf edin.`)}<div class="page-container">${breadcrumb(crumbs)}</div>${categoryExplorer}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>SEÇİLMİŞ MƏHSULLAR</p><h2>${escapeHtml(category.name)} məhsulları</h2></div><a href="/magaza/">Bütün məhsullar →</a></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Bu kateqoriyada məhsul yoxdur', 'Yeni məhsullar əlavə edilən kimi burada görünəcək. Digər alt kateqoriyalara baxa bilərsiniz.', '/magaza/', 'Mağazaya bax')}</div></section>`;
+  const html = `${pageHero('GÜNDƏLİK BAKI MAĞAZA', category.name, categoryDescription)}<div class="page-container">${breadcrumb(crumbs)}</div>${categoryExplorer}<section class="page-section"><div class="page-container"><div class="page-section-title"><h2>Məhsullar</h2><a href="/magaza/">Bütün məhsullar →</a></div>${products.rows.length ? `<div class="page-product-grid db-featured-products">${products.rows.map(productCard).join('')}</div>` : emptyState('Bu kateqoriyada məhsul yoxdur', 'Yeni məhsullar əlavə edilən kimi burada görünəcək. Digər alt kateqoriyalara baxa bilərsiniz.', '/magaza/', 'Mağazaya bax')}</div></section>`;
   return { category, html: layout({ title: category.seo_title || `${category.name} | Gündəlik Bakı`, description: category.seo_description || category.description || `${category.name} məhsulları`, path, active: 'magaza', content: html }) };
+}
+
+type ServiceCategoryOption = DatabaseCategory & { listing_count: number };
+
+function serviceCategoryHref(category: Pick<DatabaseCategory, 'path_slugs'>): string {
+  return `/elanlar/xidmetler/${category.path_slugs.map(encodeURIComponent).join('/')}/`;
+}
+
+async function serviceCategoryOptions(): Promise<ServiceCategoryOption[]> {
+  const result = await pool.query<ServiceCategoryOption>(`WITH RECURSIVE tree AS (
+    SELECT sc.id,sc.parent_id,sc.name,sc.slug,sc.description,sc.seo_title,sc.seo_description,sc.image_asset_id,
+      0 AS depth,ARRAY[sc.position] AS position_path,ARRAY[sc.slug] AS path_slugs,ARRAY[sc.name] AS path_names
+    FROM service_categories sc JOIN stores s ON s.id=sc.store_id
+    WHERE s.code=$1 AND sc.parent_id IS NULL AND sc.status='active'
+    UNION ALL
+    SELECT sc.id,sc.parent_id,sc.name,sc.slug,sc.description,sc.seo_title,sc.seo_description,sc.image_asset_id,
+      tree.depth+1,tree.position_path||sc.position,tree.path_slugs||sc.slug,tree.path_names||sc.name
+    FROM service_categories sc JOIN tree ON sc.parent_id=tree.id
+    WHERE sc.status='active' AND tree.depth<2
+  ) SELECT tree.id,tree.parent_id,tree.name,tree.slug,tree.description,tree.seo_title,tree.seo_description,
+    tree.depth,tree.path_slugs,tree.path_names,ma.public_url AS image_url,ma.alt_text AS image_alt,
+    (SELECT count(*)::int FROM classified_listings cl WHERE cl.status='published' AND cl.deleted_at IS NULL AND cl.category='service' AND cl.service_category_id IN (
+      WITH RECURSIVE descendants AS (SELECT tree.id AS id UNION ALL SELECT child.id FROM service_categories child JOIN descendants d ON child.parent_id=d.id WHERE child.status='active') SELECT id FROM descendants
+    )) AS listing_count
+  FROM tree LEFT JOIN media_assets ma ON ma.id=tree.image_asset_id ORDER BY tree.position_path,tree.name`,[env.DEFAULT_STORE_CODE]);
+  return result.rows;
+}
+
+function renderServiceCategoryExplorer(categories: ServiceCategoryOption[], selected?: DatabaseCategory): string {
+  const visible = selected
+    ? (selected.depth === 2 ? categories.filter((item) => item.parent_id === selected.parent_id) : categories.filter((item) => item.parent_id === selected.id))
+    : categories.filter((item) => item.parent_id === null);
+  if (!visible.length) return '';
+  const heading = selected ? `${selected.name}: xidmət kateqoriyaları` : 'Xidmət sahəsini seçin';
+  const cards = visible.map((item) => {
+    const children = categories.filter((child) => child.parent_id === item.id);
+    return `<article class="page-category-group${selected?.id === item.id ? ' is-current' : ''}">
+      <a class="page-category-group-head" href="${serviceCategoryHref(item)}"${selected?.id === item.id ? ' aria-current="page"' : ''}>
+        <span class="page-category-group-image"><img src="${escapeHtml(item.image_url || '/assets/wp-content/uploads/other-cat.webp')}" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
+        <span><strong>${escapeHtml(item.name)}</strong><small>${item.listing_count ? `${item.listing_count} xidmət` : 'Elan yoxdur'}</small></span><i aria-hidden="true">›</i>
+      </a>
+      ${children.length ? `<ul>${children.map((child) => `<li><a href="${serviceCategoryHref(child)}"><span>${escapeHtml(child.name)}</span><small>${child.listing_count ? `${child.listing_count} xidmət` : 'Elan yoxdur'}</small><i aria-hidden="true">›</i></a></li>`).join('')}</ul>` : ''}
+    </article>`;
+  }).join('');
+  return `<section class="page-category-explorer page-service-explorer" aria-labelledby="service-category-heading"><div class="page-container"><div class="page-category-heading"><p>XİDMƏT KATEQORİYALARI</p><h2 id="service-category-heading">${escapeHtml(heading)}</h2></div><div class="page-category-groups">${cards}</div></div></section>`;
+}
+
+async function serviceCategoryByPath(slugs: string[], categories?: ServiceCategoryOption[]): Promise<ServiceCategoryOption | undefined> {
+  const source = categories ?? await serviceCategoryOptions();
+  return source.find((item) => item.path_slugs.length === slugs.length && item.path_slugs.every((slug,index) => slug === slugs[index]));
+}
+
+async function renderServiceCategoryPage(slugs: string[]): Promise<string | null> {
+  const categories = await serviceCategoryOptions();
+  const category = await serviceCategoryByPath(slugs,categories);
+  if (!category) return null;
+  const listings = await pool.query(`SELECT cl.*,sc.name AS service_category_name,v.display_name AS vendor_name,ma.public_url AS image_url
+    FROM classified_listings cl JOIN stores s ON s.id=cl.store_id
+    LEFT JOIN service_categories sc ON sc.id=cl.service_category_id LEFT JOIN vendors v ON v.id=cl.vendor_id
+    LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id
+    WHERE s.code=$1 AND cl.category='service' AND cl.status='published' AND cl.deleted_at IS NULL AND cl.service_category_id IN (
+      WITH RECURSIVE descendants AS (SELECT id FROM service_categories WHERE id=$2 UNION ALL SELECT child.id FROM service_categories child JOIN descendants d ON child.parent_id=d.id WHERE child.status='active') SELECT id FROM descendants
+    ) ORDER BY cl.created_at DESC`,[env.DEFAULT_STORE_CODE,category.id]);
+  const path=serviceCategoryHref(category);
+  const crumbs: Array<[string,string?]>=[['Elanlar','/elanlar/'],['Xidmətlər','/elanlar/xidmetler/']];
+  category.path_names.forEach((name,index)=>{
+    if(index<category.path_names.length-1)crumbs.push([name,`/elanlar/xidmetler/${category.path_slugs.slice(0,index+1).map(encodeURIComponent).join('/')}/`]);
+    else crumbs.push([name]);
+  });
+  const content=`${pageHero('PEŞƏKAR XİDMƏTLƏR',category.name,category.description||`${category.name} üzrə etibarlı xidmət elanlarını kəşf edin.`)}<div class="page-container">${breadcrumb(crumbs)}</div>${renderServiceCategoryExplorer(categories,category)}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>AKTİV XİDMƏTLƏR</p><h2>${escapeHtml(category.name)} elanları</h2></div><a href="/elanlar/xidmetler/">Bütün xidmətlər →</a></div>${listings.rows.length?`<div class="page-listing-grid">${renderListingCards(listings.rows)}</div>`:emptyState('Bu kateqoriyada xidmət elanı yoxdur','Yeni xidmətlər təsdiqlənən kimi burada görünəcək. Digər kateqoriyalara baxa bilərsiniz.','/elanlar/xidmetler/','Bütün xidmətlərə bax')}</div></section>`;
+  return layout({title:category.seo_title||`${category.name} xidmətləri | Gündəlik Bakı`,description:category.seo_description||category.description||`${category.name} xidmət elanları`,path,active:'elanlar',content});
 }
 
 function renderCampaignCards(campaigns: Array<Record<string, unknown>>): string {
@@ -223,7 +290,7 @@ function renderPostCards(posts: Array<Record<string, unknown>>): string {
 }
 
 function renderListingCards(listings: Array<Record<string, unknown>>): string {
-  return listings.map((listing) => `<article><img src="${escapeHtml(listing['image_url'] || '/assets/wp-content/uploads/other-cat.webp')}" width="520" height="320" alt="${escapeHtml(listing['title'])}" loading="lazy" decoding="async"><div><span>${escapeHtml(listing['category'])}</span><h2>${escapeHtml(listing['title'])}</h2><p>${escapeHtml(listing['description'])}</p><strong>${listing['price'] == null ? 'Razılaşma yolu ilə' : money(String(listing['price']), String(listing['currency'] || 'AZN'))}</strong><small>${escapeHtml(listing['vendor_name'] || 'Fərdi elan')}</small></div></article>`).join('');
+  return listings.map((listing) => `<article><img src="${escapeHtml(listing['image_url'] || '/assets/wp-content/uploads/other-cat.webp')}" width="520" height="320" alt="${escapeHtml(listing['title'])}" loading="lazy" decoding="async"><div><span>${escapeHtml(listing['service_category_name'] || listing['category'])}</span><h2>${escapeHtml(listing['title'])}</h2><p>${escapeHtml(listing['description'])}</p><strong>${listing['price'] == null ? 'Razılaşma yolu ilə' : money(String(listing['price']), String(listing['currency'] || 'AZN'))}</strong><small>${escapeHtml(listing['vendor_name'] || 'Fərdi elan')}</small></div></article>`).join('');
 }
 
 const clubChildContent: Record<string, string> = {
@@ -283,8 +350,13 @@ async function renderCategoryChild(section: NavigationSection, child: Navigation
 
   if (section.key === 'elanlar') {
     const listingTypes: Record<string, string> = { mehsullar: 'product', xidmetler: 'service', emlak: 'property', avtomobil: 'vehicle' };
-    const listings = await pool.query(`SELECT cl.*,v.display_name AS vendor_name,ma.public_url AS image_url FROM classified_listings cl JOIN stores s ON s.id=cl.store_id LEFT JOIN vendors v ON v.id=cl.vendor_id LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id WHERE s.code=$1 AND cl.category=$2 AND cl.status='published' AND cl.deleted_at IS NULL ORDER BY cl.created_at DESC`, [env.DEFAULT_STORE_CODE, listingTypes[child.slug]]);
-    return `${lead}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>AKTİV ELANLAR</p><h2>${escapeHtml(child.label)}</h2></div><a href="${section.href}">Bütün elanlar →</a></div>${listings.rows.length ? `<div class="page-listing-grid">${renderListingCards(listings.rows)}</div>` : emptyState('Aktiv elan yoxdur', 'Yeni elanlar moderasiyadan sonra burada görünəcək.', '/elaqe/', 'Elan yerləşdirmək üçün əlaqə')}</div></section>`;
+    const [listings,serviceCategories] = await Promise.all([
+      pool.query(`SELECT cl.*,sc.name AS service_category_name,v.display_name AS vendor_name,ma.public_url AS image_url FROM classified_listings cl JOIN stores s ON s.id=cl.store_id LEFT JOIN service_categories sc ON sc.id=cl.service_category_id LEFT JOIN vendors v ON v.id=cl.vendor_id LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id WHERE s.code=$1 AND cl.category=$2 AND cl.status='published' AND cl.deleted_at IS NULL ORDER BY cl.created_at DESC`, [env.DEFAULT_STORE_CODE, listingTypes[child.slug]]),
+      child.slug === 'xidmetler' ? serviceCategoryOptions() : Promise.resolve([])
+    ]);
+    const explorer=child.slug === 'xidmetler' ? renderServiceCategoryExplorer(serviceCategories) : '';
+    const addAction=child.slug === 'xidmetler' ? '<a class="page-primary page-service-create" href="/satici-paneli/#classifieds">Xidmət əlavə et</a>' : '';
+    return `${lead}${explorer}<section class="page-section"><div class="page-container"><div class="page-section-title"><div><p>AKTİV ELANLAR</p><h2>${escapeHtml(child.label)}</h2></div><span class="page-section-actions"><a href="${section.href}">Bütün elanlar →</a>${addAction}</span></div>${listings.rows.length ? `<div class="page-listing-grid">${renderListingCards(listings.rows)}</div>` : emptyState('Aktiv elan yoxdur', 'Yeni elanlar moderasiyadan sonra burada görünəcək.', '/satici-qeydiyyati/', 'Xidmət yerləşdirmək üçün qeydiyyat')}</div></section>`;
   }
 
   if (section.key === 'baki-club') {
@@ -393,6 +465,18 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
   // Categories created after deployment are not part of the static navigation
   // registry, but their department URLs must still resolve immediately.
   app.get('/magaza/:department/', databaseCategoryRoute);
+
+  const serviceCategoryRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    const params=request.params as Record<string,string>;
+    const slugs=[params['department'],params['main'],params['sub']].filter(Boolean).map((value)=>z.string().min(1).max(180).parse(value));
+    const page=await renderServiceCategoryPage(slugs);
+    if(!page)return reply.callNotFound();
+    return sendHtml(reply,page);
+  };
+  for(const route of ['/elanlar/xidmetler/:department/','/elanlar/xidmetler/:department/:main/','/elanlar/xidmetler/:department/:main/:sub/']){
+    app.get(route.slice(0,-1),async(request,reply)=>reply.redirect(`${request.url.split('?')[0]}/`,308));
+    app.get(route,serviceCategoryRoute);
+  }
 
   app.get('/magaza/', async (request, reply) => {
     const query = z.object({ axtaris: z.string().trim().max(100).optional(), kateqoriya: z.string().trim().max(100).optional(), brend: z.string().trim().max(100).optional(), mense: z.string().trim().max(100).optional() }).parse(request.query);
@@ -560,7 +644,7 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/elanlar/', async (request, reply) => {
     const query=z.object({nov:z.enum(['product','service','property','vehicle']).optional()}).parse(request.query);const params:unknown[]=[env.DEFAULT_STORE_CODE];let filter='';if(query.nov){params.push(query.nov);filter=` AND cl.category=$${params.length}`;}
-    const listings=await pool.query(`SELECT cl.*,v.display_name AS vendor_name,ma.public_url AS image_url FROM classified_listings cl JOIN stores s ON s.id=cl.store_id LEFT JOIN vendors v ON v.id=cl.vendor_id LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id WHERE s.code=$1 AND cl.status='published' AND cl.deleted_at IS NULL${filter} ORDER BY cl.created_at DESC`,params);
+    const listings=await pool.query(`SELECT cl.*,sc.name AS service_category_name,v.display_name AS vendor_name,ma.public_url AS image_url FROM classified_listings cl JOIN stores s ON s.id=cl.store_id LEFT JOIN service_categories sc ON sc.id=cl.service_category_id LEFT JOIN vendors v ON v.id=cl.vendor_id LEFT JOIN classified_media cm ON cm.listing_id=cl.id AND cm.position=0 LEFT JOIN media_assets ma ON ma.id=cm.media_asset_id WHERE s.code=$1 AND cl.status='published' AND cl.deleted_at IS NULL${filter} ORDER BY cl.created_at DESC`,params);
     const section = requiredNavigationSection('elanlar');
     const content=`${pageHero('ŞƏHƏR ELANLARI','Elanlar','Məhsul, xidmət, əmlak və avtomobil elanlarını rahat şəkildə kəşf edin.')}${categoryNavigation(section)}<section class="page-section"><div class="page-container">${listings.rows.length?`<div class="page-listing-grid">${renderListingCards(listings.rows)}</div>`:emptyState('Aktiv elan yoxdur','Yeni elanlar moderasiyadan sonra burada görünəcək.','/elaqe/','Elan yerləşdirmək üçün əlaqə')}</div></section>`;
     return sendHtml(reply,layout({title:'Elanlar | Gündəlik Bakı',description:'Bakı üzrə məhsul, xidmət, əmlak və avtomobil elanları.',path:'/elanlar/',active:'elanlar',schema:categorySchemas(section),content}));

@@ -122,6 +122,13 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.equal(new Set(topPickSets.map((items) => items.join(','))).size, topPickSets.length);
     assert.ok(homeApi.json().data.categories.some((item: { path_slugs: string[] }) =>
       item.path_slugs?.join('/') === 'elektronika/elektronika-pesekar-aletler/simsiz-elektrik-aletleri'));
+    assert.ok(Array.isArray(homeApi.json().data.serviceCategories));
+    assert.ok(homeApi.json().data.serviceCategories.some((item: { depth: number }) => Number(item.depth) === 2));
+    const serviceLeaf=homeApi.json().data.serviceCategories.find((item: { depth: number; path_slugs: string[] }) => Number(item.depth) === 2);
+    assert.ok(serviceLeaf?.path_slugs?.length===3);
+    const servicePage=await app.inject({method:'GET',url:`/elanlar/xidmetler/${serviceLeaf.path_slugs.join('/')}/`});
+    assert.equal(servicePage.statusCode,200,servicePage.body);
+    assert.match(servicePage.body,/XİDMƏT KATEQORİYALARI/);
 
     const page = await app.inject({ method: 'GET', url: '/baki-club/' });
     assert.equal(page.statusCode, 200);
@@ -202,16 +209,19 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
 
     const electronics = await app.inject({ method: 'GET', url: '/magaza/elektronika/' });
     assert.equal(electronics.statusCode, 200);
+    assert.match(electronics.body, /<h1>Elektronika<\/h1>/);
+    assert.doesNotMatch(electronics.body, /<h2[^>]*>[^<]*Elektronika/i);
+    assert.doesNotMatch(electronics.body, /SEÇİLMİŞ MƏHSULLAR|Ana və alt kateqoriyalar|KATEQORİYALAR/);
     assert.match(electronics.body, /class="page-category-explorer"/);
     assert.match(electronics.body, /Peşəkar alətlər/);
     assert.match(electronics.body, /href="\/magaza\/elektronika\/elektronika-pesekar-aletler\/simsiz-elektrik-aletleri\/"/);
-    assert.match(electronics.body, /src="\/assets\/js\/catalog-navigation\.js\?v=20260816-2"/);
+    assert.match(electronics.body, /src="\/assets\/js\/catalog-navigation\.js\?v=20260822-2"/);
     assert.doesNotMatch(electronics.body, />Elan yerləşdir<\//);
 
     const emptySubcategory = await app.inject({ method: 'GET', url: '/magaza/usaq/korpe-baximi/korpe-geyimi/' });
     assert.equal(emptySubcategory.statusCode, 200);
     assert.match(emptySubcategory.body, /<h1>Körpə geyimi<\/h1>/);
-    assert.match(emptySubcategory.body, /Digər alt kateqoriyalar/);
+    assert.doesNotMatch(emptySubcategory.body, /<h2[^>]*>(?:Digər alt kateqoriyalar|SEÇİLMİŞ MƏHSULLAR)<\/h2>/);
     assert.match(emptySubcategory.body, /Bu kateqoriyada məhsul yoxdur/);
 
     const sitemap = await app.inject({ method: 'GET', url: '/api/v1/public/sitemap.xml' });
@@ -1451,13 +1461,23 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     assert.equal(journals.statusCode, 200);
     assert.ok(journals.json().data.some((row: { id: string }) => row.id === journalId));
 
+    const serviceCategory=await pool.query<{id:string}>(`SELECT sc.id FROM service_categories sc
+      WHERE sc.store_id=$1 AND sc.status='active' AND NOT EXISTS(SELECT 1 FROM service_categories child WHERE child.parent_id=sc.id AND child.status='active')
+      ORDER BY sc.position,sc.name LIMIT 1`,[storeRow.id]);
+    assert.ok(serviceCategory.rows[0]?.id);
+
+    const vendorServiceCategories=await app.inject({method:'GET',url:`/api/v1/publishing/service-categories?storeId=${storeRow.id}`,headers:authHeaders(vendorAccountJar)});
+    assert.equal(vendorServiceCategories.statusCode,200,vendorServiceCategories.body);
     const createdClassified = await app.inject({
-      method: 'POST', url: '/api/v1/publishing/classifieds', headers: authHeaders(adminJar),
-      payload: { storeId: storeRow.id, vendorId, category: 'service', title: `Audit elanı ${suffix}`, description: 'Elan moderasiya axınının avtomatik auditi.', price: 25, currency: 'AZN', phone: '+994501112233', city: 'Bakı', mediaIds: [mediaId] }
+      method: 'POST', url: '/api/v1/publishing/classifieds', headers: authHeaders(vendorAccountJar),
+      payload: { storeId: storeRow.id, vendorId, category: 'service', serviceCategoryId: serviceCategory.rows[0]!.id, title: `Audit elanı ${suffix}`, description: 'Elan moderasiya axınının avtomatik auditi.', price: 25, currency: 'AZN', phone: '+994501112233', city: 'Bakı', mediaIds: [mediaId] }
     });
     assert.equal(createdClassified.statusCode, 201, createdClassified.body);
     classifiedId = createdClassified.json().data.id;
     const classifiedDetail = await app.inject({ method: 'GET', url: `/api/v1/publishing/classifieds/${classifiedId}`, headers: authHeaders(adminJar) });
+    const vendorClassifieds=await app.inject({method:'GET',url:`/api/v1/publishing/classifieds?search=${suffix}`,headers:authHeaders(vendorAccountJar)});
+    assert.equal(vendorClassifieds.statusCode,200,vendorClassifieds.body);
+    assert.ok(vendorClassifieds.json().data.some((row:{id:string;vendor_id:string})=>row.id===classifiedId&&row.vendor_id===vendorId));
     assert.equal(classifiedDetail.statusCode, 200);
     assert.equal(classifiedDetail.json().data.media[0].id, mediaId);
     const publishedClassified = await app.inject({ method: 'PATCH', url: `/api/v1/publishing/classifieds/${classifiedId}/status`, headers: authHeaders(adminJar), payload: { status: 'published' } });

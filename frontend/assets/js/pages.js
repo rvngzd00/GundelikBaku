@@ -733,11 +733,17 @@ document.addEventListener('click', (event) => {
     selectPageMenuTab(navigation, menuTab.dataset.pageMenuTab);
   }
   const menu = event.target.closest('.page-menu-toggle');
-  if (menu) {
+  const menuClose = event.target.closest('[data-page-menu-close]');
+  if (menu || menuClose) {
     const navigation = document.querySelector('.page-navigation');
-    const open = navigation.classList.toggle('open');
-    menu.setAttribute('aria-expanded', String(open));
+    const toggle = document.querySelector('.page-menu-toggle');
+    const open = menu ? !navigation.classList.contains('open') : false;
+    navigation.classList.toggle('open', open);
+    document.body.classList.toggle('page-menu-open', open);
+    toggle?.setAttribute('aria-expanded', String(open));
+    if (menuClose) event.preventDefault();
     if (open) selectPageMenuTab(navigation, 'navigation');
+    else resetPageDrillDown(navigation);
   }
   const mobileSearch = event.target.closest('[data-mobile-search]');
   if (mobileSearch) {
@@ -901,6 +907,10 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && document.querySelector('.page-navigation.open')) {
+    document.querySelector('[data-page-menu-close]')?.click();
+    return;
+  }
   if (event.key !== 'Enter' || !event.target.matches('#db-cart-coupon-code')) return;
   event.preventDefault();
   document.querySelector('[data-apply-coupon]')?.click();

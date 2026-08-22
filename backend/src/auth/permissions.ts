@@ -17,7 +17,8 @@ export const PERMISSIONS = [
   'coupons.read', 'coupons.manage',
   'qr.read', 'qr.manage', 'qr.analytics',
   'loyalty.read', 'loyalty.manage',
-  'classifieds.read', 'classifieds.moderate',
+  'classifieds.read', 'classifieds.create', 'classifieds.update', 'classifieds.delete', 'classifieds.moderate',
+  'service_categories.manage',
   'analytics.read', 'analytics.export',
   'settings.read', 'settings.manage'
 ] as const;
@@ -27,7 +28,7 @@ export type Permission = typeof PERMISSIONS[number];
 export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   super_admin: PERMISSIONS,
   admin: PERMISSIONS.filter((permission) => permission !== 'platform.manage'),
-  editor: ['dashboard.read', 'cms.read', 'cms.create', 'cms.update', 'cms.publish', 'posts.read', 'posts.create', 'posts.update', 'posts.publish', 'journal.read', 'journal.create', 'journal.update', 'journal.publish', 'media.read', 'media.upload', 'media.manage', 'editor.read', 'editor.manage', 'editor.publish', 'seo.read'],
+  editor: ['dashboard.read', 'cms.read', 'cms.create', 'cms.update', 'cms.publish', 'posts.read', 'posts.create', 'posts.update', 'posts.publish', 'journal.read', 'journal.create', 'journal.update', 'journal.publish', 'media.read', 'media.upload', 'media.manage', 'editor.read', 'editor.manage', 'editor.publish', 'seo.read', 'classifieds.read', 'classifieds.create', 'classifieds.update', 'classifieds.delete', 'service_categories.manage'],
   seo: ['dashboard.read', 'cms.read', 'cms.update', 'posts.read', 'posts.update', 'seo.read', 'seo.manage', 'seo.audit', 'analytics.read'],
   moderator: [
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.delete', 'catalog.publish',
@@ -40,8 +41,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'catalog.delete',
     'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage',
     'campaigns.read', 'campaigns.manage', 'coupons.read', 'coupons.manage',
-    'qr.read', 'qr.manage', 'qr.analytics', 'analytics.read', 'media.read', 'media.upload', 'media.manage', 'loyalty.read', 'loyalty.manage'
+    'qr.read', 'qr.manage', 'qr.analytics', 'analytics.read', 'media.read', 'media.upload', 'media.manage', 'loyalty.read', 'loyalty.manage',
+    'classifieds.read', 'classifieds.create', 'classifieds.update', 'classifieds.delete'
   ],
-  vendor_staff: ['dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage', 'media.read', 'media.upload', 'media.manage', 'loyalty.read'],
+  vendor_staff: ['dashboard.read', 'catalog.read', 'catalog.create', 'catalog.update', 'inventory.read', 'inventory.manage', 'orders.read', 'orders.manage', 'media.read', 'media.upload', 'media.manage', 'loyalty.read', 'classifieds.read', 'classifieds.create', 'classifieds.update', 'classifieds.delete'],
   customer: []
 };

@@ -2,7 +2,7 @@ import { mountSiteEditor } from './site-editor.js';
 
 const state = { user: null, view: 'dashboard', search: {}, page: {} };
 const isVendorPortal = location.pathname.startsWith('/satici-paneli');
-const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media']);
+const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media', 'classifieds']);
 const moderatorViews = new Set(['products', 'reviews', 'categories', 'brands', 'inventory', 'posts', 'post-categories', 'journal']);
 const adminPortalRoles = new Set(['super_admin', 'admin', 'editor', 'seo', 'moderator']);
 const vendorPortalRoles = new Set(['vendor_owner', 'vendor_staff']);
@@ -57,7 +57,8 @@ const menus = [
     ['categories', '▦', 'Kateqoriyalar', 'catalog.read'],
     ['brands', '◆', 'Brendlər', 'catalog.read'],
     ['inventory', '▥', 'Anbar', 'inventory.read'],
-    ['classifieds', '▰', 'Elanlar', 'classifieds.read']
+    ['classifieds', '▰', 'Elanlar və xidmətlər', 'classifieds.read'],
+    ['service-categories', '⌘', 'Xidmət kateqoriyaları', 'service_categories.manage']
   ]],
   ['Kontent', [
     ['editor', '✦', 'Sayt editoru', 'editor.read'],
@@ -91,7 +92,8 @@ const labels = {
   categories: ['Kateqoriyalar', 'Məhsul qrupları və SEO'],
   brands: ['Brendlər', 'Məhsul istehsalçıları'],
   inventory: ['Anbar', 'Stok idarəetməsi'],
-  classifieds: ['Elanlar', 'Elanların moderasiyası və idarəetməsi'],
+  classifieds: ['Elanlar və xidmətlər', 'Məhsul, xidmət, əmlak və avtomobil elanlarının idarəetməsi'],
+  'service-categories': ['Xidmət kateqoriyaları', 'Departament, ana və alt xidmət kateqoriyaları'],
   vendors: ['Satıcı biznesləri', 'Tərəfdaş profilləri, müraciətlər və təsdiq statusları'],
   'seller-users': ['Satıcılar', 'Yalnız satıcı panelinə giriş hesabları'],
   posts: ['Məqalələr', 'Redaksiya kontenti'],
@@ -129,7 +131,7 @@ const createPermissions = {
   vendors: 'vendors.manage', 'seller-users': 'users.manage', products: 'catalog.create', categories: 'categories.manage', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
   posts: 'posts.create', 'post-categories': 'posts.create', pages: 'cms.create', seo: 'seo.manage',
   campaigns: 'campaigns.manage', coupons: 'coupons.manage', qr: 'qr.manage', rewards: 'loyalty.manage',
-  journal: 'journal.create', classifieds: 'classifieds.moderate'
+  journal: 'journal.create', classifieds: 'classifieds.create', 'service-categories': 'service_categories.manage'
 };
 
 function cookie(name) {
@@ -346,11 +348,16 @@ const configs = {
     { label: 'Miqdar', key: 'quantity' }, { label: 'Rezerv', key: 'reserved' }, { label: 'Mövcud', key: 'available' },
     { label: 'Əməliyyat', render: (row) => can('inventory.manage') ? `<button class="table-action" data-inventory-adjust data-variant="${esc(row.variant_id)}" data-warehouse="${esc(row.warehouse_id)}" data-product="${esc(row.product_name)}">Stoku dəyiş</button>` : '—' }
   ] },
+  'service-categories': { path: '/publishing/service-categories', columns: [
+    { label: 'Kateqoriya', render: (row) => `<span class="category-tree-name depth-${Number(row.depth||0)}">${esc(row.name)}</span><small class="cell-note">${['Departament','Ana kateqoriya','Alt kateqoriya'][Number(row.depth||0)]||'Kateqoriya'}</small>` },
+    { label: 'Slug', key: 'slug' }, { label: 'Elan', key: 'listing_count' }, { label: 'Sıra', key: 'position' }, { label: 'Status', render: (row) => badge(row.status) },
+    { label: '', render: (row) => can('service_categories.manage') ? `<button class="table-action" data-service-category-edit="${esc(row.id)}">Redaktə et</button> <button class="table-action danger" data-service-category-delete="${esc(row.id)}">Arxivlə</button>` : '—' }
+  ] },
   classifieds: { path: '/publishing/classifieds', columns: [
     { label: 'Elan', key: 'title' }, { label: 'Növ', render: (row) => esc({product:'Məhsul',service:'Xidmət',property:'Əmlak',vehicle:'Nəqliyyat',other:'Digər'}[row.category]||row.category) },
     { label: 'Satıcı', render: (row) => esc(row.vendor_name||'Fərdi elan') }, { label: 'Qiymət', render: (row) => row.price==null?'Razılaşma ilə':money(row.price,row.currency) },
     { label: 'Status', render: (row) => recordStatus(row,['draft','review','published','rejected','expired','archived'],`/publishing/classifieds/${row.id}/status`,'classifieds.moderate','Elan statusu') },
-    { label: 'Tarix', render: (row) => date(row.created_at) }, { label: '', render: (row) => can('classifieds.moderate')?`<button class="table-action" data-classified-edit="${esc(row.id)}">Redaktə et</button> <button class="table-action danger" data-classified-delete="${esc(row.id)}">Arxivlə</button>`:'—' }
+    { label: 'Kateqoriya', render: (row) => esc(row.service_category_name||'—') }, { label: 'Tarix', render: (row) => date(row.created_at) }, { label: '', render: (row) => can('classifieds.update')?`<button class="table-action" data-classified-edit="${esc(row.id)}">Redaktə et</button>${can('classifieds.delete')?` <button class="table-action danger" data-classified-delete="${esc(row.id)}">Arxivlə</button>`:''}`:'—' }
   ] },
   vendors: { path: '/vendors', columns: [
     { label: 'Satıcı', render: (row) => `<strong>${esc(row.display_name)}</strong><small class="cell-note">${esc(row.legal_name)}</small>${row.tax_id ? `<small class="cell-note">VÖEN: ${esc(row.tax_id)}</small>` : ''}` },
@@ -516,6 +523,37 @@ async function catalogOptions(storeId, includeMedia = true) {
   return { categories: categories.data || [], brands: brands.data || [], warehouses: warehouses.data || [], media: media.data || [] };
 }
 
+function serviceCategoryOptions(rows, { leafOnly = false, excludeIds = new Set() } = {}) {
+  const active = rows.filter((row) => row.status === 'active' && !excludeIds.has(row.id));
+  const parents = new Set(active.map((row) => row.parent_id).filter(Boolean));
+  return active
+    .filter((row) => !leafOnly || !parents.has(row.id))
+    .map((row) => {
+      const path = Array.isArray(row.path_names) && row.path_names.length
+        ? row.path_names.join(' › ')
+        : `${'— '.repeat(Number(row.depth || 0))}${row.name}`;
+      return [row.id, path];
+    });
+}
+
+function classifiedImageFields() {
+  return `<fieldset class="wide choice-field product-image-field"><legend>Elan şəkilləri</legend><p class="muted">Şəkilləri yükləyin və sürüşdürərək sıralayın. Birinci şəkil avtomatik əsas şəkil olur.</p><label class="product-image-dropzone" data-product-image-dropzone><input type="file" data-product-image-input accept="image/jpeg,image/png,image/webp,image/avif" multiple><strong>Şəkilləri seçin və ya bura atın</strong><small>JPG, PNG, WEBP və AVIF · ən çox 12 şəkil</small></label><div class="product-image-list" data-product-image-list></div><p class="product-upload-status" data-product-upload-status aria-live="polite"></p></fieldset>`;
+}
+
+function synchronizeClassifiedCategory() {
+  const form = $('#createForm');
+  if (form?.dataset.view !== 'classifieds') return;
+  const category = form.elements.category;
+  const serviceCategory = form.elements.serviceCategoryId;
+  const wrapper = form.querySelector('[data-service-category-field]');
+  if (!category || !serviceCategory || !wrapper) return;
+  const isService = category.value === 'service';
+  wrapper.hidden = !isService;
+  serviceCategory.disabled = !isService;
+  serviceCategory.required = isService;
+  if (!isService) serviceCategory.value = '';
+}
+
 function productFields(vendors, options, generatedSku = '') {
   productCategoryOptions = options.categories || [];
   const departments = productCategoryOptions.filter((category) => !category.parent_id && category.status === 'active');
@@ -669,7 +707,7 @@ async function uploadProductImages({ storeId, vendorId, altText }) {
     if (status) status.textContent = `${productImages.length} şəkildən ${index + 1}-cisi yüklənir…`;
     const upload = new FormData();
     upload.append('storeId', storeId);
-    upload.append('vendorId', vendorId);
+    if (vendorId) upload.append('vendorId', vendorId);
     upload.append('altText', altText || item.name.replace(/\.[^.]+$/, ''));
     upload.append('title', item.name.replace(/\.[^.]+$/, ''));
     upload.append('file', item.file, item.file.name);
@@ -761,7 +799,7 @@ function showDialog(title, view, fields, storeId = '') {
   $('#formFields').innerHTML = fields;
   $('#createForm').dataset.view = view;
   $('#createForm').dataset.storeId = storeId;
-  $('#createDialog').classList.toggle('product-dialog', view === 'products');
+  $('#createDialog').classList.toggle('product-dialog', view === 'products' || view === 'classifieds');
   delete $('#createForm').dataset.recordId;
   $('#createForm').querySelector('button[type="submit"]').hidden = false;
   $('#createError').textContent = '';
@@ -812,6 +850,22 @@ async function openCategoryEdit(id) {
   setDialogValues({parentId:row.parent_id||'',name:row.name,slug:row.slug,position:row.position,description:row.description,seoTitle:row.seo_title||'',seoDescription:row.seo_description||'',imageAssetId:row.image_asset_id||'',status:row.status});
 }
 
+async function openServiceCategoryEdit(id) {
+  const storeId=state.user.storeIds[0];
+  const {data}=await api(`/publishing/service-categories?storeId=${encodeURIComponent(storeId)}`);
+  const row=data.find((item)=>item.id===id);
+  if(!row)throw new Error('Xidmət kateqoriyası tapılmadı');
+  await openCreate('service-categories');
+  $('#dialogTitle').textContent='Xidmət kateqoriyasını redaktə et';
+  $('#createForm').dataset.recordId=id;
+  const unavailableParents=new Set([id]);
+  for(let changed=true;changed;){
+    changed=false;
+    for(const category of data)if(unavailableParents.has(category.parent_id)&&!unavailableParents.has(category.id)){unavailableParents.add(category.id);changed=true;}
+  }
+  $('#createForm').querySelectorAll('select[name="parentId"] option').forEach((option)=>{if(unavailableParents.has(option.value))option.remove();});
+  setDialogValues({parentId:row.parent_id||'',name:row.name,slug:row.slug,position:row.position,description:row.description||'',seoTitle:row.seo_title||'',seoDescription:row.seo_description||'',imageAssetId:row.image_asset_id||'',status:row.status});
+}
 async function openBrandEdit(id) {
   const storeId=state.user.storeIds[0]; const {data}=await api(`/catalog/brands?storeId=${encodeURIComponent(storeId)}`); const row=data.find((item)=>item.id===id); if(!row)throw new Error('Brend tapılmadı');
   await openCreate('brands'); $('#dialogTitle').textContent='Brendi redaktə et'; $('#createForm').dataset.recordId=id;
@@ -842,7 +896,9 @@ async function openJournalEdit(id) {
 async function openClassifiedEdit(id) {
   const {data}=await api(`/publishing/classifieds/${id}`);await openCreate('classifieds');$('#dialogTitle').textContent='Elanı redaktə et';$('#createForm').dataset.recordId=id;
   const local=(value)=>value?new Date(new Date(value).getTime()-new Date(value).getTimezoneOffset()*60000).toISOString().slice(0,16):'';
-  setDialogValues({vendorId:data.vendor_id||'',category:data.category,title:data.title,slug:data.slug,description:data.description,price:data.price??'',phone:data.contact_data?.phone||'',email:data.contact_data?.email||'',city:data.location_data?.city||'',address:data.location_data?.address||'',expiresAt:local(data.expires_at),mediaIds:(data.media||[]).map((item)=>item.id)});
+  setDialogValues({vendorId:data.vendor_id||'',category:data.category,serviceCategoryId:data.service_category_id||'',title:data.title,slug:data.slug,description:data.description,price:data.price??'',phone:data.contact_data?.phone||'',email:data.contact_data?.email||'',city:data.location_data?.city||'',address:data.location_data?.address||'',expiresAt:local(data.expires_at)});
+  synchronizeClassifiedCategory();
+  initializeProductEditor(data.media||[],false);
 }
 
 async function openPostCategoryEdit(id) {
@@ -920,6 +976,18 @@ async function openCreate(view) {
     const options = await catalogOptions(storeId);
     const images=options.media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
     fields = field('parentId', 'Üst kateqoriya', 'select', false, [['', 'Departament (üst səviyyə)'], ...options.categories.filter((category) => Number(category.depth) < 2 && category.status === 'active').map((category) => [category.id, `${'— '.repeat(Number(category.depth) + 1)}${category.name}`])]) + '<p class="wide category-level-help">Üst kateqoriya seçilməzsə departament, departament seçilərsə əsas kateqoriya, əsas kateqoriya seçilərsə alt kateqoriya yaradılır.</p>' + field('name', 'Kateqoriya adı') + field('slug', 'Slug', 'text', false) + field('imageAssetId','Kateqoriya şəkli','select',false,[['','Şəkilsiz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('position', 'Sıra', 'number', true, [], 'min="0" step="1" value="0"') + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
+  } else if (view === 'service-categories') {
+    const [taxonomy,media]=await Promise.all([
+      api(`/publishing/service-categories?storeId=${encodeURIComponent(storeId)}`),
+      can('media.read')?api('/media'):Promise.resolve({data:[]})
+    ]);
+    const images=(media.data||[]).filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
+    fields=field('parentId','Üst kateqoriya','select',false,[['','Departament (üst səviyyə)'],...serviceCategoryOptions((taxonomy.data||[]).filter((row)=>Number(row.depth)<2))])
+      +'<p class="wide category-level-help">Üst kateqoriya seçilməzsə departament, departament seçilərsə ana kateqoriya, ana kateqoriya seçilərsə alt kateqoriya yaradılır.</p>'
+      +field('name','Kateqoriya adı')+field('slug','Slug','text',false)+field('imageAssetId','Kateqoriya şəkli','select',false,[['','Şəkilsiz'],...images])
+      +field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']])
+      +field('position','Sıra','number',true,[],'min="0" step="1" value="0"')+field('description','Təsvir','textarea',false)
+      +field('seoTitle','SEO başlığı','text',false)+field('seoDescription','Meta təsvir','textarea',false);
   } else if (view === 'brands') {
     const options=await catalogOptions(storeId);const images=options.media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
     fields = field('name', 'Brend adı') + field('slug', 'Slug', 'text', false) + field('logoAssetId','Brend loqosu','select',false,[['','Loqosuz'],...images]) + field('status','Status','select',true,[['active','Aktiv'],['inactive','Qeyri-aktiv'],['archived','Arxivdə']]) + field('websiteUrl', 'Rəsmi sayt', 'url', false) + field('description', 'Təsvir', 'textarea', false) + field('seoTitle', 'SEO başlığı', 'text', false) + field('seoDescription', 'Meta təsvir', 'textarea', false);
@@ -933,8 +1001,16 @@ async function openCreate(view) {
     const media=can('media.read')?(await api('/media')).data:[];const images=media.filter((item)=>item.mime_type?.startsWith('image/')).map((item)=>[item.id,item.title||item.alt_text||item.metadata?.originalName||item.id]);
     fields=field('issueNumber','Buraxılış nömrəsi')+field('title','Başlıq')+field('slug','Slug','text',false)+field('coverAssetId','Örtük şəkli','select',false,[['','Şəkilsiz'],...images])+`<input type="hidden" name="pdfAssetId"><label class="wide journal-pdf-upload">Jurnal PDF-i<input type="file" name="pdfUpload" accept="application/pdf,.pdf" required><small data-current-journal-pdf>PDF faylını cihazdan seçin.</small></label>`+field('description','Təsvir','textarea',false);
   } else if (view === 'classifieds') {
-    const media=can('media.read')?(await api('/media')).data:[];const images=media.filter((item)=>item.mime_type?.startsWith('image/'));const mediaChoices=images.map((item)=>`<label class="choice-card"><input type="checkbox" name="mediaIds" value="${esc(item.id)}"><img src="${esc(item.public_url)}" alt=""><span>${esc(item.title||item.alt_text||'Şəkil')}</span></label>`).join('');
-    fields=field('vendorId','Satıcı','select',false,[['','Fərdi elan'],...vendors])+field('category','Elan növü','select',true,[['product','Məhsul'],['service','Xidmət'],['property','Əmlak'],['vehicle','Nəqliyyat'],['other','Digər']])+field('title','Başlıq')+field('slug','Slug','text',false)+field('price','Qiymət','number',false,[],'min="0" step="0.01"')+field('phone','Telefon','tel',false)+field('email','E-poçt','email',false)+field('city','Şəhər','text',false)+field('address','Ünvan','text',false)+field('expiresAt','Bitmə tarixi','datetime-local',false)+field('description','Təsvir','textarea')+`<fieldset class="wide choice-field"><legend>Elan şəkilləri</legend><div class="media-choices">${mediaChoices||'<p class="muted">Media kitabxanasında uyğun şəkil yoxdur.</p>'}</div></fieldset>`;
+    const {data:serviceCategories}=await api(`/publishing/service-categories?storeId=${encodeURIComponent(storeId)}`);
+    const serviceOptions=serviceCategoryOptions(serviceCategories,{leafOnly:true});
+    const vendorField=isVendorPortal?'':field('vendorId','Satıcı','select',false,[['','Fərdi elan'],...vendors]);
+    fields=vendorField
+      +field('category','Elan növü','select',true,[['service','Xidmət'],['product','Məhsul'],['property','Əmlak'],['vehicle','Nəqliyyat'],['other','Digər']])
+      +`<label data-service-category-field>Xidmət kateqoriyası<select name="serviceCategoryId" required><option value="">Kateqoriya yolunu seçin</option>${serviceOptions.map(([value,text])=>`<option value="${esc(value)}">${esc(text)}</option>`).join('')}</select><small class="field-hint">${serviceOptions.length?'Ən uyğun alt kateqoriyanı seçin.':'Aktiv xidmət alt kateqoriyası yoxdur.'}</small></label>`
+      +field('title','Başlıq')+field('slug','Slug','text',false)+field('price','Qiymət','number',false,[],'min="0" step="0.01"')
+      +field('phone','Telefon','tel',false,[],'inputmode="tel" placeholder="+994 12 345 67 89"')+field('email','E-poçt','email',false)
+      +field('city','Şəhər','text',false)+field('address','Ünvan','text',false)+field('expiresAt','Bitmə tarixi','datetime-local',false)
+      +field('description','Təsvir','textarea')+'<p class="wide category-level-help">Elanın dərcə göndərilməsi üçün telefon və ya e-poçtdan ən azı biri daxil edilməlidir.</p>'+classifiedImageFields();
   } else if (view === 'post-categories') {
     fields=field('name','Kateqoriya adı')+field('slug','Slug','text',false)+field('description','Təsvir','textarea',false)+field('seoTitle','SEO başlığı','text',false)+field('seoDescription','Meta təsvir','textarea',false);
   } else if (view === 'seo') {
@@ -953,6 +1029,10 @@ async function openCreate(view) {
   }
   showDialog(`${labels[view][0]} — yeni qeyd`, view, fields, storeId);
   if(view==='users'||view==='seller-users')synchronizeUserVendorField();
+  if(view==='classifieds'){
+    initializeProductEditor([],false);
+    synchronizeClassifiedCategory();
+  }
 }
 
 function openInventoryAdjust(button) {
@@ -989,6 +1069,12 @@ $('#createForm').addEventListener('submit', async (event) => {
     } else if (view === 'categories') {
       path=form.dataset.recordId?`/catalog/categories/${form.dataset.recordId}`:'/catalog/categories'; body.position=Number(body.position||0);body.parentId=String(formData.get('parentId')||'')||null;body.imageAssetId=String(formData.get('imageAssetId')||'')||null;
       if(form.dataset.recordId)delete body.storeId;
+    } else if (view === 'service-categories') {
+      path=form.dataset.recordId?`/publishing/service-categories/${form.dataset.recordId}`:'/publishing/service-categories';
+      body.position=Number(body.position||0);
+      body.parentId=String(formData.get('parentId')||'')||null;
+      body.imageAssetId=String(formData.get('imageAssetId')||'')||null;
+      if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'brands') {
       path=form.dataset.recordId?`/catalog/brands/${form.dataset.recordId}`:'/catalog/brands';body.logoAssetId=String(formData.get('logoAssetId')||'')||null;body.websiteUrl=String(formData.get('websiteUrl')||'');if(!form.dataset.recordId)delete body.status;if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'users' || view === 'seller-users') {
@@ -1008,7 +1094,19 @@ $('#createForm').addEventListener('submit', async (event) => {
       path=form.dataset.recordId?`/publishing/journal/${form.dataset.recordId}`:'/publishing/journal';body.coverAssetId=String(formData.get('coverAssetId')||'')||null;
       const uploadedPdf=await uploadJournalPdf(formData.get('pdfUpload'),form.dataset.storeId,String(body.title||''));body.pdfAssetId=uploadedPdf||String(formData.get('pdfAssetId')||'')||null;delete body.pdfUpload;if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'classifieds') {
-      path=form.dataset.recordId?`/publishing/classifieds/${form.dataset.recordId}`:'/publishing/classifieds';body.vendorId=String(formData.get('vendorId')||'')||null;body.price=String(formData.get('price')||'')?Number(formData.get('price')):null;body.currency='AZN';body.expiresAt=body.expiresAt?new Date(body.expiresAt).toISOString():null;body.mediaIds=formData.getAll('mediaIds').map(String);if(form.dataset.recordId)delete body.storeId;
+      path=form.dataset.recordId?`/publishing/classifieds/${form.dataset.recordId}`:'/publishing/classifieds';
+      const vendorId=String(formData.get('vendorId')||state.user.vendorIds[0]||'')||null;
+      const phone=String(formData.get('phone')||'').trim();
+      const email=String(formData.get('email')||'').trim();
+      if(!phone&&!email)throw new Error('Telefon və ya e-poçtdan ən azı biri daxil edilməlidir');
+      body.vendorId=vendorId;
+      body.serviceCategoryId=body.category==='service'?(String(formData.get('serviceCategoryId')||'')||null):null;
+      if(body.category==='service'&&!body.serviceCategoryId)throw new Error('Xidmət kateqoriyası seçilməlidir');
+      body.price=String(formData.get('price')||'')?Number(formData.get('price')):null;
+      body.currency='AZN';
+      body.expiresAt=body.expiresAt?new Date(body.expiresAt).toISOString():null;
+      body.mediaIds=await uploadProductImages({storeId:form.dataset.storeId,vendorId,altText:String(body.title||'')});
+      if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'post-categories') {
       path=form.dataset.recordId?`/content/post-categories/${form.dataset.recordId}`:'/content/post-categories';if(form.dataset.recordId)delete body.storeId;
     } else if (view === 'seo') {
@@ -1032,7 +1130,7 @@ $('#createForm').addEventListener('submit', async (event) => {
     await render();
     await refreshNotificationCount();
   } catch (error) {
-    if (view === 'products') await cleanupUnattachedProductImages();
+    if (view === 'products' || view === 'classifieds') await cleanupUnattachedProductImages();
     if (view === 'products' && error.code === 'DUPLICATE') await refreshProductSku();
     $('#createError').textContent = error.message;
   } finally {
@@ -1169,6 +1267,11 @@ document.addEventListener('submit', async (event) => {
 });
 
 document.addEventListener('change', async (event) => {
+  const classifiedCategory=event.target.closest('#createForm[data-view="classifieds"] select[name="category"]');
+  if(classifiedCategory){
+    synchronizeClassifiedCategory();
+    return;
+  }
   const productCategory = event.target.closest('#createForm[data-view="products"] [data-category-depth]');
   if (productCategory) {
     synchronizeProductCategoryPicker(Number(productCategory.dataset.categoryDepth));
@@ -1260,6 +1363,10 @@ document.addEventListener('click', (event) => {
   const brandEdit=event.target.closest('[data-brand-edit]');
   if(brandEdit)openBrandEdit(brandEdit.dataset.brandEdit).catch((error)=>toast(error.message,true));
   const rewardEdit=event.target.closest('[data-reward-edit]');
+  const serviceCategoryEdit=event.target.closest('[data-service-category-edit]');
+  if(serviceCategoryEdit)openServiceCategoryEdit(serviceCategoryEdit.dataset.serviceCategoryEdit).catch((error)=>toast(error.message,true));
+  const serviceCategoryDelete=event.target.closest('[data-service-category-delete]');
+  if(serviceCategoryDelete&&confirm('Bu xidmət kateqoriyası arxivlənsin?'))api(`/publishing/service-categories/${serviceCategoryDelete.dataset.serviceCategoryDelete}`,{method:'DELETE'}).then(()=>{toast('Xidmət kateqoriyası arxivləndi');return render();}).catch((error)=>toast(error.message,true));
   if(rewardEdit)openRewardEdit(rewardEdit.dataset.rewardEdit).catch((error)=>toast(error.message,true));
   const contentEdit=event.target.closest('[data-content-edit]');
   if(contentEdit)openContentEdit(contentEdit.dataset.contentType,contentEdit.dataset.contentEdit).catch((error)=>toast(error.message,true));

@@ -220,8 +220,8 @@ export function layout(options: LayoutOptions): string {
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
-  <link rel="stylesheet" href="/assets/css/pages.css?v=20260816-2">
-  <link rel="stylesheet" href="/assets/css/site.css?v=20260816-8">
+  <link rel="stylesheet" href="/assets/css/pages.css?v=20260821-1">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20260822-2">
   <link rel="stylesheet" href="/assets/css/commerce.css">
   <link rel="stylesheet" href="/assets/css/search.css">
   <link rel="stylesheet" href="/assets/css/account.css">
@@ -235,7 +235,7 @@ export function layout(options: LayoutOptions): string {
   <script src="/assets/js/search.js" defer></script>
   <script src="/assets/js/pages.js" defer></script>
   <script src="/assets/js/product.js?v=20260816-2" defer></script>
-  <script src="/assets/js/catalog-navigation.js?v=20260816-2" defer></script>
+  <script src="/assets/js/catalog-navigation.js?v=20260822-2" defer></script>
   <script src="/assets/js/site-editor.js?v=20260816-3" defer></script>
 </head>
 <body id="top" data-page="${escapeHtml(options.active || '')}">
@@ -256,7 +256,9 @@ export function layout(options: LayoutOptions): string {
       <a class="page-cart-link" href="/sebet/" data-mini-cart-toggle aria-label="Səbətimi aç"><i class="page-shell-icon cart" aria-hidden="true"></i><span data-cart-count>0</span></a>
       <button class="page-menu-toggle" type="button" aria-expanded="false" aria-controls="page-navigation" aria-label="Menyunu aç"><span></span><span></span><span></span></button>
     </div>
+    <button class="page-navigation-backdrop" type="button" data-page-menu-close aria-label="Menyunu bağla"></button>
     <nav class="page-navigation" id="page-navigation" aria-label="Əsas menyu" data-mobile-menu-tab="navigation">
+      <div class="page-mobile-menu-head"><button class="page-mobile-menu-close" type="button" data-page-menu-close aria-label="Menyunu bağla"></button><a class="page-mobile-menu-account" href="/giris/" data-auth-link><span class="page-mobile-menu-avatar" aria-hidden="true">GB</span><span><strong>Salam, qonaq</strong>Daha yaxşı təcrübə üçün daxil olun</span></a></div>
       <div class="page-mobile-menu-tabs" role="tablist" aria-label="Mobil menyu bölmələri">
         <button class="is-active" type="button" role="tab" aria-selected="true" data-page-menu-tab="navigation"><i aria-hidden="true"><span></span><span></span><span></span></i>Naviqasiya</button>
         <button type="button" role="tab" aria-selected="false" data-page-menu-tab="store">Mağaza</button>
