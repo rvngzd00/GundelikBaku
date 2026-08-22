@@ -688,16 +688,39 @@ function resetPageDrillDown(navigation, animateReturn = false) {
 }
 
 function selectPageMenuTab(navigation, selectedTab) {
-  navigation.dataset.mobileMenuTab = selectedTab;
-  navigation.querySelectorAll('[data-page-menu-tab]').forEach((button) => {
+  if (!(navigation instanceof HTMLElement) || !['navigation', 'store'].includes(selectedTab)) return;
+  resetPageDrillDown(navigation);
+  window.DailyBakuCatalogNavigation?.resetMobileMenus?.();
+
+  navigation.querySelectorAll('.page-mobile-menu-tabs button[data-page-menu-tab]').forEach((button) => {
     const selected = button.dataset.pageMenuTab === selectedTab;
     button.classList.toggle('is-active', selected);
     button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
   });
-  resetPageDrillDown(navigation);
+
+  navigation.querySelectorAll('[data-page-menu-panel]').forEach((panel) => {
+    const selected = panel.dataset.pageMenuPanel === selectedTab;
+    panel.hidden = !selected;
+    panel.toggleAttribute('inert', !selected);
+    panel.setAttribute('aria-hidden', String(!selected));
+  });
+
+  navigation.dataset.mobileMenuTab = selectedTab;
+  const scrollRegion = navigation.querySelector('.page-navigation-row');
+  if (scrollRegion) scrollRegion.scrollTop = 0;
 }
 
+function normalizePageMenu() {
+  const navigation = document.querySelector('.page-navigation');
+  if (navigation instanceof HTMLElement) selectPageMenuTab(navigation, 'navigation');
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', normalizePageMenu, { once: true });
+else normalizePageMenu();
+
 document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
   const navigationParent = event.target.closest('.page-navigation-item > a');
   if (navigationParent && window.matchMedia('(max-width: 1023px)').matches) {
     const navigation = navigationParent.closest('.page-navigation');
@@ -727,10 +750,11 @@ document.addEventListener('click', (event) => {
       }
     }
   }
-  const menuTab = event.target.closest('[data-page-menu-tab]');
+  const menuTab = event.target.closest('.page-mobile-menu-tabs button[data-page-menu-tab]');
   if (menuTab) {
+    event.preventDefault();
     const navigation = menuTab.closest('.page-navigation');
-    selectPageMenuTab(navigation, menuTab.dataset.pageMenuTab);
+    if (navigation) selectPageMenuTab(navigation, menuTab.dataset.pageMenuTab);
   }
   const menu = event.target.closest('.page-menu-toggle');
   const menuClose = event.target.closest('[data-page-menu-close]');

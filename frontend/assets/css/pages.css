@@ -40,6 +40,10 @@
 }
 
 @media(max-width:1023px) {
+  .page-navigation [data-page-menu-panel][hidden] {
+    display:none!important;
+  }
+
   .page-navigation .page-mobile-menu-tabs {
     display:flex;
     width:100%;
@@ -2743,3 +2747,98 @@
   .page-navigation .page-mobile-menu-tabs button{font-size:14px}
 }
 @media(max-width:430px){.page-navigation{width:100vw!important}.page-mobile-menu-head{min-height:72px}.page-navigation-row{height:calc(100dvh - 130px)!important}}
+
+/* Final mobile shell guard: menu copy stays left aligned and only content,
+   never desktop spacing, determines the vertical rhythm on small screens. */
+@media(max-width:1023px) {
+  .page-navigation .page-navigation-root > .page-navigation-item > a,
+  .page-navigation-root.is-drilled .page-submenu > li > a,
+  .page-navigation .page-store-navigation.db-mobile-taxonomy .db-mobile-taxonomy-control,
+  .page-navigation .page-store-navigation.db-mobile-taxonomy .db-mobile-taxonomy-back,
+  .page-navigation .page-store-navigation.db-mobile-taxonomy .db-mobile-taxonomy-all {
+    justify-content:flex-start!important;
+    text-align:left!important;
+  }
+
+  .page-navigation .page-navigation-root > .page-navigation-item > a .page-nav-arrow,
+  .page-navigation .db-mobile-taxonomy-chevron {
+    margin-left:auto;
+  }
+
+  .page-navigation .page-mobile-menu-tabs button {
+    justify-content:center!important;
+    text-align:center!important;
+  }
+}
+
+@media(max-width:767px) {
+  .page-breadcrumb {
+    width:100%;
+    min-width:0;
+    gap:6px;
+    padding:10px 0;
+    overflow-x:auto;
+    overflow-y:hidden;
+    font-size:10px;
+    line-height:1.4;
+    white-space:nowrap;
+    scroll-padding-inline:2px;
+    scroll-snap-type:x proximity;
+    scrollbar-width:none;
+    overscroll-behavior-inline:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .page-breadcrumb::-webkit-scrollbar {
+    display:none;
+  }
+
+  .page-breadcrumb > * {
+    flex:0 0 auto;
+    scroll-snap-align:start;
+  }
+
+  .page-category-nav {
+    padding:14px 0 16px;
+  }
+
+  .page-category-heading {
+    margin-bottom:10px;
+  }
+
+  .page-category-explorer {
+    padding:12px 0 14px;
+  }
+
+  .page-category-groups {
+    gap:8px;
+  }
+
+  .page-section {
+    padding:22px 0 28px;
+  }
+
+  .page-category-nav + .page-section,
+  .page-category-explorer + .page-section {
+    padding-top:17px;
+  }
+
+  .page-section-title {
+    gap:10px;
+    margin-bottom:14px;
+  }
+
+  .page-section-title h2 {
+    font-size:21px;
+    line-height:1.2;
+  }
+
+  .page-shop-layout {
+    gap:12px;
+  }
+
+  .page-results-head {
+    min-height:34px;
+    font-size:11px;
+  }
+}

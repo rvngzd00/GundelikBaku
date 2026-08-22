@@ -3807,3 +3807,28 @@ html.db-quick-view-open {
   #menu-mobile-menu .db-service-mobile-department>.mi-link{min-height:43px!important;padding-left:30px!important;color:#556077!important;font-size:11px!important;font-weight:650!important;text-transform:none!important}
 }
 @media(prefers-reduced-motion:reduce){.db-mega-panel{transition:none!important}}
+
+/* Homepage drawer alignment shared with the compact inner-page menu. */
+@media(max-width:1023px) {
+  .db-mobile-store-pane .mobile-menu .mi-link,
+  .db-mobile-navigation-pane #menu-mobile-menu > .menu-item > .mi-link,
+  .db-mobile-navigation-pane #menu-mobile-menu .sub-menu > .menu-item > .mi-link,
+  #menu-mobile-store.db-mobile-taxonomy .db-mobile-taxonomy-control,
+  #menu-mobile-store.db-mobile-taxonomy .db-mobile-taxonomy-back,
+  #menu-mobile-store.db-mobile-taxonomy .db-mobile-taxonomy-all {
+    justify-content:flex-start!important;
+    text-align:left!important;
+  }
+
+  .db-mobile-store-pane .mobile-menu .mi-link > .txt,
+  .db-mobile-navigation-pane .mobile-menu .mi-link > .txt,
+  #menu-mobile-store.db-mobile-taxonomy .db-mobile-taxonomy-title {
+    min-width:0;
+    text-align:left!important;
+  }
+
+  .db-mobile-navigation-pane #menu-mobile-menu .db-mobile-nav-chevron,
+  #menu-mobile-store.db-mobile-taxonomy .db-mobile-taxonomy-chevron {
+    margin-left:auto;
+  }
+}

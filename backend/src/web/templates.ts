@@ -220,8 +220,8 @@ export function layout(options: LayoutOptions): string {
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
-  <link rel="stylesheet" href="/assets/css/pages.css?v=20260821-1">
-  <link rel="stylesheet" href="/assets/css/site.css?v=20260822-2">
+  <link rel="stylesheet" href="/assets/css/pages.css?v=20260823-2">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20260823-2">
   <link rel="stylesheet" href="/assets/css/commerce.css">
   <link rel="stylesheet" href="/assets/css/search.css">
   <link rel="stylesheet" href="/assets/css/account.css">
@@ -233,9 +233,9 @@ export function layout(options: LayoutOptions): string {
   <script src="/assets/js/auth.js" defer></script>
   <script src="/assets/js/mobile-panels.js" defer></script>
   <script src="/assets/js/search.js" defer></script>
-  <script src="/assets/js/pages.js" defer></script>
+  <script src="/assets/js/pages.js?v=20260823-2" defer></script>
   <script src="/assets/js/product.js?v=20260816-2" defer></script>
-  <script src="/assets/js/catalog-navigation.js?v=20260822-2" defer></script>
+  <script src="/assets/js/catalog-navigation.js?v=20260823-2" defer></script>
   <script src="/assets/js/site-editor.js?v=20260816-3" defer></script>
 </head>
 <body id="top" data-page="${escapeHtml(options.active || '')}">
@@ -260,10 +260,10 @@ export function layout(options: LayoutOptions): string {
     <nav class="page-navigation" id="page-navigation" aria-label="Əsas menyu" data-mobile-menu-tab="navigation">
       <div class="page-mobile-menu-head"><button class="page-mobile-menu-close" type="button" data-page-menu-close aria-label="Menyunu bağla"></button><a class="page-mobile-menu-account" href="/giris/" data-auth-link><span class="page-mobile-menu-avatar" aria-hidden="true">GB</span><span><strong>Salam, qonaq</strong>Daha yaxşı təcrübə üçün daxil olun</span></a></div>
       <div class="page-mobile-menu-tabs" role="tablist" aria-label="Mobil menyu bölmələri">
-        <button class="is-active" type="button" role="tab" aria-selected="true" data-page-menu-tab="navigation"><i aria-hidden="true"><span></span><span></span><span></span></i>Naviqasiya</button>
-        <button type="button" role="tab" aria-selected="false" data-page-menu-tab="store">Mağaza</button>
+        <button class="is-active" id="page-menu-tab-navigation" type="button" role="tab" aria-selected="true" aria-controls="page-menu-panel-navigation" tabindex="0" data-page-menu-tab="navigation"><i aria-hidden="true"><span></span><span></span><span></span></i>Naviqasiya</button>
+        <button id="page-menu-tab-store" type="button" role="tab" aria-selected="false" aria-controls="page-menu-panel-store" tabindex="-1" data-page-menu-tab="store">Mağaza</button>
       </div>
-      <div class="page-container page-navigation-row"><ul class="page-store-navigation" aria-label="Mağaza kateqoriyaları">${storeNavigationHtml}</ul><ul class="page-navigation-root">${navigationHtml}</ul><a class="page-navigation-tools" href="/hesabim/secilmisler/" aria-label="Seçilmiş məhsullar"><i class="page-shell-icon heart" aria-hidden="true"></i><b data-wishlist-count>0</b></a></div>
+      <div class="page-container page-navigation-row"><ul class="page-store-navigation" id="page-menu-panel-store" role="tabpanel" aria-labelledby="page-menu-tab-store" aria-label="Mağaza kateqoriyaları" aria-hidden="true" data-page-menu-panel="store" hidden inert>${storeNavigationHtml}</ul><ul class="page-navigation-root" id="page-menu-panel-navigation" role="tabpanel" aria-labelledby="page-menu-tab-navigation" aria-hidden="false" data-page-menu-panel="navigation">${navigationHtml}</ul><a class="page-navigation-tools" href="/hesabim/secilmisler/" aria-label="Seçilmiş məhsullar"><i class="page-shell-icon heart" aria-hidden="true"></i><b data-wishlist-count>0</b></a></div>
     </nav>
   </header>
   <main id="main-content">${options.content}</main>

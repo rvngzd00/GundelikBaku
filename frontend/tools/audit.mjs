@@ -13,7 +13,9 @@ const commerce = readFileSync(join(root, 'assets/js/commerce.js'), 'utf8');
 const i18n = readFileSync(join(root, 'assets/js/i18n.js'), 'utf8');
 const siteEditor = readFileSync(join(root, 'assets/js/site-editor.js'), 'utf8');
 const catalogNavigation = readFileSync(join(root, 'assets/js/catalog-navigation.js'), 'utf8');
+const pages = readFileSync(join(root, 'assets/js/pages.js'), 'utf8');
 const siteCss = readFileSync(join(root, 'assets/css/site.css'), 'utf8');
+const pagesCss = readFileSync(join(root, 'assets/css/pages.css'), 'utf8');
 const accountCss = readFileSync(join(root, 'assets/css/account.css'), 'utf8');
 const mobilePanels = readFileSync(join(root, 'assets/js/mobile-panels.js'), 'utf8');
 const errors = [];
@@ -123,6 +125,9 @@ const required = [
   ['management accounts use role-aware menus with logout', /ADMIN_PORTAL_ROLES/.test(auth) && /VENDOR_PORTAL_ROLES/.test(auth) && /renderPanelAccount/.test(auth) && /accountMenuMarkup/.test(auth) && /data-account-logout/.test(auth) && /DailyBakuPanelPath/.test(auth) && /panelLinks/.test(mobilePanels) && !/window\.location\.assign\(panelPath\)/.test(mobilePanels)],
   ['customer header account menu uses the redesigned accessible layout', /db-header-account-menu/.test(auth) && /navigationLabel = 'Hesab keçidləri'/.test(auth) && /db-header-account-logout/.test(auth) && /\.et__login\.db-customer-account \.login-box/.test(siteCss)],
   ['desktop mega menu preserves the shared mobile fallback without injecting mega links into the navbar', catalogNavigation.includes("fallbackMenu?.classList.add('db-mega-mobile-fallback')") && catalogNavigation.includes("!item.closest('.db-mega-panel')") && siteCss.includes('.db-mega-root>.db-mega-mobile-fallback{display:none!important}')],
+  ['mobile menu tab state only responds to actual tab controls', pages.includes("closest('.page-mobile-menu-tabs button[data-page-menu-tab]')") && !pages.includes("closest('[data-page-menu-tab]')") && catalogNavigation.includes(".page-mobile-menu-tabs > button[data-page-menu-tab]")],
+  ['inner-page mobile menu panels have exclusive semantic state', pages.includes("querySelectorAll('[data-page-menu-panel]')") && pages.includes("panel.hidden = !selected") && pages.includes("panel.toggleAttribute('inert', !selected)") && /\[data-page-menu-panel\]\[hidden\]\s*\{\s*display:none!important;/s.test(pagesCss) && catalogNavigation.includes('resetMobileMenus, get categories()')],
+  ['mobile breadcrumbs scroll without wrapping and listing spacing is compact', /\.page-breadcrumb\s*\{[\s\S]*?overflow-x:auto;[\s\S]*?white-space:nowrap;/s.test(pagesCss) && /\.page-section\s*\{\s*padding:22px 0 28px;/s.test(pagesCss)],
   ['seller login is linked from desktop and mobile account entry points', /href="\/satici-girisi\/" class="db-header-vendor-login"/.test(html) && /db-mobile-panel-vendor[^>]*href="\/satici-girisi\/"|href="\/satici-girisi\/"[^>]*db-mobile-panel-vendor/.test(mobilePanels)],
   ['seller registration and login use dedicated auth APIs', /type === 'vendor-login'[\s\S]*authApi\('\/vendor-login'/.test(auth) && /type === 'vendor-register'[\s\S]*authApi\('\/vendor-register'/.test(auth)],
   ['customer and seller registration complete automatic sign-in', /type === 'register'[\s\S]*?authApi\('\/register'[\s\S]*?completeAuthentication\('\/hesabim\/'\)/.test(auth) && /type === 'vendor-register'[\s\S]*?authApi\('\/vendor-register'[\s\S]*?completeAuthentication\('\/satici-paneli\/'\)/.test(auth)],

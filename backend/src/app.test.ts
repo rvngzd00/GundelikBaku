@@ -215,7 +215,11 @@ test('public web səhifələri HTML və canonical metadata ilə render olunur', 
     assert.match(electronics.body, /class="page-category-explorer"/);
     assert.match(electronics.body, /Peşəkar alətlər/);
     assert.match(electronics.body, /href="\/magaza\/elektronika\/elektronika-pesekar-aletler\/simsiz-elektrik-aletleri\/"/);
-    assert.match(electronics.body, /src="\/assets\/js\/catalog-navigation\.js\?v=20260822-2"/);
+    assert.match(electronics.body, /src="\/assets\/js\/catalog-navigation\.js\?v=20260823-2"/);
+    assert.match(electronics.body, /data-page-menu-panel="store" hidden inert/);
+    assert.match(electronics.body, /data-page-menu-panel="navigation"/);
+    assert.match(electronics.body, /aria-controls="page-menu-panel-navigation"/);
+    assert.match(electronics.body, /aria-controls="page-menu-panel-store"/);
     assert.doesNotMatch(electronics.body, />Elan yerləşdir<\//);
 
     const emptySubcategory = await app.inject({ method: 'GET', url: '/magaza/usaq/korpe-baximi/korpe-geyimi/' });

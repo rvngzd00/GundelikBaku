@@ -357,12 +357,12 @@
     });
   }
 
-  globalThis.DailyBakuCatalogNavigation = { render, get categories() { return categoryCache; }, get serviceCategories() { return serviceCategoryCache; } };
+  globalThis.DailyBakuCatalogNavigation = { render, resetMobileMenus, get categories() { return categoryCache; }, get serviceCategories() { return serviceCategoryCache; } };
   new MutationObserver(scheduleRender).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
-    const tab = event.target.closest('.mobile-tabset > .mobile-tab-item, [data-page-menu-tab]');
-    if (tab && !String(tab.textContent || '').trim().includes('Mağaza')) resetMobileMenus();
+    const tab = event.target.closest('.mobile-tabset > .mobile-tab-item, .page-mobile-menu-tabs > button[data-page-menu-tab]');
+    if (tab) resetMobileMenus();
   });
 
   fetch('/api/v1/public/home', { headers: { Accept: 'application/json' } })
