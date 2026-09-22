@@ -681,8 +681,8 @@ export async function webRoutes(app: FastifyInstance): Promise<void> {
       <label>Telefon <small>(istəyə bağlı)</small><input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="+994 12 345 67 89" maxlength="17" pattern="\\+994 [0-9]{2} [0-9]{3} [0-9]{2} [0-9]{2}" data-az-phone></label>
       <fieldset class="db-auth-demographics"><legend>Şəxsi məlumatlar</legend><p>Bu məlumatlar sizə daha uyğun təkliflər göstərməyimizə kömək edir.</p><div class="db-auth-form-grid">
         <label>Yaş<input name="age" type="number" inputmode="numeric" min="1" max="120" step="1" placeholder="Məsələn, 28" required></label>
-        <label>Cinsiyyət<select name="gender" required><option value="" selected disabled>Seçin</option><option value="male">Kişi</option><option value="female">Qadın</option><option value="prefer_not_to_say">Demək istəmirəm</option></select></label>
-        <label class="db-auth-field-wide">Ailə vəziyyəti<select name="maritalStatus" required><option value="" selected disabled>Seçin</option><option value="married">Evli</option><option value="single">Subay</option><option value="prefer_not_to_say">Demək istəmirəm</option></select></label>
+        <label>Cinsiyyət<select name="gender" required><option value="" selected disabled>Seçin</option><option value="male">Kişi</option><option value="female">Qadın</option></select></label>
+        <label class="db-auth-field-wide">Ailə vəziyyəti<select name="maritalStatus" required><option value="" selected disabled>Seçin</option><option value="married">Evli</option><option value="single">Subay</option></select></label>
       </div></fieldset>
       <label>Şifrə<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>Ən az 12 simvol istifadə edin.</small></label>
       <label>Şifrəni təsdiqləyin<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label>

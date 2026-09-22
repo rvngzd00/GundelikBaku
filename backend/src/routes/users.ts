@@ -53,8 +53,8 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       accountType: z.enum(['general', 'vendor', 'all']).default('general'),
       ageMin: z.coerce.number().int().min(1).max(120).optional(),
       ageMax: z.coerce.number().int().min(1).max(120).optional(),
-      gender: z.enum(['male', 'female', 'prefer_not_to_say']).optional(),
-      maritalStatus: z.enum(['married', 'single', 'prefer_not_to_say']).optional()
+      gender: z.enum(['male', 'female']).optional(),
+      maritalStatus: z.enum(['married', 'single']).optional()
     }).superRefine((value, context) => {
       if (value.ageMin !== undefined && value.ageMax !== undefined && value.ageMin > value.ageMax) {
         context.addIssue({ code: 'custom', path: ['ageMax'], message: 'Maksimum yaş minimum yaşdan kiçik ola bilməz' });

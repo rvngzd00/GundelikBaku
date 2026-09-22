@@ -128,11 +128,11 @@ const roleLabels = {
 };
 
 const genderLabels = {
-  male: 'Kişi', female: 'Qadın', prefer_not_to_say: 'Demək istəmir'
+  male: 'Kişi', female: 'Qadın'
 };
 
 const maritalStatusLabels = {
-  married: 'Evli', single: 'Subay', prefer_not_to_say: 'Demək istəmir'
+  married: 'Evli', single: 'Subay'
 };
 
 const createPermissions = {

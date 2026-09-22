@@ -30,8 +30,8 @@ const registerSchema = z.object({
   firstName: z.string().trim().min(2).max(100),
   lastName: z.string().trim().min(2).max(100),
   age: z.coerce.number().int().min(1).max(120),
-  gender: z.enum(['male', 'female', 'prefer_not_to_say']),
-  maritalStatus: z.enum(['married', 'single', 'prefer_not_to_say']),
+  gender: z.enum(['male', 'female']),
+  maritalStatus: z.enum(['married', 'single']),
   password: z.string().min(12).max(200)
 });
 

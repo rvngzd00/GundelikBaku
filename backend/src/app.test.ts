@@ -654,6 +654,7 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     assert.match(registrationPage.body, /name="age"[^>]+type="number"[^>]+min="1"[^>]+max="120"/);
     assert.match(registrationPage.body, /name="gender"[^>]+required/);
     assert.match(registrationPage.body, /name="maritalStatus"[^>]+required/);
+    assert.doesNotMatch(registrationPage.body, /prefer_not_to_say|Demək istəmirəm/);
     const loginPage = await app.inject({ method: 'GET', url: '/giris/' });
     assert.equal(loginPage.statusCode, 200);
     assert.match(loginPage.body, /href="\/satici-girisi\/">Satıcı olaraq daxil ol/);
