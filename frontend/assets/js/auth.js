@@ -211,6 +211,7 @@
         await completeAuthentication('/satici-paneli/');
       } else if (type === 'register') {
         if (!values.phone) delete values.phone;
+        values.age = Number(values.age);
         await authApi('/register', values);
         status.textContent = 'Hesabınız yaradıldı. Yönləndirilirsiniz…';
         status.classList.add('is-success');

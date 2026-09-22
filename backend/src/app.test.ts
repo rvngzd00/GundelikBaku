@@ -651,6 +651,9 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     const registrationPage = await app.inject({ method: 'GET', url: '/qeydiyyat/' });
     assert.equal(registrationPage.statusCode, 200);
     assert.match(registrationPage.body, /href="\/satici-qeydiyyati\/">Partnyorluq üçün qeydiyyatdan keçin/);
+    assert.match(registrationPage.body, /name="age"[^>]+type="number"[^>]+min="1"[^>]+max="120"/);
+    assert.match(registrationPage.body, /name="gender"[^>]+required/);
+    assert.match(registrationPage.body, /name="maritalStatus"[^>]+required/);
     const loginPage = await app.inject({ method: 'GET', url: '/giris/' });
     assert.equal(loginPage.statusCode, 200);
     assert.match(loginPage.body, /href="\/satici-girisi\/">Satıcı olaraq daxil ol/);
@@ -658,6 +661,7 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     assert.equal(vendorRegistrationPage.statusCode, 200);
     assert.match(vendorRegistrationPage.body, /data-auth-form="vendor-register"/);
     assert.match(vendorRegistrationPage.body, /name="displayName"/);
+    assert.doesNotMatch(vendorRegistrationPage.body, /name="(?:age|gender|maritalStatus)"/);
     const vendorLoginPage = await app.inject({ method: 'GET', url: '/satici-girisi/' });
     assert.equal(vendorLoginPage.statusCode, 200);
     assert.match(vendorLoginPage.body, /data-auth-form="vendor-login"/);
@@ -704,8 +708,14 @@ test('satıcı özünü qeydiyyatı pending təsdiq və admin bildirişi axını
     assert.equal(duplicateRegistration.statusCode, 409, duplicateRegistration.body);
     assert.equal(duplicateRegistration.json().error.code, 'VENDOR_EXISTS');
 
-    const owner = await pool.query<{ id: string }>('SELECT id FROM users WHERE email=$1', [vendorEmail]);
+    const owner = await pool.query<{ id: string; age: number | null; gender: string | null; marital_status: string | null }>(
+      'SELECT id,age,gender,marital_status FROM users WHERE email=$1',
+      [vendorEmail]
+    );
     vendorUserId = owner.rows[0]!.id;
+    assert.equal(owner.rows[0]!.age, null);
+    assert.equal(owner.rows[0]!.gender, null);
+    assert.equal(owner.rows[0]!.marital_status, null);
     const pendingLogin = await app.inject({
       method: 'POST', url: '/api/v1/auth/vendor-login', payload: { email: vendorEmail, password: vendorPassword }
     });
@@ -1041,7 +1051,16 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
 
     const registration = await app.inject({
       method: 'POST', url: '/api/v1/auth/register',
-      payload: { email: customerEmail, phone: `+99450${Date.now().toString().slice(-7)}`, firstName: 'Audit', lastName: 'Müştəri', password: customerPassword }
+      payload: {
+        email: customerEmail,
+        phone: `+99450${Date.now().toString().slice(-7)}`,
+        firstName: 'Audit',
+        lastName: 'Müştəri',
+        age: 34,
+        gender: 'female',
+        maritalStatus: 'single',
+        password: customerPassword
+      }
     });
     assert.equal(registration.statusCode, 201);
     assert.deepEqual(registration.json().data.roles, ['customer']);
@@ -1050,6 +1069,27 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
     const customerId = registration.json().data.userId as string;
     createdUserIds.push(customerId);
     const originalCustomerJar = mergeCookies(registration);
+
+    const customerDemographics = await pool.query<{
+      age: number; gender: string; marital_status: string;
+    }>('SELECT age,gender,marital_status FROM users WHERE id=$1', [customerId]);
+    assert.deepEqual(customerDemographics.rows[0], { age: 34, gender: 'female', marital_status: 'single' });
+    const filteredCustomers = await app.inject({
+      method: 'GET',
+      url: '/api/v1/users?accountType=general&ageMin=34&ageMax=34&gender=female&maritalStatus=single&limit=100',
+      headers: authHeaders(adminJar)
+    });
+    assert.equal(filteredCustomers.statusCode, 200, filteredCustomers.body);
+    const filteredCustomer = filteredCustomers.json().data.find((item: { id: string }) => item.id === customerId);
+    assert.ok(filteredCustomer);
+    assert.equal(filteredCustomer.age, 34);
+    assert.equal(filteredCustomer.gender, 'female');
+    assert.equal(filteredCustomer.marital_status, 'single');
+
+    const impossibleAgeRange = await app.inject({
+      method: 'GET', url: '/api/v1/users?ageMin=40&ageMax=20', headers: authHeaders(adminJar)
+    });
+    assert.equal(impossibleAgeRange.statusCode, 400);
 
     const customerMe = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: authHeaders(originalCustomerJar) });
     assert.equal(customerMe.statusCode, 200);
@@ -1088,7 +1128,15 @@ test('qeydiyyat, admin, satıcı, icazə və sessiya axınları birlikdə işlə
 
     const duplicateRegistration = await app.inject({
       method: 'POST', url: '/api/v1/auth/register',
-      payload: { email: customerEmail, firstName: 'Audit', lastName: 'Müştəri', password: customerPassword }
+      payload: {
+        email: customerEmail,
+        firstName: 'Audit',
+        lastName: 'Müştəri',
+        age: 34,
+        gender: 'female',
+        maritalStatus: 'single',
+        password: customerPassword
+      }
     });
     assert.equal(duplicateRegistration.statusCode, 409);
     assert.equal(duplicateRegistration.json().error.code, 'ACCOUNT_EXISTS');

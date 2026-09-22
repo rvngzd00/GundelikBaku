@@ -50,7 +50,15 @@ const userUpdate = z.object({
 export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', { preHandler: app.requirePermission('users.read') }, async (request) => {
     const query = paginationSchema.extend({
-      accountType: z.enum(['general', 'vendor', 'all']).default('general')
+      accountType: z.enum(['general', 'vendor', 'all']).default('general'),
+      ageMin: z.coerce.number().int().min(1).max(120).optional(),
+      ageMax: z.coerce.number().int().min(1).max(120).optional(),
+      gender: z.enum(['male', 'female', 'prefer_not_to_say']).optional(),
+      maritalStatus: z.enum(['married', 'single', 'prefer_not_to_say']).optional()
+    }).superRefine((value, context) => {
+      if (value.ageMin !== undefined && value.ageMax !== undefined && value.ageMin > value.ageMax) {
+        context.addIssue({ code: 'custom', path: ['ageMax'], message: 'Maksimum yaş minimum yaşdan kiçik ola bilməz' });
+      }
     }).parse(request.query);
     const actor = actorOf(request);
     const params: unknown[] = [];
@@ -75,9 +83,25 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       params.push(query.status);
       conditions.push(`u.status::text = $${params.length}`);
     }
+    if (query.ageMin !== undefined) {
+      params.push(query.ageMin);
+      conditions.push(`u.age >= $${params.length}`);
+    }
+    if (query.ageMax !== undefined) {
+      params.push(query.ageMax);
+      conditions.push(`u.age <= $${params.length}`);
+    }
+    if (query.gender) {
+      params.push(query.gender);
+      conditions.push(`u.gender = $${params.length}`);
+    }
+    if (query.maritalStatus) {
+      params.push(query.maritalStatus);
+      conditions.push(`u.marital_status = $${params.length}`);
+    }
     params.push(query.limit, (query.page - 1) * query.limit);
     const result = await pool.query(`
-      SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.status,
+      SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.age, u.gender, u.marital_status, u.status,
         u.last_login_at, u.created_at, u.failed_login_count, u.login_blocked_at, u.login_block_reason,
         array_remove(array_agg(DISTINCT r.code), NULL) AS roles,
         array_remove(array_agg(DISTINCT ur.store_id::text), NULL) AS store_ids,
@@ -98,7 +122,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const id = z.uuid().parse((request.params as { id: string }).id);
     const actor = actorOf(request);
     const result = await pool.query(`
-      SELECT u.id,u.email,u.phone,u.first_name,u.last_name,u.status,u.last_login_at,u.created_at,
+      SELECT u.id,u.email,u.phone,u.first_name,u.last_name,u.age,u.gender,u.marital_status,u.status,u.last_login_at,u.created_at,
         u.failed_login_count,u.login_blocked_at,u.login_block_reason,
         array_remove(array_agg(DISTINCT r.code),NULL) AS roles,
         array_remove(array_agg(DISTINCT ur.store_id::text),NULL) AS store_ids,

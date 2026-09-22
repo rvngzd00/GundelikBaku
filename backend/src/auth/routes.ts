@@ -29,6 +29,9 @@ const registerSchema = z.object({
   phone: azerbaijanPhoneSchema.optional(),
   firstName: z.string().trim().min(2).max(100),
   lastName: z.string().trim().min(2).max(100),
+  age: z.coerce.number().int().min(1).max(120),
+  gender: z.enum(['male', 'female', 'prefer_not_to_say']),
+  maritalStatus: z.enum(['married', 'single', 'prefer_not_to_say']),
   password: z.string().min(12).max(200)
 });
 
@@ -324,9 +327,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         if (!store.rows[0]) throw new AppError(503, 'STORE_UNAVAILABLE', 'Qeydiyyat müvəqqəti əlçatan deyil');
 
         const created = await client.query<{ id: string }>(`
-          INSERT INTO users(email,phone,password_hash,first_name,last_name,status)
-          VALUES($1,$2,$3,$4,$5,'active') RETURNING id
-        `, [input.email, input.phone ?? null, passwordHash, input.firstName, input.lastName]);
+          INSERT INTO users(
+            email,phone,password_hash,first_name,last_name,age,gender,marital_status,status
+          ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'active') RETURNING id
+        `, [
+          input.email,
+          input.phone ?? null,
+          passwordHash,
+          input.firstName,
+          input.lastName,
+          input.age,
+          input.gender,
+          input.maritalStatus
+        ]);
         const id = created.rows[0]!.id;
         const assigned = await client.query(`
           INSERT INTO user_roles(user_id,role_id,store_id)
@@ -345,7 +358,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         await client.query(`
           INSERT INTO audit_logs(store_id,action,entity_type,entity_id,after_data,request_id)
           VALUES($1,'user.register','user',$2,$3,$4)
-        `, [store.rows[0].id, id, JSON.stringify({ email: input.email, roleCode: 'customer' }), request.id]);
+        `, [store.rows[0].id, id, JSON.stringify({
+          email: input.email,
+          roleCode: 'customer',
+          age: input.age,
+          gender: input.gender,
+          maritalStatus: input.maritalStatus
+        }), request.id]);
         return id;
       });
     } catch (error) {

@@ -1,6 +1,6 @@
 import { mountSiteEditor } from './site-editor.js';
 
-const state = { user: null, view: 'dashboard', search: {}, page: {} };
+const state = { user: null, view: 'dashboard', search: {}, page: {}, filters: {} };
 const isVendorPortal = location.pathname.startsWith('/satici-paneli');
 const vendorPortalViews = new Set(['dashboard', 'products', 'reviews', 'inventory', 'orders', 'media', 'classifieds']);
 const moderatorViews = new Set(['products', 'reviews', 'categories', 'brands', 'inventory', 'posts', 'post-categories', 'journal']);
@@ -127,6 +127,14 @@ const roleLabels = {
   moderator: 'Moderator', vendor_owner: 'Satıcı sahibi', vendor_staff: 'Satıcı işçisi', customer: 'Müştəri'
 };
 
+const genderLabels = {
+  male: 'Kişi', female: 'Qadın', prefer_not_to_say: 'Demək istəmir'
+};
+
+const maritalStatusLabels = {
+  married: 'Evli', single: 'Subay', prefer_not_to_say: 'Demək istəmir'
+};
+
 const createPermissions = {
   vendors: 'vendors.manage', 'seller-users': 'users.manage', products: 'catalog.create', categories: 'categories.manage', brands: 'catalog.create', users: 'users.manage', media: 'media.manage',
   posts: 'posts.create', 'post-categories': 'posts.create', pages: 'cms.create', seo: 'seo.manage',
@@ -159,7 +167,8 @@ async function api(path, options = {}, retry = true) {
       initialStock: 'İlkin stok', seoTitle: 'SEO başlığı', seoDescription: 'Meta təsvir', shortDescription: 'Qısa təsvir',
       description: 'Ətraflı təsvir', variant: 'Variant', ownerFirstName: 'Hesab sahibinin adı', ownerLastName: 'Hesab sahibinin soyadı',
       accountEmail: 'Satıcı giriş e-poçtu', accountPassword: 'Satıcı giriş şifrəsi', email: 'E-poçt', phone: 'Telefon',
-      firstName: 'Ad', lastName: 'Soyad', temporaryPassword: 'Müvəqqəti şifrə', newPassword: 'Yeni şifrə', roleCode: 'Rol'
+      firstName: 'Ad', lastName: 'Soyad', temporaryPassword: 'Müvəqqəti şifrə', newPassword: 'Yeni şifrə', roleCode: 'Rol',
+      ageMin: 'Minimum yaş', ageMax: 'Maksimum yaş', gender: 'Cinsiyyət', maritalStatus: 'Ailə vəziyyəti'
     };
     const field = issue?.path?.length ? fieldNames[issue.path[0]] || issue.path.join(' → ') : '';
     const message = issue?.message
@@ -383,6 +392,9 @@ const configs = {
   ] },
   users: { path: '/users', query: { accountType: 'general' }, columns: [
     { label: 'Ad', render: (row) => `${esc(row.first_name)} ${esc(row.last_name)}` }, { label: 'E-poçt', key: 'email' },
+    { label: 'Yaş', render: (row) => row.age == null ? '—' : `${Number(row.age)} yaş` },
+    { label: 'Cinsiyyət', render: (row) => esc(genderLabels[row.gender] || '—') },
+    { label: 'Ailə vəziyyəti', render: (row) => esc(maritalStatusLabels[row.marital_status] || '—') },
     { label: 'Rollar', render: (row) => (row.roles || []).map((role) => `<span class="badge active">${esc(roleLabels[role] || role)}</span>`).join(' ') },
     { label: 'Status', render: userStatus }, { label: 'Son giriş', render: (row) => date(row.last_login_at) },
     { label: '', render: (row) => userActions(row, 'users') }
@@ -437,16 +449,32 @@ const configs = {
 async function listing(view) {
   const config = configs[view];
   const search = state.search[view] || '';
+  const filters = state.filters[view] || {};
   const page = state.page[view] || 1;
   const query = new URLSearchParams({ page: String(page), limit: '20' });
   for (const [key, value] of Object.entries(config.query || {})) query.set(key, value);
   if (search) query.set('search', search);
+  if (view === 'users') {
+    for (const key of ['ageMin', 'ageMax', 'gender', 'maritalStatus']) {
+      if (filters[key] !== undefined && filters[key] !== '') query.set(key, String(filters[key]));
+    }
+  }
   const result = await api(`${config.path}?${query}`);
   const create = createPermissions[view] && can(createPermissions[view])
     ? `<button class="primary" data-create="${view}">+ Yeni əlavə et</button>` : '';
   const meta = result.meta || { page: 1, pages: 1, total: result.data?.length || 0 };
   const pagination = meta.pages > 1 ? `<nav class="pagination" aria-label="Səhifələmə"><button type="button" data-page-view="${view}" data-page="${meta.page - 1}" ${meta.page <= 1 ? 'disabled' : ''}>Əvvəlki</button><span>${meta.page} / ${meta.pages}</span><button type="button" data-page-view="${view}" data-page="${meta.page + 1}" ${meta.page >= meta.pages ? 'disabled' : ''}>Növbəti</button></nav>` : '';
-  return `<div class="page-actions"><form class="table-search" data-search-view="${view}"><input type="search" name="search" value="${esc(search)}" placeholder="Axtar…" aria-label="${esc(labels[view][0])} üzrə axtarış"><button class="secondary" type="submit">Axtar</button></form>${create}</div>${table(config.columns, result.data || [])}<p class="result-meta">${Number(meta.total)} nəticə</p>${pagination}`;
+  const searchForm = view === 'users'
+    ? `<form class="table-search user-filter-form" data-search-view="${view}" data-demographic-filters>
+        <input class="user-filter-search" type="search" name="search" value="${esc(search)}" placeholder="Ad və ya e-poçtla axtar…" aria-label="İstifadəçilər üzrə axtarış">
+        <label><span>Minimum yaş</span><input type="number" name="ageMin" value="${esc(filters.ageMin || '')}" min="1" max="120" inputmode="numeric" placeholder="1"></label>
+        <label><span>Maksimum yaş</span><input type="number" name="ageMax" value="${esc(filters.ageMax || '')}" min="1" max="120" inputmode="numeric" placeholder="120"></label>
+        <label><span>Cinsiyyət</span><select name="gender"><option value="">Hamısı</option>${Object.entries(genderLabels).map(([value, label]) => `<option value="${value}" ${filters.gender === value ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label>
+        <label><span>Ailə vəziyyəti</span><select name="maritalStatus"><option value="">Hamısı</option>${Object.entries(maritalStatusLabels).map(([value, label]) => `<option value="${value}" ${filters.maritalStatus === value ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label>
+        <div class="user-filter-actions"><button class="secondary" type="submit">Filtrlə</button><button class="filter-clear" type="button" data-clear-user-filters>Hamısını sıfırla</button></div>
+      </form>`
+    : `<form class="table-search" data-search-view="${view}"><input type="search" name="search" value="${esc(search)}" placeholder="Axtar…" aria-label="${esc(labels[view][0])} üzrə axtarış"><button class="secondary" type="submit">Axtar</button></form>`;
+  return `<div class="page-actions ${view === 'users' ? 'has-user-filters' : ''}">${searchForm}${create}</div>${table(config.columns, result.data || [])}<p class="result-meta">${Number(meta.total)} nəticə</p>${pagination}`;
 }
 
 async function settings() {
@@ -915,7 +943,10 @@ async function openUserEdit(id, view = 'users') {
   const [{data},vendors]=await Promise.all([api(`/users/${id}`),vendorOptions()]);
   const storeId=data.store_ids?.[0]||state.user.storeIds[0];
   const sellerOnly = view === 'seller-users';
-  showDialog(sellerOnly ? 'Satıcı hesabını redaktə et' : 'İstifadəçini redaktə et',view,userFields(vendors,true,sellerOnly),storeId);
+  const demographics = !sellerOnly && data.roles?.includes('customer')
+    ? `<fieldset class="wide choice-field customer-demographics"><legend>Müştəri məlumatları</legend><div class="detail-grid"><div><span>Yaş</span><strong>${data.age == null ? 'Məlumat yoxdur' : `${Number(data.age)} yaş`}</strong></div><div><span>Cinsiyyət</span><strong>${esc(genderLabels[data.gender] || 'Məlumat yoxdur')}</strong></div><div><span>Ailə vəziyyəti</span><strong>${esc(maritalStatusLabels[data.marital_status] || 'Məlumat yoxdur')}</strong></div></div></fieldset>`
+    : '';
+  showDialog(sellerOnly ? 'Satıcı hesabını redaktə et' : 'İstifadəçini redaktə et',view,userFields(vendors,true,sellerOnly) + demographics,storeId);
   $('#createForm').dataset.recordId=id;
   setDialogValues({firstName:data.first_name,lastName:data.last_name,email:data.email,phone:data.phone||'',status:data.status,roleCode:data.roles?.[0]||'customer',vendorId:data.vendor_ids?.[0]||''});
   const role=$('#createForm').elements.roleCode;
@@ -1239,8 +1270,19 @@ document.addEventListener('submit', async (event) => {
   const searchForm = event.target.closest('[data-search-view]');
   if (searchForm) {
     event.preventDefault();
-    state.search[searchForm.dataset.searchView] = new FormData(searchForm).get('search')?.toString().trim() || '';
-    state.page[searchForm.dataset.searchView] = 1;
+    const formData = new FormData(searchForm);
+    const view = searchForm.dataset.searchView;
+    state.search[view] = formData.get('search')?.toString().trim() || '';
+    if (searchForm.matches('[data-demographic-filters]')) {
+      const ageMin = Number(formData.get('ageMin') || 0);
+      const ageMax = Number(formData.get('ageMax') || 0);
+      if (ageMin && ageMax && ageMin > ageMax) {
+        toast('Maksimum yaş minimum yaşdan kiçik ola bilməz', true);
+        return;
+      }
+      state.filters[view] = Object.fromEntries(['ageMin', 'ageMax', 'gender', 'maritalStatus'].map((key) => [key, formData.get(key)?.toString().trim() || '']));
+    }
+    state.page[view] = 1;
     await render();
     return;
   }
@@ -1321,6 +1363,14 @@ document.addEventListener('change', async (event) => {
 });
 
 document.addEventListener('click', (event) => {
+  const clearUserFilters = event.target.closest('[data-clear-user-filters]');
+  if (clearUserFilters) {
+    state.search.users = '';
+    state.filters.users = {};
+    state.page.users = 1;
+    render();
+    return;
+  }
   const addAttribute = event.target.closest('[data-attribute-add]');
   if (addAttribute) {
     $('[data-product-attributes]').insertAdjacentHTML('beforeend', attributeRow());
